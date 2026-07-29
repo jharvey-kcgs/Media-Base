@@ -103,6 +103,8 @@ versions here rather than generating them from a live `expo install`.
 | `@react-native-async-storage/async-storage` | All local data storage — the entire app's data layer runs on this |
 | `react-native-get-random-values`, `uuid` | Generates unique IDs for every stored item |
 | `expo-camera` | Camera access + permission status for the optional barcode-scan shortcut and the Permissions settings page |
+| `isbn3` | Real ISBN validation/hyphenation for the Books ISBN field - bundles the official ISBN-agency range data, since hyphen placement isn't a fixed pattern that could be hand-written |
+| `@expo/vector-icons` | Icons used in headers/menus - Home screen's cog (Settings) and play (refresh), Books' "•••" menu |
 | `expo-font`, `@expo-google-fonts/jetbrains-mono` | The app's JetBrains Mono typeface (Extra Bold for titles/headers, Regular for everything else) |
 | `expo-splash-screen` | Holds the launch splash until JetBrains Mono finishes loading, so there's no flash of the system font |
 
@@ -205,14 +207,29 @@ building Comics/Manga, Movies, etc.:
   case-insensitive) against anything already tracked - other than the
   item currently being edited - blocks the save with an alert instead of
   creating a second copy.
+- **Live ISBN formatting/validation (Books specifically)**: as digits are
+  typed, once there are 10 or 13 of them the field reformats itself with
+  the real, official hyphen positions (via `isbn3`, which bundles the
+  actual ISBN-agency range data - there's no fixed pattern like a phone
+  number that could be hand-written for this) and checks the checksum
+  digit, showing "✓ Valid ISBN" or a "check digit doesn't look right"
+  warning immediately - catching a mistyped digit before it ever reaches
+  the lookup below. This doesn't block saving; it's advisory only.
 - **Optional ISBN field (Books specifically)**: filling it in and moving
-  to the next field triggers an automatic lookup against the Google Books
-  API (free, no key needed) and fills Title/Author/Genre/Page count -
-  same end result as scanning, without needing the camera wired up yet.
-  Not network-testable from the sandbox this was built in - worth
-  confirming on a real device that Google's response shape hasn't
-  changed. Categories without a clean ISBN-equivalent (Movies use UPC,
-  which is messier - see the Roadmap doc) will need their own lookup
+  to the next field triggers an automatic lookup - Open Library first
+  (verified reliable for exact-ISBN matches; requires the descriptive
+  `User-Agent` header their API asks for, or requests can be silently
+  rate-limited), falling back to Google Books if Open Library has no
+  match - and fills
+  Title/Author/Genre/Page count. Same end result as scanning, without
+  needing the camera wired up yet. Neither database has 100% ISBN
+  coverage on its own (a specific printing/edition can be missing from
+  one but not the other), which is why both get checked rather than
+  just one. Not network-testable from the sandbox this was built in -
+  API errors and "genuinely no match" both log a `console.warn('Media
+  Base: ...')` to help tell those apart if it still comes back empty for
+  a real ISBN. Categories without a clean ISBN-equivalent (Movies use
+  UPC, which is messier - see the Roadmap doc) will need their own lookup
   approach rather than copying this one directly.
 - **A-Z index** on the right edge, only shown when sorted by an
   alphabetical field (Title/Genre/Author here) - tapping a letter jumps

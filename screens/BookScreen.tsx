@@ -24,6 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
@@ -101,6 +102,8 @@ export default function BookScreen({ navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
+  const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [isbnGroup, setIsbnGroup] = useState('');
   const sectionListRef = useRef<SectionList<Book>>(null);
 
   const load = useCallback(async () => {
@@ -131,6 +134,7 @@ export default function BookScreen({ navigation }: any) {
   const openAdd = () => {
     setEditingId(null);
     setDraft(EMPTY_DRAFT);
+    setIsbnStatus('idle');
     setModalVisible(true);
   };
 
@@ -146,6 +150,14 @@ export default function BookScreen({ navigation }: any) {
       rating: book.rating ?? 0,
       review: book.review,
     });
+    const digits = (book.isbn ?? '').replace(/[^0-9Xx]/g, '');
+    if (digits.length === 10 || digits.length === 13) {
+      const parsed = ISBN.parse(digits);
+      setIsbnStatus(parsed?.isValid ? 'valid' : 'invalid');
+      setIsbnGroup(parsed?.groupname ?? '');
+    } else {
+      setIsbnStatus('idle');
+    }
     setModalVisible(true);
   };
 
@@ -204,23 +216,104 @@ export default function BookScreen({ navigation }: any) {
     Alert.alert('Barcode scanning', "Scanning is coming in a future update - for now, try the ISBN field below, or enter the details by hand.");
   };
 
+  // Fires on every keystroke in the ISBN field. Once there are enough
+  // digits for a real ISBN (10 or 13), reformats with the *official*
+  // hyphen positions via isbn3 (which bundles the real ISBN-agency range
+  // data - hand-rolling this wasn't possible since hyphen placement isn't
+  // a fixed pattern) and checks the checksum digit, so a typo shows up
+  // immediately rather than only failing later at lookup/save time.
+  const handleIsbnChange = (text: string) => {
+    const digits = text.replace(/[^0-9Xx]/g, '');
+    if (digits.length !== 10 && digits.length !== 13) {
+      setIsbnStatus('idle');
+      setDraft((d) => ({ ...d, isbn: digits }));
+      return;
+    }
+    try {
+      const parsed = ISBN.parse(digits);
+      if (parsed?.isValid) {
+        setIsbnStatus('valid');
+        setIsbnGroup(parsed.groupname ?? '');
+        setDraft((d) => ({ ...d, isbn: (parsed.isIsbn13 ? parsed.isbn13h : parsed.isbn10h) || digits }));
+        return;
+      }
+      setIsbnStatus('invalid');
+    } catch (err) {
+      console.warn('Media Base: isbn3 parse failed', err);
+      setIsbnStatus('idle');
+    }
+    setDraft((d) => ({ ...d, isbn: digits }));
+  };
+
   // Fires when the (optional) ISBN field loses focus, if it looks like a
-  // real ISBN. Uses the Google Books API - free, no key required for a
-  // lookup like this. NOTE: not network-testable from the sandbox this
-  // was written in: worth confirming on-device that the response shape
-  // (items[0].volumeInfo.{title,authors,categories,pageCount}) still
-  // matches, since Google could change it without notice.
+  // real ISBN. Tries Open Library first, then Google Books as a fallback.
+  // Open Library is the primary source deliberately: verified via a real
+  // lookup that it has clean, complete data for a real ISBN that Google
+  // Books came back empty for. Open Library's docs also ask every caller
+  // to send a descriptive User-Agent - without one, requests can be
+  // silently rate-limited/blocked, which is exactly the kind of failure
+  // that looks identical to "not found" unless it's logged separately.
+  // NOTE: not network-testable from the sandbox this was written in - if
+  // this still comes back empty for an ISBN you know is real, check the
+  // Metro/dev console for the "Media Base:" warnings this logs; that'll
+  // show whether it's an API error/block versus neither database
+  // actually having that specific edition indexed.
+  const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
+
+  const lookupOpenLibrary = async (digits: string) => {
+    const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${digits}&format=json&jscmd=data`, {
+      headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT },
+    });
+    if (!res.ok) {
+      console.warn('Media Base: Open Library returned', res.status);
+      return null;
+    }
+    const json = await res.json();
+    const info = json?.[`ISBN:${digits}`];
+    if (!info) return null; // genuinely not indexed - not an error worth logging
+    return {
+      title: info.title as string | undefined,
+      authors: Array.isArray(info.authors) ? info.authors.map((a: any) => a.name).filter(Boolean) : undefined,
+      categories: Array.isArray(info.subjects) ? info.subjects.map((s: any) => s.name).filter(Boolean) : undefined,
+      pageCount: info.number_of_pages as number | undefined,
+    };
+  };
+
+  const lookupGoogleBooks = async (digits: string) => {
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${digits}`);
+    if (!res.ok) {
+      console.warn('Media Base: Google Books returned', res.status);
+      return null;
+    }
+    const json = await res.json();
+    if (json?.error) {
+      console.warn('Media Base: Google Books API error', json.error);
+      return null;
+    }
+    return json?.items?.[0]?.volumeInfo ?? null;
+  };
+
   const handleIsbnBlur = async () => {
     const digits = draft.isbn.replace(/[^0-9Xx]/g, '');
     if (digits.length !== 10 && digits.length !== 13) return;
 
     setLookingUp(true);
     try {
-      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${digits}`);
-      const json = await res.json();
-      const info = json?.items?.[0]?.volumeInfo;
+      let info = await lookupOpenLibrary(digits).catch((err) => {
+        console.warn('Media Base: Open Library lookup threw', err);
+        return null;
+      });
       if (!info) {
-        Alert.alert("Couldn't find that ISBN", 'No match in the book database - you can still fill in the details by hand.');
+        info = await lookupGoogleBooks(digits).catch((err) => {
+          console.warn('Media Base: Google Books lookup threw', err);
+          return null;
+        });
+      }
+      if (!info) {
+        Alert.alert(
+          "Couldn't find that ISBN",
+          'No match in either book database checked - you can still fill in the details by hand.',
+        );
         return;
       }
       setDraft((d) => ({
@@ -230,7 +323,8 @@ export default function BookScreen({ navigation }: any) {
         genre: (info.categories && info.categories[0]) || d.genre,
         pageCount: info.pageCount ? String(info.pageCount) : d.pageCount,
       }));
-    } catch {
+    } catch (err) {
+      console.warn('Media Base: ISBN lookup failed', err);
       Alert.alert('Lookup failed', 'Could not reach the book database - check your connection, or fill in the details by hand.');
     } finally {
       setLookingUp(false);
@@ -389,13 +483,23 @@ export default function BookScreen({ navigation }: any) {
               </AppText>
               <TextInput
                 value={draft.isbn}
-                onChangeText={(text) => setDraft((d) => ({ ...d, isbn: text }))}
+                onChangeText={handleIsbnChange}
                 onBlur={handleIsbnBlur}
                 keyboardType="number-pad"
-                placeholder="e.g. 9781398710390"
+                placeholder="e.g. 978-1-4767-5318-8"
                 placeholderTextColor={theme.colors.textMuted}
                 style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
               />
+              {isbnStatus === 'valid' && (
+                <AppText style={{ color: theme.colors.success, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
+                  ✓ Valid ISBN{isbnGroup ? ` · ${isbnGroup}` : ''}
+                </AppText>
+              )}
+              {isbnStatus === 'invalid' && (
+                <AppText style={{ color: theme.colors.danger, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
+                  ⚠ That check digit doesn't look right - double-check the numbers
+                </AppText>
+              )}
               {lookingUp && (
                 <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
                   Looking up...
