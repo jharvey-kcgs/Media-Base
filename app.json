@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Media Base",
+    "slug": "media-base",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.JHarvey.MediaBase",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Media Base uses the camera to scan barcodes so you can add media without typing everything by hand. This is always optional - you can enter items manually instead."
+      }
+    },
+    "android": {
+      "package": "com.JHarvey.MediaBase",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": ["CAMERA"]
+    },
+    "plugins": []
+  }
+}
