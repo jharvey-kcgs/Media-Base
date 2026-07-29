@@ -14,7 +14,7 @@
       "package": "com.JHarvey.MediaBase",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#000000"
       }
     },
     "plugins": [
@@ -22,6 +22,16 @@
         "expo-camera",
         {
           "cameraPermission": "Media Base uses the camera to scan barcodes so you can add media without typing everything by hand. This is always optional - you can enter items manually instead."
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
         }
       ]
     ]

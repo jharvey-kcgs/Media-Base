@@ -1,8 +1,9 @@
 // screens/OnboardingScreen.tsx
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppText from '../components/AppText';
 import { useTheme } from '../lib/theme';
 import { saveSettings } from '../lib/storage';
 import { ALL_CATEGORIES, CATEGORY_LABELS, MediaCategory, DEFAULT_SETTINGS } from '../types/models';
@@ -32,12 +33,12 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 24 * theme.fontScale }]}>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 24 * theme.fontScale }]}>
           Welcome to Media Base
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textSecondary, fontSize: 15 * theme.fontScale }]}>
+        </AppText>
+        <AppText style={[styles.subtitle, { color: theme.colors.textSecondary, fontSize: 15 * theme.fontScale }]}>
           Pick the kinds of media you want to track. You can change this anytime in Settings.
-        </Text>
+        </AppText>
 
         {ALL_CATEGORIES.map((cat) => {
           const selected = picked.has(cat);
@@ -53,14 +54,14 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 },
               ]}
             >
-              <Text
+              <AppText
                 style={{
                   color: selected ? theme.colors.accentText : theme.colors.text,
                   fontSize: 16 * theme.fontScale,
                 }}
               >
                 {CATEGORY_LABELS[cat]}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           );
         })}
@@ -75,15 +76,14 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
             { backgroundColor: picked.size === 0 ? theme.colors.border : theme.colors.accent },
           ]}
         >
-          <Text
+          <AppText
             style={{
               color: picked.size === 0 ? theme.colors.textMuted : theme.colors.accentText,
               fontSize: 16 * theme.fontScale,
-              fontWeight: '600',
             }}
           >
             Continue
-          </Text>
+          </AppText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -93,7 +93,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: 20, paddingBottom: 8 },
-  title: { fontWeight: '700', marginBottom: 6 },
+  title: { marginBottom: 6 },
   subtitle: { marginBottom: 20 },
   row: {
     borderWidth: 1,

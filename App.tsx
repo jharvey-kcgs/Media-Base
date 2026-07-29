@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, StatusBar } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts, JetBrainsMono_400Regular, JetBrainsMono_800ExtraBold } from '@expo-google-fonts/jetbrains-mono';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
@@ -18,6 +20,11 @@ import { getSettings } from './lib/storage';
 import { ThemeProvider, useTheme } from './lib/theme';
 
 const Stack = createNativeStackNavigator();
+
+// Keep the native splash screen visible until JetBrains Mono has loaded -
+// without this, Expo hides it as soon as the JS bundle starts, which is
+// before the font is ready and would show a flash of the system font first.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function RootGate() {
   const { theme, refreshSettings } = useTheme();
@@ -82,6 +89,22 @@ function ThemedApp() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    JetBrainsMono_400Regular,
+    JetBrainsMono_800ExtraBold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    // Native splash screen is still showing on top of this.
+    return null;
+  }
+
   return (
     <ThemeProvider>
       <RootGate />

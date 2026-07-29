@@ -1,8 +1,9 @@
 // screens/FAQScreen.tsx
 
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppText from '../components/AppText';
 import { useTheme } from '../lib/theme';
 
 const FAQS: { q: string; a: string }[] = [
@@ -27,19 +28,23 @@ export default function FAQScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>FAQ</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
+          FAQ
+        </AppText>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {FAQS.map((item) => (
           <View key={item.q} style={styles.item}>
-            <Text style={[styles.q, { color: theme.colors.text, fontSize: 15 * theme.fontScale }]}>{item.q}</Text>
-            <Text style={[styles.a, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+            <AppText variant="header" style={[styles.q, { color: theme.colors.text, fontSize: 15 * theme.fontScale }]}>
+              {item.q}
+            </AppText>
+            <AppText style={[styles.a, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
               {item.a}
-            </Text>
+            </AppText>
           </View>
         ))}
       </ScrollView>
@@ -57,9 +62,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   content: { padding: 20, paddingTop: 8 },
   item: { marginBottom: 18 },
-  q: { fontWeight: '600', marginBottom: 4 },
+  q: { marginBottom: 4 },
   a: { lineHeight: 20 },
 });

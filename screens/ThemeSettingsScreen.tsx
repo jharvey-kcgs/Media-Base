@@ -1,8 +1,9 @@
 // screens/ThemeSettingsScreen.tsx
 
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppText from '../components/AppText';
 import { useTheme, THEME_COLOR_OPTIONS } from '../lib/theme';
 import { AppSettings } from '../types/models';
 
@@ -15,16 +16,18 @@ export default function ThemeSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>Theme</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
+          Theme
+        </AppText>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
           Theme color
-        </Text>
+        </AppText>
         <View style={styles.swatchRow}>
           {THEME_COLOR_OPTIONS.map((opt) => (
             <TouchableOpacity
@@ -42,9 +45,9 @@ export default function ThemeSettingsScreen({ navigation }: any) {
           ))}
         </View>
 
-        <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
+        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
           Mode
-        </Text>
+        </AppText>
         <View style={styles.choiceRow}>
           {(['light', 'dark'] as const).map((mode) => (
             <TouchableOpacity
@@ -58,7 +61,7 @@ export default function ThemeSettingsScreen({ navigation }: any) {
                 },
               ]}
             >
-              <Text
+              <AppText
                 style={{
                   color: settings.themeMode === mode ? theme.colors.accentText : theme.colors.text,
                   fontSize: 15 * theme.fontScale,
@@ -66,14 +69,14 @@ export default function ThemeSettingsScreen({ navigation }: any) {
                 }}
               >
                 {mode}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
+        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
           Text size
-        </Text>
+        </AppText>
         <View style={styles.choiceRow}>
           {FONT_SIZES.map((size) => (
             <TouchableOpacity
@@ -87,7 +90,7 @@ export default function ThemeSettingsScreen({ navigation }: any) {
                 },
               ]}
             >
-              <Text
+              <AppText
                 style={{
                   color: settings.fontSize === size ? theme.colors.accentText : theme.colors.text,
                   fontSize: 15 * theme.fontScale,
@@ -95,7 +98,7 @@ export default function ThemeSettingsScreen({ navigation }: any) {
                 }}
               >
                 {size}
-              </Text>
+              </AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   content: { padding: 20, paddingTop: 8 },
   label: { marginBottom: 10 },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

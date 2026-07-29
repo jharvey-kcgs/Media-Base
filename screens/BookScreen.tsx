@@ -3,7 +3,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   FlatList,
   TextInput,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AppText, { FONT_FAMILY } from '../components/AppText';
 import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook } from '../lib/storage';
 import { Book, BookSortField } from '../types/models';
@@ -48,6 +48,8 @@ interface DraftState {
 }
 
 const EMPTY_DRAFT: DraftState = { title: '', genre: '', author: '', pageCount: '', read: false, rating: 0, review: '' };
+
+const INPUT_FONT = { fontFamily: FONT_FAMILY.body };
 
 export default function BookScreen({ navigation }: any) {
   const { theme } = useTheme();
@@ -140,11 +142,13 @@ export default function BookScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Home</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Home</AppText>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>Books</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
+          Books
+        </AppText>
         <TouchableOpacity onPress={openAdd}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>+ Add</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>+ Add</AppText>
         </TouchableOpacity>
       </View>
 
@@ -161,14 +165,14 @@ export default function BookScreen({ navigation }: any) {
               },
             ]}
           >
-            <Text
+            <AppText
               style={{
                 color: sortField === opt.field ? theme.colors.accentText : theme.colors.text,
                 fontSize: 13 * theme.fontScale,
               }}
             >
               {opt.label}
-            </Text>
+            </AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -178,9 +182,9 @@ export default function BookScreen({ navigation }: any) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Text style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
+          <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
             No books yet. Tap + Add to track your first one.
-          </Text>
+          </AppText>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -188,15 +192,15 @@ export default function BookScreen({ navigation }: any) {
             onLongPress={() => handleDelete(item.id)}
             style={[styles.card, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
           >
-            <Text style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale, fontWeight: '600' }}>
+            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
               {item.title}
-            </Text>
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
+            </AppText>
+            <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
               {item.author} · {item.genre} · {item.pageCount} pages
-            </Text>
-            <Text style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
+            </AppText>
+            <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
               {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
-            </Text>
+            </AppText>
           </TouchableOpacity>
         )}
       />
@@ -205,13 +209,13 @@ export default function BookScreen({ navigation }: any) {
         <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Cancel</Text>
+              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
             </TouchableOpacity>
-            <Text style={[styles.title, { color: theme.colors.text, fontSize: 18 * theme.fontScale }]}>
+            <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 18 * theme.fontScale }]}>
               {editingId ? 'Edit book' : 'Add book'}
-            </Text>
+            </AppText>
             <TouchableOpacity onPress={handleSave}>
-              <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale, fontWeight: '600' }}>Save</Text>
+              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Save</AppText>
             </TouchableOpacity>
           </View>
 
@@ -220,36 +224,36 @@ export default function BookScreen({ navigation }: any) {
               onPress={handleScanPress}
               style={[styles.scanButton, { borderColor: theme.colors.accent }]}
             >
-              <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</Text>
+              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
             </TouchableOpacity>
 
             {(['title', 'genre', 'author'] as const).map((field) => (
               <View key={field} style={styles.field}>
-                <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
                   {field[0].toUpperCase() + field.slice(1)} *
-                </Text>
+                </AppText>
                 <TextInput
                   value={draft[field]}
                   onChangeText={(text) => setDraft((d) => ({ ...d, [field]: text }))}
-                  style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
                 />
               </View>
             ))}
 
             <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
                 Page count *
-              </Text>
+              </AppText>
               <TextInput
                 value={draft.pageCount}
                 onChangeText={(text) => setDraft((d) => ({ ...d, pageCount: text }))}
                 keyboardType="number-pad"
-                style={[styles.input, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
               />
             </View>
 
             <View style={[styles.row, { marginTop: 8 }]}>
-              <Text style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale }}>Read this? *</Text>
+              <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale }}>Read this? *</AppText>
               <Switch
                 value={draft.read}
                 onValueChange={(read) => setDraft((d) => ({ ...d, read }))}
@@ -259,27 +263,27 @@ export default function BookScreen({ navigation }: any) {
 
             {draft.read && (
               <>
-                <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
+                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
                   Rating
-                </Text>
+                </AppText>
                 <View style={styles.starRow}>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <TouchableOpacity key={n} onPress={() => setDraft((d) => ({ ...d, rating: n }))}>
-                      <Text style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accent : theme.colors.border }}>
+                      <AppText style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accent : theme.colors.border }}>
                         ★
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   ))}
                 </View>
 
-                <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
+                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
                   Review
-                </Text>
+                </AppText>
                 <TextInput
                   value={draft.review}
                   onChangeText={(text) => setDraft((d) => ({ ...d, review: text }))}
                   multiline
-                  style={[styles.input, styles.multiline, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  style={[styles.input, styles.multiline, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
                 />
               </>
             )}
@@ -300,7 +304,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   sortRow: { flexGrow: 0, marginBottom: 8 },
   sortChip: { borderWidth: 1, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8 },
   list: { padding: 20, paddingTop: 0 },

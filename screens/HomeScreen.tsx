@@ -1,9 +1,10 @@
 // screens/HomeScreen.tsx
 
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import AppText from '../components/AppText';
 import { useTheme } from '../lib/theme';
 import { getBooks } from '../lib/storage';
 import { Book, CATEGORY_LABELS, MediaCategory } from '../types/models';
@@ -45,17 +46,19 @@ export default function HomeScreen({ navigation }: any) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 22 * theme.fontScale }]}>Media Base</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 22 * theme.fontScale }]}>
+          Media Base
+        </AppText>
         <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Settings</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Settings</AppText>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {settings.categories.length === 0 && (
-          <Text style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale }}>
+          <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale }}>
             No categories selected yet. Head to Settings → Profile to pick some.
-          </Text>
+          </AppText>
         )}
 
         {settings.categories.map((cat) => {
@@ -69,25 +72,25 @@ export default function HomeScreen({ navigation }: any) {
               onPress={() => route && navigation.navigate(route)}
               style={[styles.widget, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
             >
-              <Text style={[styles.widgetTitle, { color: theme.colors.text, fontSize: 17 * theme.fontScale }]}>
+              <AppText variant="header" style={[styles.widgetTitle, { color: theme.colors.text, fontSize: 17 * theme.fontScale }]}>
                 {CATEGORY_LABELS[cat]}
-              </Text>
+              </AppText>
 
               {isBooks ? (
                 <>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
+                  <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
                     {bookCount} {bookCount === 1 ? 'book' : 'books'} tracked
-                  </Text>
+                  </AppText>
                   {suggestedBook && (
-                    <Text style={{ color: theme.colors.accent, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
+                    <AppText style={{ color: theme.colors.accent, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
                       Try today: {suggestedBook.title}
-                    </Text>
+                    </AppText>
                   )}
                 </>
               ) : (
-                <Text style={{ color: theme.colors.textMuted, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
+                <AppText style={{ color: theme.colors.textMuted, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
                   Coming soon
-                </Text>
+                </AppText>
               )}
             </TouchableOpacity>
           );
@@ -107,7 +110,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   content: { padding: 20, paddingTop: 8 },
   widget: {
     borderWidth: 1,
@@ -115,5 +118,5 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
-  widgetTitle: { fontWeight: '600' },
+  widgetTitle: {},
 });

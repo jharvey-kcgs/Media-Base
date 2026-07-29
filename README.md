@@ -102,6 +102,8 @@ versions here rather than generating them from a live `expo install`.
 | `@react-native-async-storage/async-storage` | All local data storage — the entire app's data layer runs on this |
 | `react-native-get-random-values`, `uuid` | Generates unique IDs for every stored item |
 | `expo-camera` | Camera access + permission status for the optional barcode-scan shortcut and the Permissions settings page |
+| `expo-font`, `@expo-google-fonts/jetbrains-mono` | The app's JetBrains Mono typeface (Extra Bold for titles/headers, Regular for everything else) |
+| `expo-splash-screen` | Holds the launch splash until JetBrains Mono finishes loading, so there's no flash of the system font |
 
 If you ever need to add a **new** native dependency, always use
 `npx expo install <package>` rather than plain `npm install` — it picks
@@ -118,9 +120,6 @@ npx expo start
 Scan the QR code with the iPhone's Camera app — it offers to open in
 Expo Go, and the app runs live on the phone. Saving any code change shows
 up in about a second.
-
-**Before your first run:** drop a real `assets/icon.png` in — this
-scaffold doesn't ship one yet, and `app.json` references it.
 
 ---
 
@@ -155,6 +154,17 @@ lib/
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
 
+components/
+  AppText.tsx                      Drop-in replacement for RN's <Text> -
+                                     applies JetBrains Mono (Extra Bold for
+                                     variant="header", Regular by default).
+                                     Every screen imports Text from here,
+                                     not from 'react-native'. TextInputs
+                                     aren't covered by this (RN doesn't
+                                     route TextInput through Text) - they
+                                     get `fontFamily: FONT_FAMILY.body`
+                                     set directly instead.
+
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book
                                     shape, AppSettings. Add a field here
@@ -162,7 +172,7 @@ types/models.ts                   Every TypeScript type and shared
                                     stores.
 
 assets/
-  icon.png                         App icon (not yet added)
+  icon.png                         App icon (1024x1024)
 ```
 
 ### Where to make common changes
@@ -248,7 +258,11 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 
 - **Bundle identifier**: set (`com.JHarvey.MediaBase`, both iOS and
   Android, in `app.json`).
-- **App icon**: not yet added.
+- **App icon**: added (`assets/icon.png`, 1024x1024) - also used as the
+  Android adaptive icon foreground and the splash screen image, both on a
+  black background matching the logo's own background.
+- **Typography**: JetBrains Mono throughout - Extra Bold for titles and
+  section headers, Regular for everything else, via `components/AppText.tsx`.
 - **Data safety**: export/import/delete-all all implemented in Settings
   → Data, not yet tested end-to-end on-device.
 - **Permissions**: camera status + Phone Settings link implemented;

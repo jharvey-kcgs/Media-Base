@@ -1,8 +1,9 @@
 // screens/DataSettingsScreen.tsx
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Share, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, TextInput, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppText, { FONT_FAMILY } from '../components/AppText';
 import { useTheme } from '../lib/theme';
 import { exportAllData, importAllData, deleteAllData } from '../lib/storage';
 
@@ -50,9 +51,11 @@ export default function DataSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>Data</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
+          Data
+        </AppText>
         <View style={{ width: 60 }} />
       </View>
 
@@ -61,12 +64,12 @@ export default function DataSettingsScreen({ navigation }: any) {
           onPress={handleExport}
           style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
         >
-          <Text style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Export data</Text>
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Export data</AppText>
         </TouchableOpacity>
 
-        <Text style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+        <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
           Paste a Media Base backup below to import it
-        </Text>
+        </AppText>
         <TextInput
           value={importText}
           onChangeText={setImportText}
@@ -75,7 +78,12 @@ export default function DataSettingsScreen({ navigation }: any) {
           placeholderTextColor={theme.colors.textMuted}
           style={[
             styles.input,
-            { color: theme.colors.text, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+            {
+              color: theme.colors.text,
+              borderColor: theme.colors.border,
+              backgroundColor: theme.colors.surface,
+              fontFamily: FONT_FAMILY.body,
+            },
           ]}
         />
         <TouchableOpacity
@@ -86,14 +94,14 @@ export default function DataSettingsScreen({ navigation }: any) {
             { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, opacity: importText.trim() ? 1 : 0.5 },
           ]}
         >
-          <Text style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Import data</Text>
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Import data</AppText>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={handleDelete}
           style={[styles.button, styles.dangerButton, { borderColor: theme.colors.danger }]}
         >
-          <Text style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</Text>
+          <AppText style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</AppText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -110,7 +118,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   content: { padding: 20, paddingTop: 8 },
   label: { marginTop: 20, marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, minHeight: 100, textAlignVertical: 'top' },

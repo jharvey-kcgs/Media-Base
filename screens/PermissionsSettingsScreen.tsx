@@ -1,9 +1,10 @@
 // screens/PermissionsSettingsScreen.tsx
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, Linking, Alert } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
+import AppText from '../components/AppText';
 import { useTheme } from '../lib/theme';
 
 export default function PermissionsSettingsScreen({ navigation }: any) {
@@ -47,19 +48,21 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</Text>
+          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>Permissions</Text>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
+          Permissions
+        </AppText>
         <View style={{ width: 60 }} />
       </View>
 
       <View style={styles.content}>
         <View style={[styles.row, { borderColor: theme.colors.border }]}>
           <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Camera access</Text>
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
+            <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Camera access</AppText>
+            <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
               Only used for the optional barcode-scan shortcut when adding an entry.
-            </Text>
+            </AppText>
           </View>
           <Switch
             value={granted}
@@ -72,7 +75,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
           onPress={() => Linking.openSettings()}
           style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
         >
-          <Text style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Open Phone Settings</Text>
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Open Phone Settings</AppText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  title: { fontWeight: '700' },
+  title: {},
   content: { padding: 20, paddingTop: 8 },
   row: {
     flexDirection: 'row',
