@@ -1,9 +1,10 @@
 // screens/ProfileSettingsScreen.tsx
 
 import React from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet, Switch } from 'react-native';
+import { View, ScrollView, StyleSheet, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { getSettings, saveSettings } from '../lib/storage';
 import { ALL_CATEGORIES, CATEGORY_LABELS, MediaCategory } from '../types/models';
@@ -23,16 +24,8 @@ export default function ProfileSettingsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Profile
-        </AppText>
-        <View style={{ width: 60 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="Profile" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <AppText style={[styles.hint, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
         Turning a category off hides it from Home but keeps its data - turn it back on anytime.
@@ -56,15 +49,6 @@ export default function ProfileSettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   hint: { paddingHorizontal: 20, paddingBottom: 8 },
   content: { padding: 20, paddingTop: 8 },
   row: {

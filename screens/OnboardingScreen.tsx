@@ -2,14 +2,30 @@
 
 import React, { useState } from 'react';
 import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useTheme } from '../lib/theme';
 import { saveSettings } from '../lib/storage';
 import { ALL_CATEGORIES, CATEGORY_LABELS, MediaCategory, DEFAULT_SETTINGS } from '../types/models';
 
+// Simple visual variety per category so the list isn't just plain rows of
+// text - a real illustration set is a nice-to-have for later, this is the
+// quick version.
+const CATEGORY_ICONS: Record<MediaCategory, string> = {
+  books: '📚',
+  comics: '💥',
+  movies: '🎬',
+  tvshows: '📺',
+  anime: '🎌',
+  music: '🎵',
+  vinyl: '💿',
+  puzzles: '🧩',
+  boardgames: '🎲',
+};
+
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<Set<MediaCategory>>(new Set());
 
   const toggle = (cat: MediaCategory) => {
@@ -31,9 +47,9 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 24 * theme.fontScale }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 28 }]}>
+        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 26 * theme.fontScale }]}>
           Welcome to Media Base
         </AppText>
         <AppText style={[styles.subtitle, { color: theme.colors.textSecondary, fontSize: 15 * theme.fontScale }]}>
@@ -54,6 +70,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 },
               ]}
             >
+              <AppText style={styles.icon}>{CATEGORY_ICONS[cat]}</AppText>
               <AppText
                 style={{
                   color: selected ? theme.colors.accentText : theme.colors.text,
@@ -93,15 +110,18 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: 20, paddingBottom: 8 },
-  title: { marginBottom: 6 },
-  subtitle: { marginBottom: 20 },
+  title: { marginBottom: 6, textAlign: 'center' },
+  subtitle: { marginBottom: 24, textAlign: 'center' },
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 10,
   },
+  icon: { fontSize: 22, marginRight: 12 },
   footer: { padding: 20, paddingTop: 8 },
   continueButton: {
     borderRadius: 10,

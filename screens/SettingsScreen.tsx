@@ -4,6 +4,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 
 const ROWS: { label: string; route: string }[] = [
@@ -19,16 +20,8 @@ export default function SettingsScreen({ navigation }: any) {
   const { theme } = useTheme();
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Home</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Settings
-        </AppText>
-        <View style={{ width: 50 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="Settings" onBack={() => navigation.goBack()} backLabel="Home" />
 
       <View style={styles.content}>
         {ROWS.map((row) => (
@@ -48,15 +41,6 @@ export default function SettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
   row: {
     flexDirection: 'row',

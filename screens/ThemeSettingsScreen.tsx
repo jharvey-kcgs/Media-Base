@@ -4,6 +4,7 @@ import React from 'react';
 import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme, THEME_COLOR_OPTIONS } from '../lib/theme';
 import { AppSettings } from '../types/models';
 
@@ -13,39 +14,39 @@ export default function ThemeSettingsScreen({ navigation }: any) {
   const { theme, settings, setThemeColor, setThemeMode, setFontSize } = useTheme();
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Theme
-        </AppText>
-        <View style={{ width: 60 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="Theme" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <ScrollView contentContainerStyle={styles.content}>
         <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
           Theme color
         </AppText>
-        <View style={styles.swatchRow}>
-          {THEME_COLOR_OPTIONS.map((opt) => (
-            <TouchableOpacity
-              key={opt.hex}
-              onPress={() => setThemeColor(opt.hex)}
-              style={[
-                styles.swatch,
-                {
-                  backgroundColor: opt.hex,
-                  borderColor: settings.themeColor === opt.hex ? theme.colors.text : theme.colors.border,
-                  borderWidth: settings.themeColor === opt.hex ? 3 : 1,
-                },
-              ]}
-            />
-          ))}
+        <View style={styles.swatchGrid}>
+          {THEME_COLOR_OPTIONS.map((opt) => {
+            const selected = settings.themeColor === opt.hex;
+            return (
+              <TouchableOpacity
+                key={opt.hex}
+                onPress={() => setThemeColor(opt.hex)}
+                style={[
+                  styles.swatchItem,
+                  {
+                    borderColor: selected ? theme.colors.text : theme.colors.border,
+                    borderWidth: selected ? 2 : 1,
+                    backgroundColor: theme.colors.surface,
+                  },
+                ]}
+              >
+                <View style={[styles.swatch, { backgroundColor: opt.hex, borderColor: theme.colors.border }]} />
+                <AppText style={{ color: theme.colors.text, fontSize: 13 * theme.fontScale, marginTop: 6 }}>
+                  {opt.name}
+                </AppText>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
+        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 28 }]}>
           Mode
         </AppText>
         <View style={styles.choiceRow}>
@@ -74,7 +75,7 @@ export default function ThemeSettingsScreen({ navigation }: any) {
           ))}
         </View>
 
-        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 24 }]}>
+        <AppText variant="header" style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 28 }]}>
           Text size
         </AppText>
         <View style={styles.choiceRow}>
@@ -109,19 +110,11 @@ export default function ThemeSettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
   label: { marginBottom: 10 },
-  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  swatch: { width: 40, height: 40, borderRadius: 20 },
+  swatchGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  swatchItem: { width: 76, borderRadius: 10, alignItems: 'center', paddingVertical: 10 },
+  swatch: { width: 32, height: 32, borderRadius: 16, borderWidth: 1 },
   choiceRow: { flexDirection: 'row', gap: 10 },
   choice: { borderWidth: 1, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
 });

@@ -5,6 +5,7 @@ import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 
 export default function PermissionsSettingsScreen({ navigation }: any) {
@@ -12,9 +13,6 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
   const [permission, requestPermission] = useCameraPermissions();
 
   const granted = permission?.granted ?? false;
-  // "Can ask again" is false once the user has explicitly denied it before -
-  // at that point iOS/Android no longer let an app re-prompt, so the only
-  // way back in is the Phone Settings app.
   const canAskAgain = permission?.canAskAgain ?? true;
 
   const handleToggle = async (wantsOn: boolean) => {
@@ -32,7 +30,6 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
       }
       await requestPermission();
     } else {
-      // Apps can't revoke a permission on their own - only the OS settings can.
       Alert.alert(
         'Turn off camera access',
         'This has to be done from Phone Settings, not from inside Media Base.',
@@ -45,16 +42,8 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Permissions
-        </AppText>
-        <View style={{ width: 60 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="Permissions" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <View style={styles.content}>
         <View style={[styles.row, { borderColor: theme.colors.border }]}>
@@ -84,15 +73,6 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
   row: {
     flexDirection: 'row',

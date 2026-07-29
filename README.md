@@ -12,9 +12,10 @@ alongside the in-app About/FAQ screens as more categories get built.*
 3. [Running the dev server](#3-running-the-dev-server)
 4. [What's here — project structure](#4-whats-here--project-structure)
 5. [Permissions](#5-permissions)
-6. [Known setup gotchas](#6-known-setup-gotchas)
-7. [Status](#7-status)
-8. [Roadmap (genuinely open, not yet built)](#8-roadmap-genuinely-open-not-yet-built)
+6. [Color accessibility](#6-color-accessibility)
+7. [Known setup gotchas](#7-known-setup-gotchas)
+8. [Status](#8-status)
+9. [Roadmap (genuinely open, not yet built)](#9-roadmap-genuinely-open-not-yet-built)
 
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
@@ -164,6 +165,20 @@ components/
                                      route TextInput through Text) - they
                                      get `fontFamily: FONT_FAMILY.body`
                                      set directly instead.
+  ScreenHeader.tsx                  Every screen's header goes through
+                                     this - centered title (same size
+                                     everywhere), a smaller back link on
+                                     the left (or a custom left/right node
+                                     for icons/Cancel/Save), and safe-area
+                                     padding read directly via
+                                     useSafeAreaInsets rather than relying
+                                     only on the parent SafeAreaView. That
+                                     second part matters: SafeAreaView's
+                                     automatic inset isn't reliable inside
+                                     a <Modal> on iOS, which is what made
+                                     Cancel/Save unreachable under the
+                                     status bar on the Add/Edit Book
+                                     screen before this existed.
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book
@@ -218,7 +233,39 @@ worth knowing before changing anything in
 
 ---
 
-## 6. Known setup gotchas
+## 6. Color accessibility
+
+The app supports a user-selected accent color (10 options, including
+White and Black) across both Light and Dark mode, which means the same
+color has to stay legible in combinations it was never individually
+designed for - e.g. a "White" accent picked while in Light mode, or
+"Black" picked while in Dark mode, would otherwise be invisible. The fix,
+in `lib/theme.tsx`:
+
+- **`accent`** - the user's true, unmodified color choice. Use ONLY for
+  filled backgrounds (buttons, active chips/switches, the swatch tile
+  itself in Theme settings) - not as a text or icon color.
+- **`accentText`** - text/icons placed on top of a *filled* `accent`
+  background. Picks whichever of black/white has the actual higher WCAG
+  contrast ratio against that specific accent, not a brightness guess.
+- **`accentReadable`** - the accent color used as *plain* text, an icon,
+  or a border directly on the screen's own background (back links, the
+  Home screen's cog/play icons, star ratings, "Try today" text). If the
+  raw accent color doesn't hit 4.5:1 against the current background, this
+  walks its HSL *lightness* toward the background (preserving hue) until
+  it does - so a "Yellow" pick still reads as recognizably yellow, just a
+  shade deep enough to be legible, rather than silently becoming plain
+  black or white. White and Black themselves land here too: picked as an
+  accent against a same-shade background, this is what keeps them from
+  disappearing entirely.
+
+Every screen was audited to use `accentReadable` for foreground use and
+`accent` only for fills - not yet re-verified against all 10 colors ×
+Light/Dark on a real device the way Home Base's equivalent system was.
+
+---
+
+## 7. Known setup gotchas
 
 Carried over from Home Base/League Base's setup experience, since this
 project uses the identical Node/Expo stack — nothing below has needed
@@ -254,7 +301,7 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 
 ---
 
-## 7. Status
+## 8. Status
 
 - **Bundle identifier**: set (`com.JHarvey.MediaBase`, both iOS and
   Android, in `app.json`).
@@ -263,6 +310,10 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
   black background matching the logo's own background.
 - **Typography**: JetBrains Mono throughout - Extra Bold for titles and
   section headers, Regular for everything else, via `components/AppText.tsx`.
+- **Header consistency & contrast**: every screen uses
+  `components/ScreenHeader.tsx` (centered title, consistent size, safe-area
+  fix for the Modal issue) and `accentReadable` for foreground color -
+  see [Section 6](#6-color-accessibility).
 - **Data safety**: export/import/delete-all all implemented in Settings
   → Data, not yet tested end-to-end on-device.
 - **Permissions**: camera status + Phone Settings link implemented;
@@ -275,7 +326,7 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 
 ---
 
-## 8. Roadmap (genuinely open, not yet built)
+## 9. Roadmap (genuinely open, not yet built)
 
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a

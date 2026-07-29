@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AppText, { FONT_FAMILY } from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook } from '../lib/storage';
 import { Book, BookSortField } from '../types/models';
@@ -139,18 +140,17 @@ export default function BookScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Home</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Books
-        </AppText>
-        <TouchableOpacity onPress={openAdd}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>+ Add</AppText>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader
+        title="Books"
+        onBack={() => navigation.goBack()}
+        backLabel="Home"
+        right={
+          <TouchableOpacity onPress={openAdd}>
+            <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>+ Add</AppText>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortRow} contentContainerStyle={{ paddingHorizontal: 20 }}>
         {SORT_FIELDS.map((opt) => (
@@ -206,25 +206,31 @@ export default function BookScreen({ navigation }: any) {
       />
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
-            </TouchableOpacity>
-            <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 18 * theme.fontScale }]}>
-              {editingId ? 'Edit book' : 'Add book'}
-            </AppText>
-            <TouchableOpacity onPress={handleSave}>
-              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Save</AppText>
-            </TouchableOpacity>
-          </View>
+        <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+          <ScreenHeader
+            title={editingId ? 'Edit book' : 'Add book'}
+            left={
+              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
+              </TouchableOpacity>
+            }
+            right={
+              <TouchableOpacity onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Save</AppText>
+              </TouchableOpacity>
+            }
+          />
 
           <ScrollView contentContainerStyle={styles.form}>
+            <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
+              * required
+            </AppText>
+
             <TouchableOpacity
               onPress={handleScanPress}
-              style={[styles.scanButton, { borderColor: theme.colors.accent }]}
+              style={[styles.scanButton, { borderColor: theme.colors.accentReadable }]}
             >
-              <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
+              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
             </TouchableOpacity>
 
             {(['title', 'genre', 'author'] as const).map((field) => (
@@ -253,7 +259,9 @@ export default function BookScreen({ navigation }: any) {
             </View>
 
             <View style={[styles.row, { marginTop: 8 }]}>
-              <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale }}>Read this? *</AppText>
+              <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>
+                Have you read this book? *
+              </AppText>
               <Switch
                 value={draft.read}
                 onValueChange={(read) => setDraft((d) => ({ ...d, read }))}
@@ -269,7 +277,7 @@ export default function BookScreen({ navigation }: any) {
                 <View style={styles.starRow}>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <TouchableOpacity key={n} onPress={() => setDraft((d) => ({ ...d, rating: n }))}>
-                      <AppText style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accent : theme.colors.border }}>
+                      <AppText style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accentReadable : theme.colors.border }}>
                         ★
                       </AppText>
                     </TouchableOpacity>
@@ -296,15 +304,6 @@ export default function BookScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   sortRow: { flexGrow: 0, marginBottom: 8 },
   sortChip: { borderWidth: 1, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8 },
   list: { padding: 20, paddingTop: 0 },
@@ -316,5 +315,5 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   starRow: { flexDirection: 'row', gap: 8 },
-  scanButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 18 },
+  scanButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 8 },
 });

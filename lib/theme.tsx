@@ -14,8 +14,9 @@ export interface ThemeColors {
   textSecondary: string;
   textMuted: string;
   border: string;
-  accent: string;
-  accentText: string; // readable text color to place on top of `accent`
+  accent: string; // the user's raw chosen color - use ONLY for filled backgrounds (buttons, active chips, swatches)
+  accentText: string; // text/icons placed ON TOP of a filled `accent` background
+  accentReadable: string; // `accent` used as plain text/icon/border color directly on the screen background
   danger: string;
   success: string;
 }
@@ -38,6 +39,8 @@ export const THEME_COLOR_OPTIONS: { name: string; hex: string }[] = [
   { name: 'White', hex: '#FFFFFF' },
   { name: 'Black', hex: '#000000' },
 ];
+
+// --- WCAG contrast math ---
 
 function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
@@ -66,33 +69,105 @@ function contrastTextColor(hex: string): string {
   return withBlack >= withWhite ? '#000000' : '#FFFFFF';
 }
 
+function hexToHsl(hex: string): [number, number, number] {
+  const [r0, g0, b0] = hexToRgb(hex).map((v) => v / 255);
+  const max = Math.max(r0, g0, b0);
+  const min = Math.min(r0, g0, b0);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case r0:
+        h = ((g0 - b0) / d) % 6;
+        break;
+      case g0:
+        h = (b0 - r0) / d + 2;
+        break;
+      default:
+        h = (r0 - g0) / d + 4;
+    }
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return [h, s, l];
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r, g, b] = [0, 0, 0];
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+/**
+ * Walks the accent color's HSL lightness toward the background until it
+ * passes 4.5:1 (WCAG AA for text), preserving hue/saturation so e.g. a
+ * "Yellow" pick still reads as yellow rather than falling back to a flat
+ * black/white. This is what makes every one of the 10 theme colors -
+ * including White and Black, which fail outright against a same-shade
+ * background - actually readable as plain text/icon color in both modes.
+ */
+function accentReadableFor(accentHex: string, backgroundHex: string): string {
+  if (contrastRatio(accentHex, backgroundHex) >= 4.5) return accentHex;
+  const [h, s, l] = hexToHsl(accentHex);
+  const bgIsLight = relativeLuminance(hexToRgb(backgroundHex)) > 0.5;
+  for (let step = 1; step <= 25; step++) {
+    const delta = step * 0.035;
+    const newL = bgIsLight ? Math.max(0, l - delta) : Math.min(1, l + delta);
+    const candidate = hslToHex(h, s, newL);
+    if (contrastRatio(candidate, backgroundHex) >= 4.5) return candidate;
+  }
+  return bgIsLight ? '#000000' : '#FFFFFF';
+}
+
 function buildTheme(mode: 'light' | 'dark', accent: string, fontSize: AppSettings['fontSize']): Theme {
   const fontScale = fontSize === 'small' ? 0.9 : fontSize === 'large' ? 1.2 : 1;
-  const light: ThemeColors = {
-    background: '#FFFFFF',
-    surface: '#F4F3F0',
-    text: '#1A1A18',
-    textSecondary: '#5F5E5A',
-    textMuted: '#888780',
-    border: '#D3D1C7',
+  const background = mode === 'dark' ? '#17181A' : '#FFFFFF';
+  const colorsBase =
+    mode === 'dark'
+      ? {
+          background: '#17181A',
+          surface: '#232427',
+          text: '#EDEDEB',
+          textSecondary: '#B4B2A9',
+          textMuted: '#888780',
+          border: '#3A3B3E',
+          danger: '#F09595',
+          success: '#97C459',
+        }
+      : {
+          background: '#FFFFFF',
+          surface: '#F4F3F0',
+          text: '#1A1A18',
+          textSecondary: '#5F5E5A',
+          textMuted: '#888780',
+          border: '#D3D1C7',
+          danger: '#A32D2D',
+          success: '#3B6D11',
+        };
+
+  const colors: ThemeColors = {
+    ...colorsBase,
     accent,
     accentText: contrastTextColor(accent),
-    danger: '#A32D2D',
-    success: '#3B6D11',
+    accentReadable: accentReadableFor(accent, background),
   };
-  const dark: ThemeColors = {
-    background: '#17181A',
-    surface: '#232427',
-    text: '#EDEDEB',
-    textSecondary: '#B4B2A9',
-    textMuted: '#888780',
-    border: '#3A3B3E',
-    accent,
-    accentText: contrastTextColor(accent),
-    danger: '#F09595',
-    success: '#97C459',
-  };
-  return { mode, colors: mode === 'dark' ? dark : light, fontScale };
+
+  return { mode, colors, fontScale };
 }
 
 interface ThemeContextValue {

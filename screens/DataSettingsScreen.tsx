@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, TextInput, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText, { FONT_FAMILY } from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { exportAllData, importAllData, deleteAllData } from '../lib/storage';
 
@@ -48,16 +49,8 @@ export default function DataSettingsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          Data
-        </AppText>
-        <View style={{ width: 60 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="Data" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <View style={styles.content}>
         <TouchableOpacity
@@ -110,15 +103,6 @@ export default function DataSettingsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
   label: { marginTop: 20, marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, minHeight: 100, textAlignVertical: 'top' },

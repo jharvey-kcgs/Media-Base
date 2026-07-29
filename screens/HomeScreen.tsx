@@ -1,10 +1,12 @@
 // screens/HomeScreen.tsx
 
 import React, { useCallback, useState } from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { getBooks } from '../lib/storage';
 import { Book, CATEGORY_LABELS, MediaCategory } from '../types/models';
@@ -33,26 +35,33 @@ export default function HomeScreen({ navigation }: any) {
   const [suggestedBook, setSuggestedBook] = useState<Book | null>(null);
   const [bookCount, setBookCount] = useState(0);
 
+  const load = useCallback(async () => {
+    const books = await getBooks();
+    setBookCount(books.length);
+    setSuggestedBook(pickRandomUnread(books));
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        const books = await getBooks();
-        setBookCount(books.length);
-        setSuggestedBook(pickRandomUnread(books));
-      })();
-    }, []),
+      load();
+    }, [load]),
   );
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 22 * theme.fontScale }]}>
-          Media Base
-        </AppText>
-        <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>Settings</AppText>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader
+        title="Media Base"
+        left={
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="settings-outline" size={24} color={theme.colors.accentReadable} />
+          </TouchableOpacity>
+        }
+        right={
+          <TouchableOpacity onPress={load} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="play" size={24} color={theme.colors.accentReadable} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.content}>
         {settings.categories.length === 0 && (
@@ -72,7 +81,7 @@ export default function HomeScreen({ navigation }: any) {
               onPress={() => route && navigation.navigate(route)}
               style={[styles.widget, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
             >
-              <AppText variant="header" style={[styles.widgetTitle, { color: theme.colors.text, fontSize: 17 * theme.fontScale }]}>
+              <AppText variant="header" style={{ color: theme.colors.text, fontSize: 17 * theme.fontScale }}>
                 {CATEGORY_LABELS[cat]}
               </AppText>
 
@@ -82,7 +91,7 @@ export default function HomeScreen({ navigation }: any) {
                     {bookCount} {bookCount === 1 ? 'book' : 'books'} tracked
                   </AppText>
                   {suggestedBook && (
-                    <AppText style={{ color: theme.colors.accent, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
+                    <AppText style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
                       Try today: {suggestedBook.title}
                     </AppText>
                   )}
@@ -102,15 +111,6 @@ export default function HomeScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
   widget: {
     borderWidth: 1,
@@ -118,5 +118,4 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
-  widgetTitle: {},
 });

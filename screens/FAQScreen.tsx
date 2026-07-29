@@ -1,9 +1,10 @@
 // screens/FAQScreen.tsx
 
 import React from 'react';
-import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
+import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 
 const FAQS: { q: string; a: string }[] = [
@@ -25,24 +26,23 @@ export default function FAQScreen({ navigation }: any) {
   const { theme } = useTheme();
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <AppText style={{ color: theme.colors.accent, fontSize: 15 * theme.fontScale }}>‹ Settings</AppText>
-        </TouchableOpacity>
-        <AppText variant="header" style={[styles.title, { color: theme.colors.text, fontSize: 20 * theme.fontScale }]}>
-          FAQ
-        </AppText>
-        <View style={{ width: 60 }} />
-      </View>
+    <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+      <ScreenHeader title="FAQ" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <ScrollView contentContainerStyle={styles.content}>
-        {FAQS.map((item) => (
-          <View key={item.q} style={styles.item}>
-            <AppText variant="header" style={[styles.q, { color: theme.colors.text, fontSize: 15 * theme.fontScale }]}>
+        {FAQS.map((item, i) => (
+          <View
+            key={item.q}
+            style={[
+              styles.card,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              i === FAQS.length - 1 && { marginBottom: 0 },
+            ]}
+          >
+            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, marginBottom: 6 }}>
               {item.q}
             </AppText>
-            <AppText style={[styles.a, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+            <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 20 }}>
               {item.a}
             </AppText>
           </View>
@@ -54,17 +54,11 @@ export default function FAQScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  title: {},
   content: { padding: 20, paddingTop: 8 },
-  item: { marginBottom: 18 },
-  q: { marginBottom: 4 },
-  a: { lineHeight: 20 },
+  card: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+  },
 });
