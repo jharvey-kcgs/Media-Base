@@ -56,7 +56,7 @@ export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
 export interface Book {
   id: string;
   title: string;
-  genre: string;
+  genres: string[]; // a book can carry more than one genre tag; index 0 is treated as "primary" for sorting/A-Z grouping
   author: string;
   pageCount: number | null;
   isbn: string; // optional - if filled in, triggers the same auto-fill lookup as scanning

@@ -2,11 +2,13 @@
 //
 // This is the reference pattern for every future category screen
 // (Comics/Manga, Movies, TV Shows, etc.): a clean list with all actions
-// tucked behind a "•••" menu (Add / Filter by / Delete) rather than
-// visible buttons/chips, tap-to-edit on any row (with Delete living
-// inside that edit screen too), a same-title duplicate guard on save,
-// and - for alphabetical sort fields - a right-edge A-Z index for
-// jumping around a long list.
+// tucked behind a "•••" menu (Add / Filter by sort field / Filter by
+// genre / Delete) rather than visible buttons/chips, tap-to-edit on any
+// row (with Delete living inside that edit screen too), a same-title
+// duplicate guard on save, multi-genre entries (a book can carry more
+// than one genre tag, and a genre filter matches if any tag fits), and -
+// for alphabetical sort fields - a right-edge A-Z index for jumping
+// around a long list.
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -43,20 +45,65 @@ const SORT_FIELDS: { field: BookSortField; label: string }[] = [
 const ALPHA_FIELDS: BookSortField[] = ['title', 'genre', 'author'];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+// Broad classifications that should sort *after* more specific genre tags
+// (e.g. a book auto-tagged "Fiction, Romance, Contemporary" should show as
+// "Romance, Contemporary, Fiction" - Fiction on its own tells you nothing
+// useful once you already have a more specific tag).
+const GENERIC_GENRE_TERMS = new Set(['fiction', 'nonfiction', 'non-fiction']);
+
+function titleCaseTag(tag: string): string {
+  return tag
+    .trim()
+    .split(' ')
+    .map((w) => (w.length ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(' ');
+}
+
+// Turns whatever a lookup API returned into a clean, ordered genre list.
+// Google Books often returns one BISAC-style string per entry ("Fiction /
+// Romance / Contemporary") - those get split apart. Open Library's subject
+// list is long and noisy (bestseller-list mentions, character/setting
+// keywords, foreign-language duplicates of the same tag) with the
+// genuinely useful genre tags consistently appearing first for mainstream
+// titles, so this caps to the first few raw entries rather than pulling in
+// the whole list.
+function normalizeGenres(rawCategories: string[] | undefined): string[] {
+  if (!rawCategories || rawCategories.length === 0) return [];
+  const flattened = rawCategories.flatMap((c) => c.split('/').map((part) => part.trim()).filter(Boolean));
+  const capped = flattened.slice(0, 3);
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const tag of capped) {
+    const cased = titleCaseTag(tag);
+    const key = cased.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(cased);
+    }
+  }
+  const specific = deduped.filter((t) => !GENERIC_GENRE_TERMS.has(t.toLowerCase()));
+  const generic = deduped.filter((t) => GENERIC_GENRE_TERMS.has(t.toLowerCase()));
+  return [...specific, ...generic];
+}
+
 function sortBooks(books: Book[], field: BookSortField): Book[] {
   const copy = [...books];
   copy.sort((a, b) => {
     if (field === 'pageCount') return (a.pageCount ?? 0) - (b.pageCount ?? 0);
     if (field === 'read') return Number(a.read) - Number(b.read);
+    if (field === 'genre') return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '');
     return String(a[field]).localeCompare(String(b[field]));
   });
   return copy;
 }
 
+// Genre grouping/sorting uses genres[0] ("primary" tag) as the key -
+// Title/Author still read directly off the book.
 function groupByFirstLetter(sorted: Book[], field: 'title' | 'genre' | 'author'): { title: string; data: Book[] }[] {
+  const getKey = (item: Book) => (field === 'genre' ? item.genres[0] ?? '' : String(item[field] ?? ''));
   const groups: Record<string, Book[]> = {};
   for (const item of sorted) {
-    const raw = String(item[field] ?? '').trim();
+    const raw = getKey(item).trim();
     const letter = raw[0]?.toUpperCase() ?? '#';
     const key = /[A-Z]/.test(letter) ? letter : '#';
     if (!groups[key]) groups[key] = [];
@@ -69,7 +116,7 @@ function groupByFirstLetter(sorted: Book[], field: 'title' | 'genre' | 'author')
 
 interface DraftState {
   title: string;
-  genre: string;
+  genresText: string; // comma-separated as typed; parsed into an array on save
   author: string;
   pageCount: string;
   isbn: string;
@@ -80,7 +127,7 @@ interface DraftState {
 
 const EMPTY_DRAFT: DraftState = {
   title: '',
-  genre: '',
+  genresText: '',
   author: '',
   pageCount: '',
   isbn: '',
@@ -98,6 +145,7 @@ export default function BookScreen({ navigation }: any) {
   const { theme } = useTheme();
   const [books, setBooks] = useState<Book[]>([]);
   const [sortField, setSortField] = useState<BookSortField>('title');
+  const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
@@ -116,7 +164,19 @@ export default function BookScreen({ navigation }: any) {
     }, [load]),
   );
 
-  const sorted = useMemo(() => sortBooks(books, sortField), [books, sortField]);
+  const allGenres = useMemo(() => {
+    const set = new Set<string>();
+    books.forEach((b) => b.genres.forEach((g) => set.add(g)));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [books]);
+
+  const filteredBooks = useMemo(
+    () =>
+      genreFilter ? books.filter((b) => b.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : books,
+    [books, genreFilter],
+  );
+
+  const sorted = useMemo(() => sortBooks(filteredBooks, sortField), [filteredBooks, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
   const isAlpha = ALPHA_FIELDS.includes(sortField);
   const sections = useMemo(
@@ -142,7 +202,7 @@ export default function BookScreen({ navigation }: any) {
     setEditingId(book.id);
     setDraft({
       title: book.title,
-      genre: book.genre,
+      genresText: book.genres.join(', '),
       author: book.author,
       pageCount: book.pageCount != null ? String(book.pageCount) : '',
       isbn: book.isbn ?? '',
@@ -175,13 +235,27 @@ export default function BookScreen({ navigation }: any) {
     ]);
   };
 
-  const openFilterMenu = () => {
+  const openSortMenu = () => {
     Alert.alert(
-      'Filter by',
+      'Sort by',
       undefined,
       SORT_FIELDS.map((opt) => ({ text: opt.label, onPress: () => setSortField(opt.field) })).concat([
         { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
       ]),
+    );
+  };
+
+  const openGenreFilterMenu = () => {
+    if (allGenres.length === 0) {
+      Alert.alert('No genres yet', 'Add a book with a genre first.');
+      return;
+    }
+    Alert.alert(
+      'Filter by genre',
+      'A book shows up if it has this genre among its tags.',
+      [{ text: 'All genres', onPress: () => setGenreFilter(null) }]
+        .concat(allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })))
+        .concat([{ text: 'Cancel', style: 'cancel' as const, onPress: () => {} }]),
     );
   };
 
@@ -203,7 +277,8 @@ export default function BookScreen({ navigation }: any) {
   const openMenu = () => {
     Alert.alert('Books', undefined, [
       { text: '+ Add entry', onPress: openAdd },
-      { text: 'Filter by...', onPress: openFilterMenu },
+      { text: 'Filter by...', onPress: openSortMenu },
+      { text: 'Filter by genre...', onPress: openGenreFilterMenu },
       { text: '- Delete entry', style: 'destructive', onPress: openDeleteMenu },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -316,11 +391,12 @@ export default function BookScreen({ navigation }: any) {
         );
         return;
       }
+      const genres = normalizeGenres(info.categories);
       setDraft((d) => ({
         ...d,
         title: info.title || d.title,
         author: (info.authors && info.authors[0]) || d.author,
-        genre: (info.categories && info.categories[0]) || d.genre,
+        genresText: genres.length > 0 ? genres.join(', ') : d.genresText,
         pageCount: info.pageCount ? String(info.pageCount) : d.pageCount,
       }));
     } catch (err) {
@@ -332,8 +408,13 @@ export default function BookScreen({ navigation }: any) {
   };
 
   const handleSave = async () => {
-    if (!draft.title.trim() || !draft.genre.trim() || !draft.author.trim() || !draft.pageCount.trim()) {
-      Alert.alert('Missing info', 'Title, genre, author, and page count are all required.');
+    const genres = draft.genresText
+      .split(',')
+      .map((g) => g.trim())
+      .filter(Boolean);
+
+    if (!draft.title.trim() || genres.length === 0 || !draft.author.trim() || !draft.pageCount.trim()) {
+      Alert.alert('Missing info', 'Title, at least one genre, author, and page count are all required.');
       return;
     }
     const pageCount = parseInt(draft.pageCount, 10);
@@ -354,7 +435,7 @@ export default function BookScreen({ navigation }: any) {
 
     const payload = {
       title: draft.title.trim(),
-      genre: draft.genre.trim(),
+      genres,
       author: draft.author.trim(),
       pageCount,
       isbn: draft.isbn.trim(),
@@ -381,7 +462,7 @@ export default function BookScreen({ navigation }: any) {
         {item.title}
       </AppText>
       <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-        {item.author} · {item.genre} · {item.pageCount} pages
+        {item.author} · {item.genres.join(', ')} · {item.pageCount} pages
       </AppText>
       <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
         {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
@@ -391,7 +472,7 @@ export default function BookScreen({ navigation }: any) {
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
-      No books yet. Tap ••• to add your first one.
+      {genreFilter ? `No books tagged "${genreFilter}" yet.` : 'No books yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -408,9 +489,16 @@ export default function BookScreen({ navigation }: any) {
         }
       />
 
-      <AppText style={[styles.sortLabel, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }]}>
-        Sorted by {sortLabel}
-      </AppText>
+      <View style={styles.metaRow}>
+        <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }}>Sorted by {sortLabel}</AppText>
+        {genreFilter && (
+          <TouchableOpacity onPress={() => setGenreFilter(null)}>
+            <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale, marginLeft: 8 }}>
+              · Genre: {genreFilter} ✕
+            </AppText>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={styles.flex}>
         {isAlpha ? (
@@ -507,18 +595,38 @@ export default function BookScreen({ navigation }: any) {
               )}
             </View>
 
-            {(['title', 'genre', 'author'] as const).map((field) => (
-              <View key={field} style={styles.field}>
-                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                  {field[0].toUpperCase() + field.slice(1)} *
-                </AppText>
-                <TextInput
-                  value={draft[field]}
-                  onChangeText={(text) => setDraft((d) => ({ ...d, [field]: text }))}
-                  style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-                />
-              </View>
-            ))}
+            <View style={styles.field}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                Title *
+              </AppText>
+              <TextInput
+                value={draft.title}
+                onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
+                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                Genre(s) * (comma-separated, e.g. Romance, Contemporary)
+              </AppText>
+              <TextInput
+                value={draft.genresText}
+                onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
+                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                Author *
+              </AppText>
+              <TextInput
+                value={draft.author}
+                onChangeText={(text) => setDraft((d) => ({ ...d, author: text }))}
+                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              />
+            </View>
 
             <View style={styles.field}>
               <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
@@ -590,7 +698,7 @@ export default function BookScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  sortLabel: { paddingHorizontal: 20, marginBottom: 8 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 8, flexWrap: 'wrap' },
   list: { padding: 20, paddingTop: 0 },
   sectionHeader: { paddingVertical: 4, marginBottom: 4 },
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },

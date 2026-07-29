@@ -198,8 +198,8 @@ assets/
 building Comics/Manga, Movies, etc.:
 - Header right slot is a **"•••" menu** (`Ionicons ellipsis-horizontal`),
   not a persistent "+ Add" button or a visible filter-chip row - tapping
-  it shows **+ Add entry / Filter by... / - Delete entry**, keeping the
-  main list screen clean. "Filter by..." and "- Delete entry" each open a
+  it shows **+ Add entry / Filter by... / Filter by genre... / - Delete
+  entry**, keeping the main list screen clean. Each of those opens a
   second native picker (also `Alert.alert` with one button per option).
 - **Tapping any row opens it for editing** - every field is editable, and
   a **Delete** button lives inside that same edit screen.
@@ -207,6 +207,13 @@ building Comics/Manga, Movies, etc.:
   case-insensitive) against anything already tracked - other than the
   item currently being edited - blocks the save with an alert instead of
   creating a second copy.
+- **Multi-genre entries**: a book can carry more than one genre tag
+  (entered comma-separated, e.g. "Romance, Contemporary"). `genres[0]` is
+  treated as the "primary" tag for sorting and the A-Z index; **"Filter by
+  genre..."** in the ••• menu shows every distinct tag currently in use
+  and narrows the list to books that have that tag *anywhere* in their
+  list, not just as the primary one. The active filter shows next to
+  "Sorted by X" and clears with a tap.
 - **Live ISBN formatting/validation (Books specifically)**: as digits are
   typed, once there are 10 or 13 of them the field reformats itself with
   the real, official hyphen positions (via `isbn3`, which bundles the
@@ -220,17 +227,23 @@ building Comics/Manga, Movies, etc.:
   (verified reliable for exact-ISBN matches; requires the descriptive
   `User-Agent` header their API asks for, or requests can be silently
   rate-limited), falling back to Google Books if Open Library has no
-  match - and fills
-  Title/Author/Genre/Page count. Same end result as scanning, without
-  needing the camera wired up yet. Neither database has 100% ISBN
-  coverage on its own (a specific printing/edition can be missing from
-  one but not the other), which is why both get checked rather than
-  just one. Not network-testable from the sandbox this was built in -
-  API errors and "genuinely no match" both log a `console.warn('Media
-  Base: ...')` to help tell those apart if it still comes back empty for
-  a real ISBN. Categories without a clean ISBN-equivalent (Movies use
-  UPC, which is messier - see the Roadmap doc) will need their own lookup
-  approach rather than copying this one directly.
+  match - and fills Title/Author/Genre(s)/Page count. Genre tags get
+  normalized: Google's often-slash-joined BISAC strings ("Fiction /
+  Romance / Contemporary") get split apart, results are capped to the
+  first 3 raw tags (Open Library's subject list gets noisy fast -
+  bestseller-list mentions, character/setting keywords - past the first
+  few), and generic classifications like "Fiction" sort *after* more
+  specific tags like "Romance" rather than crowding them out. Same end
+  result as scanning, without needing the camera wired up yet. Neither
+  database has 100% ISBN coverage on its own (a specific printing/edition
+  can be missing from one but not the other), which is why both get
+  checked rather than just one. Not network-testable from the sandbox
+  this was built in - API errors and "genuinely no match" both log a
+  `console.warn('Media Base: ...')` to help tell those apart if it still
+  comes back empty for a real ISBN. Categories without a clean
+  ISBN-equivalent (Movies use UPC, which is messier - see the Roadmap
+  doc) will need their own lookup approach rather than copying this one
+  directly.
 - **A-Z index** on the right edge, only shown when sorted by an
   alphabetical field (Title/Genre/Author here) - tapping a letter jumps
   to the nearest section at or after it. Not shown for non-alphabetical
@@ -238,10 +251,11 @@ building Comics/Manga, Movies, etc.:
 
 **Known limitation worth knowing before relying on this further:**
 `Alert.alert` shows unlimited buttons on iOS but caps at 3 on Android -
-fine for now since only iOS is targeted, but the Filter/Delete menus (5
-and up-to-10 options respectively) will need a real action-sheet
-component (e.g. `@expo/react-native-action-sheet`) before this app could
-support Android.
+fine for now since only iOS is targeted, but the Filter/Filter-by-genre/
+Delete menus (5, "however many distinct genre tags exist", and
+up-to-10 options respectively) will need a real action-sheet component
+(e.g. `@expo/react-native-action-sheet`) before this app could support
+Android.
 
 ### Where to make common changes
 

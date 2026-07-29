@@ -47,7 +47,10 @@ export async function saveSettings(settings: AppSettings): Promise<void> {
 // --- Books ---
 
 export async function getBooks(): Promise<Book[]> {
-  return getAll<Book>(KEYS.books);
+  const raw = await getAll<any>(KEYS.books);
+  // Migrates anything saved before genres became an array (genre: string ->
+  // genres: string[]) - old data still loads correctly instead of breaking.
+  return raw.map((b) => (Array.isArray(b.genres) ? (b as Book) : { ...b, genres: b.genre ? [b.genre] : [] }));
 }
 
 export async function addBook(input: Omit<Book, 'id' | 'createdAt'>): Promise<Book> {
