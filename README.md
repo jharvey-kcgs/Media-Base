@@ -190,6 +190,42 @@ assets/
   icon.png                         App icon (1024x1024)
 ```
 
+### Category screen pattern (applies to every future category, not just Books)
+
+`screens/BookScreen.tsx` is the reference implementation to copy when
+building Comics/Manga, Movies, etc.:
+- Header right slot is a **"•••" menu** (`Ionicons ellipsis-horizontal`),
+  not a persistent "+ Add" button or a visible filter-chip row - tapping
+  it shows **+ Add entry / Filter by... / - Delete entry**, keeping the
+  main list screen clean. "Filter by..." and "- Delete entry" each open a
+  second native picker (also `Alert.alert` with one button per option).
+- **Tapping any row opens it for editing** - every field is editable, and
+  a **Delete** button lives inside that same edit screen.
+- **No duplicate entries**: on save, a same-title match (trimmed,
+  case-insensitive) against anything already tracked - other than the
+  item currently being edited - blocks the save with an alert instead of
+  creating a second copy.
+- **Optional ISBN field (Books specifically)**: filling it in and moving
+  to the next field triggers an automatic lookup against the Google Books
+  API (free, no key needed) and fills Title/Author/Genre/Page count -
+  same end result as scanning, without needing the camera wired up yet.
+  Not network-testable from the sandbox this was built in - worth
+  confirming on a real device that Google's response shape hasn't
+  changed. Categories without a clean ISBN-equivalent (Movies use UPC,
+  which is messier - see the Roadmap doc) will need their own lookup
+  approach rather than copying this one directly.
+- **A-Z index** on the right edge, only shown when sorted by an
+  alphabetical field (Title/Genre/Author here) - tapping a letter jumps
+  to the nearest section at or after it. Not shown for non-alphabetical
+  sorts like Page count or Read?.
+
+**Known limitation worth knowing before relying on this further:**
+`Alert.alert` shows unlimited buttons on iOS but caps at 3 on Android -
+fine for now since only iOS is targeted, but the Filter/Delete menus (5
+and up-to-10 options respectively) will need a real action-sheet
+component (e.g. `@expo/react-native-action-sheet`) before this app could
+support Android.
+
 ### Where to make common changes
 
 - **Add or change a category's screen** → its file in `screens/`, plus a
@@ -235,7 +271,7 @@ worth knowing before changing anything in
 
 ## 6. Color accessibility
 
-The app supports a user-selected accent color (10 options, including
+The app supports a user-selected accent color (12 options, including
 White and Black) across both Light and Dark mode, which means the same
 color has to stay legible in combinations it was never individually
 designed for - e.g. a "White" accent picked while in Light mode, or
@@ -260,7 +296,7 @@ in `lib/theme.tsx`:
   disappearing entirely.
 
 Every screen was audited to use `accentReadable` for foreground use and
-`accent` only for fills - not yet re-verified against all 10 colors ×
+`accent` only for fills - not yet re-verified against all 12 colors ×
 Light/Dark on a real device the way Home Base's equivalent system was.
 
 ---

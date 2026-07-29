@@ -59,6 +59,7 @@ export interface Book {
   genre: string;
   author: string;
   pageCount: number | null;
+  isbn: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
   read: boolean;
   rating: number | null; // 1-5, only meaningful once read = true
   review: string; // only meaningful once read = true

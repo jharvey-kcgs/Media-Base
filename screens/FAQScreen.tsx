@@ -39,7 +39,7 @@ export default function FAQScreen({ navigation }: any) {
               i === FAQS.length - 1 && { marginBottom: 0 },
             ]}
           >
-            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, marginBottom: 6 }}>
+            <AppText variant="header" style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale, marginBottom: 6 }}>
               {item.q}
             </AppText>
             <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 20 }}>

@@ -36,6 +36,8 @@ export const THEME_COLOR_OPTIONS: { name: string; hex: string }[] = [
   { name: 'Red', hex: '#E24B4A' },
   { name: 'Amber', hex: '#BA7517' },
   { name: 'Teal', hex: '#1D9E75' },
+  { name: 'Brown', hex: '#8B5A2B' },
+  { name: 'Indigo', hex: '#4F46E5' },
   { name: 'White', hex: '#FFFFFF' },
   { name: 'Black', hex: '#000000' },
 ];

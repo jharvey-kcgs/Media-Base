@@ -43,7 +43,7 @@ export default function AboutScreen({ navigation }: any) {
               i === SECTIONS.length - 1 && { marginBottom: 0 },
             ]}
           >
-            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale, marginBottom: 6 }}>
+            <AppText variant="header" style={{ color: theme.colors.accentReadable, fontSize: 16 * theme.fontScale, marginBottom: 6 }}>
               {section.title}
             </AppText>
             <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21 }}>
