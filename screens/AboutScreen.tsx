@@ -33,6 +33,11 @@ export default function AboutScreen({ navigation }: any) {
           Settings → Data lets you export everything to a backup file, import a previous backup, or permanently
           delete all your data. Deletion is all-or-nothing and always asks for confirmation twice.
         </Text>
+        <Text style={[styles.section, { color: theme.colors.text, fontSize: 15 * theme.fontScale }]}>
+          Settings → Permissions shows whether camera access is currently granted and links straight to Phone
+          Settings to change it. Camera access is only ever used for the optional scan shortcut - nothing about
+          adding media requires it.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );

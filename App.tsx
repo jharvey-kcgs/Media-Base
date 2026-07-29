@@ -9,6 +9,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import ProfileSettingsScreen from './screens/ProfileSettingsScreen';
 import ThemeSettingsScreen from './screens/ThemeSettingsScreen';
 import DataSettingsScreen from './screens/DataSettingsScreen';
+import PermissionsSettingsScreen from './screens/PermissionsSettingsScreen';
 import AboutScreen from './screens/AboutScreen';
 import FAQScreen from './screens/FAQScreen';
 import BookScreen from './screens/BookScreen';
@@ -70,6 +71,7 @@ function ThemedApp() {
           <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
           <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
           <Stack.Screen name="DataSettings" component={DataSettingsScreen} />
+          <Stack.Screen name="PermissionsSettings" component={PermissionsSettingsScreen} />
           <Stack.Screen name="About" component={AboutScreen} />
           <Stack.Screen name="FAQ" component={FAQScreen} />
           <Stack.Screen name="Book" component={BookScreen} />

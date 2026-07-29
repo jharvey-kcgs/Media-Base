@@ -31,6 +31,7 @@ List of that category's items, with sort/filter controls specific to the categor
 - **Profile** — toggle categories on/off. Turning one off hides its Home widget but keeps its data; turning it back on restores the widget with data intact.
 - **Theme** — Text size (small/default/large), Theme color, Light/Dark mode. Independent from Home Base and League Base's theme settings (confirmed — not shared).
 - **Data** — Export, Import, Delete (all-or-nothing wipe, no per-category delete — confirmed).
+- **Permissions** — camera access status/toggle plus a direct link to the phone's own Settings app (apps can't grant or revoke OS permissions on their own, so this is a status display + deep link, not a real in-app toggle).
 - **About** — explains Profile, every screen/setting, why items appear on Home, and the Data section.
 - **FAQ** — separate page from About (same split as Home Base).
 

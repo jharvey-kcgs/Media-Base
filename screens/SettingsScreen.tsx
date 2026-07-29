@@ -9,6 +9,7 @@ const ROWS: { label: string; route: string }[] = [
   { label: 'Profile', route: 'ProfileSettings' },
   { label: 'Theme', route: 'ThemeSettings' },
   { label: 'Data', route: 'DataSettings' },
+  { label: 'Permissions', route: 'PermissionsSettings' },
   { label: 'About', route: 'About' },
   { label: 'FAQ', route: 'FAQ' },
 ];
