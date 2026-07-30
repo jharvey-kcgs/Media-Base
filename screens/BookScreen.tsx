@@ -630,7 +630,7 @@ export default function BookScreen({ navigation }: any) {
 
       <View style={styles.flex} onLayout={onListLayout}>
         {isAlpha ? (
-          <SectionList
+          <SectionList<Book, { title: string }>
             ref={sectionListRef}
             sections={sections}
             keyExtractor={(item) => item.id}

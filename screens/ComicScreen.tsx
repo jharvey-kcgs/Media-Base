@@ -590,7 +590,7 @@ export default function ComicScreen({ navigation }: any) {
 
       <View style={styles.flex} onLayout={onListLayout}>
         {isAlpha ? (
-          <SectionList
+          <SectionList<Comic, { title: string }>
             ref={sectionListRef}
             sections={sections}
             keyExtractor={(item) => item.id}

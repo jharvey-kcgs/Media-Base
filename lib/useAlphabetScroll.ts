@@ -22,7 +22,12 @@ interface Section<T> {
 }
 
 export function useAlphabetScroll<T>(sections: Section<T>[], fontScale: number) {
-  const listRef = useRef<SectionList<T>>(null);
+  // The second generic parameter tells TypeScript our sections have a
+  // `title: string` field - without it, SectionList assumes the default
+  // section shape (no `title` guaranteed), and the actual <SectionList>
+  // JSX tag using this ref needs to declare the exact same second
+  // generic parameter or the ref type won't match what's rendered.
+  const listRef = useRef<SectionList<T, { title: string }>>(null);
   const contentHeightRef = useRef(0);
   const viewportHeightRef = useRef(0);
 

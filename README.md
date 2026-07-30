@@ -201,7 +201,19 @@ lib/
                                      on letters near the end of the
                                      alphabet). Any future category with
                                      an A-Z index should use this rather
-                                     than reimplementing it.
+                                     than reimplementing it. Important
+                                     TypeScript detail if you do: the
+                                     hook's SectionList ref is typed
+                                     `SectionList<T, { title: string }>` -
+                                     the `<SectionList>` JSX tag in the
+                                     screen using it MUST declare that
+                                     same second generic parameter
+                                     (`<SectionList<Book, { title: string }>>`),
+                                     or TypeScript doesn't know the
+                                     sections have a `title` field and
+                                     `renderSectionHeader` fails to
+                                     type-check ("Property 'title' is
+                                     missing in type SectionBase<...>").
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -
