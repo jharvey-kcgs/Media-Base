@@ -218,6 +218,26 @@ assets/
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
 building Comics/Manga, Movies, etc.:
+- **The row component (`BookCard`) is defined at module scope and wrapped
+  in `React.memo`** - not as a plain function inside the screen's body.
+  This is what actually fixes React Native's "VirtualizedList: You have a
+  large list that is slow to update" warning and genuinely sluggish
+  scrolling/filtering once the list has 50+ entries: with a plain inline
+  render function, every visible row re-rendered from scratch on *any*
+  state change anywhere on the screen (typing in a filter, toggling
+  selection, even just scrolling), because the list's `renderItem`
+  callback got a new identity every render. `renderItem` itself is still
+  a `useCallback` (its own identity does still change when things like
+  `selectedIds` change), but because `BookCard` is memoized, React skips
+  re-rendering any individual row whose actual props (`book`, `selected`,
+  `selectionMode`) didn't change, even when the outer `renderItem`
+  reference did. The row's `onPress` handler (`handleCardPress`)
+  deliberately only depends on `selectionMode` - not `selectedIds` or
+  `books` - by receiving the full `book` object rather than an id to look
+  up, so routine sorting/filtering/data-reloading never invalidates it.
+  Any future category screen copying this pattern should keep its own
+  row component defined the same way (module-scope, `React.memo`) rather
+  than reverting to an inline render function for convenience.
 - Header right slot is a **"•••" menu** (`Ionicons ellipsis-horizontal`),
   not a persistent "+ Add" button or a visible filter-chip row - tapping
   it shows **+ Add entry / Filter by... / Filter by genre... / - Delete

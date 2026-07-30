@@ -192,6 +192,64 @@ const INPUT_FONT = { fontFamily: FONT_FAMILY.body };
 // of wrapping onto its own line at larger text sizes.
 const REQUIRED_SWITCH_LABEL = 'Have you read this book?\u00A0*';
 
+// Memoized row component, defined at module scope (never recreated) - this
+// is the actual fix for the "large list slow to update" warning and
+// sluggish scrolling/filtering at 65+ books. The previous version defined
+// row rendering as a plain function inside BookScreen's body, recreated on
+// every render; even though FlatList/SectionList's data itself was
+// memoized, a fresh renderItem function identity on every parent render
+// (from any state change anywhere on the screen, including typing in a
+// filter) meant every visible row got fully re-rendered every time, not
+// just the ones that actually changed. Wrapping the row itself in
+// React.memo means a row only re-renders when ITS OWN props (book, selected,
+// selectionMode) actually change - unaffected rows are skipped even if the
+// list's outer renderItem callback gets a new identity.
+const BookCard = React.memo(function BookCard({
+  book,
+  selected,
+  selectionMode,
+  onPress,
+}: {
+  book: Book;
+  selected: boolean;
+  selectionMode: boolean;
+  onPress: (book: Book) => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={() => onPress(book)}
+      style={[
+        styles.card,
+        { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
+        selected && styles.cardSelected,
+      ]}
+    >
+      <View style={styles.cardRow}>
+        {selectionMode && (
+          <Ionicons
+            name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+            size={22}
+            color={selected ? theme.colors.accentReadable : theme.colors.textMuted}
+            style={styles.cardCheckbox}
+          />
+        )}
+        <View style={styles.flex}>
+          <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
+            {book.title}
+          </AppText>
+          <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
+            {book.author} · {book.genres.join(', ')}
+          </AppText>
+          <AppText style={{ color: book.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
+            {book.read ? `Read${book.rating ? ` · ${book.rating}★` : ''}` : 'Not read yet'}
+          </AppText>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function BookScreen({ navigation }: any) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -681,41 +739,29 @@ export default function BookScreen({ navigation }: any) {
     load();
   };
 
-  const renderCard = (item: Book) => {
-    const selected = selectedIds.has(item.id);
-    return (
-      <TouchableOpacity
-        onPress={() => (selectionMode ? toggleSelected(item.id) : openEdit(item))}
-        style={[
-          styles.card,
-          { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
-          selected && styles.cardSelected,
-        ]}
-      >
-        <View style={styles.cardRow}>
-          {selectionMode && (
-            <Ionicons
-              name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-              size={22}
-              color={selected ? theme.colors.accentReadable : theme.colors.textMuted}
-              style={styles.cardCheckbox}
-            />
-          )}
-          <View style={styles.flex}>
-            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
-              {item.title}
-            </AppText>
-            <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-              {item.author} · {item.genres.join(', ')}
-            </AppText>
-            <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
-              {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
-            </AppText>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const handleCardPress = useCallback(
+    (book: Book) => {
+      if (selectionMode) {
+        toggleSelected(book.id);
+      } else {
+        openEdit(book);
+      }
+    },
+    // Deliberately just selectionMode - not selectedIds, books, or anything
+    // that changes during routine scrolling/sorting/filtering, since any of
+    // those would give renderItem (below) a new identity on every such
+    // interaction and defeat BookCard's memoization for no reason. Taking
+    // the full `book` object (rather than an id to look up in `books`)
+    // is what makes leaving `books` out of this list safe.
+    [selectionMode],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Book }) => (
+      <BookCard book={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+    ),
+    [selectedIds, selectionMode, handleCardPress],
+  );
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
@@ -784,7 +830,7 @@ export default function BookScreen({ navigation }: any) {
                 {section.title}
               </AppText>
             )}
-            renderItem={({ item }) => renderCard(item)}
+            renderItem={renderItem}
           />
         ) : (
           <FlatList
@@ -792,7 +838,7 @@ export default function BookScreen({ navigation }: any) {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
             ListEmptyComponent={emptyState}
-            renderItem={({ item }) => renderCard(item)}
+            renderItem={renderItem}
           />
         )}
 
