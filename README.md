@@ -385,6 +385,22 @@ building Comics/Manga, Movies, etc.:
   an estimate, so it can land a little short/long, especially for long
   book titles that wrap to two lines - there's no further "precision
   correction" pass anymore, since that's exactly what was breaking it.
+
+  One more real bug this surfaced: the per-row height estimate's error
+  accumulates with every row summed, so a letter near the **end** of the
+  alphabet (where most rows have already been counted) can accumulate
+  enough error to land the target way past the list's actual scrollable
+  height - jumping to "T" on a 65-book list was overshooting badly enough
+  that iOS's rubber-band bounce made it look like the app was "freaking
+  out" (confirmed from a screen recording: slides down, then violently
+  snaps back). Fixed by tracking the real measured content height
+  (`onContentSizeChange`) and viewport height (`onLayout` on the
+  container) in refs, and clamping the estimated target to
+  `Math.max(0, contentHeight - viewportHeight)` before scrolling - the
+  estimate can still be imprecise, but it can never ask for more scroll
+  distance than actually exists, so it can't overshoot into that bounce
+  regardless of how far off the per-row guess is.
+
   Not shown for the non-alphabetical Read? sort.
 - **Keyboard doesn't cover fields while typing**: the Add/Edit form is
   wrapped in React Native's built-in `KeyboardAvoidingView`

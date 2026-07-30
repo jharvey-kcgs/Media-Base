@@ -268,6 +268,8 @@ export default function BookScreen({ navigation }: any) {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const scanLockRef = useRef(false);
   const sectionListRef = useRef<SectionList<Book>>(null);
+  const contentHeightRef = useRef(0);
+  const viewportHeightRef = useRef(0);
 
   const load = useCallback(async () => {
     setBooks(await getBooks());
@@ -335,10 +337,19 @@ export default function BookScreen({ navigation }: any) {
     const index = sections.findIndex((s) => s.title >= letter);
     const target = index === -1 ? sections.length - 1 : index;
     if (target < 0 || !sections[target]) return;
-    sectionListRef.current?.getScrollResponder()?.scrollTo({
-      y: estimateSectionOffset(target),
-      animated: true,
-    });
+    // Clamp to the actual measured scroll range. The per-row height used
+    // above is a rough guess (real rows vary with title wrapping etc.),
+    // and that error accumulates with every row summed - so a letter near
+    // the end of the alphabet (where most rows have already been counted)
+    // can accumulate enough error to estimate WAY past the list's real
+    // scrollable height. Asking the ScrollView to scroll past its actual
+    // content produces a hard rubber-band bounce back to the max position
+    // - exactly the "slides way down then violently snaps" behavior a
+    // video of jumping to "T" showed. Clamping means the estimate can
+    // still be imprecise, but it can never overshoot into that bounce.
+    const maxScrollY = Math.max(0, contentHeightRef.current - viewportHeightRef.current);
+    const y = Math.min(estimateSectionOffset(target), maxScrollY);
+    sectionListRef.current?.getScrollResponder()?.scrollTo({ y, animated: true });
   };
 
   const openAdd = () => {
@@ -817,7 +828,7 @@ export default function BookScreen({ navigation }: any) {
         )}
       </View>
 
-      <View style={styles.flex}>
+      <View style={styles.flex} onLayout={(e) => { viewportHeightRef.current = e.nativeEvent.layout.height; }}>
         {isAlpha ? (
           <SectionList
             ref={sectionListRef}
@@ -825,6 +836,7 @@ export default function BookScreen({ navigation }: any) {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[styles.list, { paddingRight: 20 + 22 }]}
             ListEmptyComponent={emptyState}
+            onContentSizeChange={(_w, h) => { contentHeightRef.current = h; }}
             renderSectionHeader={({ section }) => (
               <AppText style={[styles.sectionHeader, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, backgroundColor: theme.colors.background }]}>
                 {section.title}
