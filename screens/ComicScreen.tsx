@@ -58,6 +58,14 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 // blocking). This one differs from Books' by including manga demographic
 // labels (Shonen/Shoujo/Seinen/Josei) alongside traditional genres, since
 // manga readers filter by demographic just as often as by genre.
+//
+// Grounded in BISAC's actual "COMICS & GRAPHIC NOVELS" subcategory list
+// (bisg.org/comics-and-graphic-novels), verified directly rather than
+// guessed - this confirmed Mecha/Isekai/Manhua/Manhwa are real industry
+// terms (not just fan-community jargon), and surfaced several real
+// subcategories the original version was missing entirely (Cyberpunk,
+// Steampunk, Light Novel, Occult, School Life, Espionage, Superheroes/
+// Supervillains as their own headings, Magical Realism, Coming Of Age).
 const GENRE_ALLOWLIST = [
   'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Science Fiction',
   'Horror', 'Mystery', 'Thriller', 'Suspense', 'Romance', 'Slice Of Life',
@@ -66,6 +74,11 @@ const GENRE_ALLOWLIST = [
   'Anthology', 'Biography', 'Memoir', 'Fiction', 'Nonfiction', 'Western',
   'Psychological', 'Shonen', 'Shoujo', 'Seinen', 'Josei', 'Manga',
   'Manhwa', 'Manhua', 'Graphic Novel',
+  // Added after confirming against BISG's real Comics & Graphic Novels
+  // subcategory list.
+  'Coming Of Age', 'Cyberpunk', 'Steampunk', 'Light Novel', 'Literary',
+  'Magical Realism', 'Occult', 'School Life', 'Espionage', 'Superheroes',
+  'Supervillains', 'LGBTQ', 'Erotica', 'Mythology', 'Fairy Tales',
 ];
 
 function sortComics(comics: Comic[], field: ComicSortField): Comic[] {

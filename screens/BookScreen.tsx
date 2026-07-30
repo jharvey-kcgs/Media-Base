@@ -58,15 +58,42 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 // how it's phrased. See lib/isbnLookup.ts for how this gets applied
 // (shared with Comics/Manga and any future ISBN-based category, each with
 // its own allowlist here).
+//
+// Grounded in BISAC (Book Industry Standards and Communications) - the
+// real classification system the US book trade actually uses, and what
+// Google Books' own `categories` field is drawn from - rather than an
+// improvised list. Verified against BISG's official 2025 top-level
+// heading list (bisg.org/complete-bisac-subject-headings-list) directly.
+// A few real headings are deliberately left out or shortened here: full
+// compound BISAC headings like "Business & Economics" rarely appear
+// verbatim in Open Library/Google Books subject data, so this uses the
+// shorter core term each concept is actually likely to show up as
+// ("Economics" rather than "Business & Economics"). A couple of common
+// single words that are real BISAC categories (GAMES & ACTIVITIES,
+// HOUSE & HOME) were left out specifically because "Games" or "Home"
+// alone risk matching unrelated proper-noun tags (e.g. "The Hunger
+// Games" as a thematic keyword) - a real precision/recall tradeoff,
+// flagged rather than silently decided.
 const GENRE_ALLOWLIST = [
   'Fiction', 'Nonfiction', 'Romance', 'Mystery', 'Thriller', 'Suspense',
   'Science Fiction', 'Fantasy', 'Horror', 'Historical Fiction', 'Contemporary',
-  'Literary Fiction', 'Young Adult', "Children's", 'Classics', 'Adventure',
-  'Crime', 'Dystopian', 'Paranormal', 'Biography', 'Memoir', 'Self-Help',
-  'Poetry', 'Humor', 'Graphic Novel', 'Comics', 'Short Stories', 'Essays',
-  'True Crime', 'Western', 'War', 'Drama', 'Philosophy', 'Psychology',
-  'Religion', 'Spirituality', 'History', 'Science', 'Business', 'Health',
-  'Cooking', 'Travel', 'Art', 'Music', 'Sports', 'Politics', 'Technology',
+  'Literary Fiction', 'Young Adult', 'New Adult', "Children's", 'Classics',
+  'Adventure', 'Crime', 'Dystopian', 'Post-Apocalyptic', 'Paranormal',
+  'Magical Realism', 'Coming Of Age', 'LGBTQ', 'Biography', 'Memoir',
+  'Self-Help', 'Poetry', 'Humor', 'Satire', 'Anthology', 'Graphic Novel',
+  'Comics', 'Short Stories', 'Essays', 'True Crime', 'Western', 'War',
+  'Drama', 'Philosophy', 'Psychology', 'Sociology', 'Religion',
+  'Spirituality', 'History', 'Science', 'Nature', 'Business',
+  'Personal Finance', 'Parenting', 'Health', 'Cooking', 'Travel', 'Art',
+  'Music', 'Sports', 'Politics', 'Technology',
+  // Added after confirming against BISG's real 2025 BISAC list - mostly
+  // nonfiction top-level categories that had zero coverage before.
+  'Antiques', 'Architecture', 'Bibles', 'Economics', 'Computers', 'Crafts',
+  'Design', 'Education', 'Family', 'Relationships', 'Gardening', 'Fitness',
+  'Language', 'Law', 'Literary Criticism', 'Mathematics', 'Medical',
+  'Performing Arts', 'Pets', 'Photography', 'Reference', 'Study Aids',
+  'Transportation', 'Juvenile', 'Engineering', 'Espionage', 'Occult',
+  'Mythology', 'Fairy Tales', 'Cyberpunk', 'Steampunk', 'Erotica',
 ];
 
 function sortBooks(books: Book[], field: BookSortField): Book[] {

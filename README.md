@@ -391,6 +391,26 @@ form fields, the row component, the allowlist).
   one-line edit to that array, not a new filtering rule to write and
   test.
 
+  Both `GENRE_ALLOWLIST`s (Books' and Comics/Manga's in
+  `screens/ComicScreen.tsx`) are grounded in **BISAC** (Book Industry
+  Standards and Communications) - the real classification system the US
+  book trade actually uses, and what Google Books' own `categories` field
+  is drawn from - verified directly against BISG's official 2025 heading
+  lists rather than improvised. The first version of Books' list covered
+  mainstream fiction well but was missing most nonfiction categories
+  entirely (no Architecture, Computers, Crafts, Gardening, Law,
+  Mathematics, Medical, Nature, Pets, Photography, Reference, and more) -
+  a real coverage gap raised directly, fixed by cross-checking against
+  BISG's actual top-level list. A couple of real BISAC categories were
+  deliberately left out or shortened: full compound headings like
+  "Business & Economics" rarely appear verbatim in real subject data, so
+  the shorter core term is used instead ("Economics"); and a couple of
+  single common words that are technically real BISAC categories (Games,
+  Home) were left out because they risk matching unrelated proper-noun
+  tags (e.g. "Games" inside "The Hunger Games" as a thematic keyword) -
+  a genuine precision/recall tradeoff, flagged here rather than silently
+  decided either way.
+
   **If genre is still missing after merging those two**, a third source
   gets tried: Open Library's *search index* (`search.json?isbn=...`)
   rather than its single-edition record. The search index is aggregated
