@@ -24,6 +24,12 @@ export async function scheduleDailyRecommendationNotification(): Promise<void> {
     content: {
       title: 'Media Base',
       body: "Come check out today's recommendations!",
+      // A flat "something's waiting" signal (not a precise unread count -
+      // there's only ever this one notification type) - same approach
+      // Home Base settled on for its own alerts, since local (non-push)
+      // notifications on iOS can't reliably accumulate a real count
+      // across multiple pending notifications anyway.
+      badge: 1,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.CALENDAR,

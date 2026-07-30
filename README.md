@@ -569,12 +569,20 @@ derived from OS permission status), since the two can drift independently
 "thinks" it's enabled, in which case the scheduled notification just
 silently won't fire; nothing currently re-syncs that automatically.
 
-Not device-tested from the sandbox this was built in - `expo-notifications`
-API surface (`SchedulableTriggerInputTypes`, the exact trigger object
-shape, the notification-handler field names in `App.tsx`) has changed
-across SDK versions, so this is worth confirming end-to-end (permission
-prompt, notification actually firing at 10am, toggling off actually
-canceling it) on a real device before relying on it.
+**Confirmed working on a real device**: the notification itself fires
+correctly at 10am with the right title/body. One thing it was initially
+missing: the app icon's badge (the red number) never appeared, because
+the scheduled notification never actually set one (`content.badge` was
+absent) and the foreground handler in `App.tsx` had `shouldSetBadge`
+explicitly set to `false`. Fixed by setting a flat `badge: 1` on the
+notification - a "something's waiting" signal rather than a precise
+unread count, since there's only ever this one notification type and
+local (non-push) notifications on iOS can't reliably accumulate a real
+count across multiple pending ones anyway, which is the same approach
+Home Base already settled on for its own alerts - plus clearing the
+badge back to 0 on cold launch and every time the app returns to the
+foreground (`AppState` listener in `App.tsx`), so it doesn't just sit
+there indefinitely once you've already seen it.
 
 ---
 

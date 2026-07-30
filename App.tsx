@@ -1,7 +1,7 @@
 // App.tsx
 
 import React, { useEffect, useState } from 'react';
-import { View, StatusBar } from 'react-native';
+import { View, StatusBar, AppState } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { useFonts, JetBrainsMono_400Regular, JetBrainsMono_800ExtraBold } from '@expo-google-fonts/jetbrains-mono';
@@ -31,12 +31,29 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Show the daily recommendation reminder as a normal alert+sound even if
 // the app happens to already be open at 10am, rather than staying silent.
+// shouldSetBadge is true so the badge set on the notification itself
+// (lib/notifications.ts) actually applies even if it happens to arrive
+// while the app is in the foreground, not just when delivered normally
+// while the app is closed/backgrounded.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
   }),
+});
+
+// Clears the badge on cold launch and every time the app returns to the
+// foreground - otherwise the "something's waiting" badge from the daily
+// reminder would just sit there indefinitely once you've already seen
+// it. Same approach Home Base already uses successfully for its own
+// notifications.
+function clearBadge() {
+  Notifications.setBadgeCountAsync(0).catch(() => {});
+}
+clearBadge();
+AppState.addEventListener('change', (state) => {
+  if (state === 'active') clearBadge();
 });
 
 function RootGate() {
