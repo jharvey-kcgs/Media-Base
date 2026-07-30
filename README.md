@@ -339,20 +339,25 @@ building Comics/Manga, Movies, etc.:
   alphabetical field (Title/Author here). Tapping a letter scrolls the
   underlying `ScrollView` directly to an *estimated* pixel offset
   (`estimateSectionOffset()`, based on rough row/header height guesses),
-  rather than relying on `SectionList.scrollToLocation`. That's a
-  deliberate workaround for a real, confirmed React Native bug
-  (facebook/react-native#50143, #48032): `scrollToLocation` silently
-  does nothing when `itemIndex` is 0, which every letter-jump was
-  passing - a "call it twice" workaround was tried first and still
-  didn't reliably scroll in practice, so this switched to bypassing that
-  API entirely. A follow-up `scrollToLocation` call after a short delay
-  attempts to correct any drift now that the target section is actually
-  rendered (which is what that API needs to succeed) - if that
-  correction itself no-ops, the user still lands roughly in the right
-  place from the estimate rather than nothing happening at all. The
-  tradeoff: it's an estimate, so it can land a little short/long,
-  especially for long book titles that wrap to two lines. Not shown for
-  the non-alphabetical Read? sort.
+  rather than using `SectionList.scrollToLocation` at all. Two rounds of
+  real React Native bugs in that API led here:
+  `scrollToLocation({ itemIndex: 0 })` - which every letter-jump needs to
+  pass, since jumping to the *start* of a section is the whole point -
+  is documented as either silently doing nothing
+  (facebook/react-native#50143) or unconditionally snapping to the
+  *first* section regardless of which one was requested
+  (facebook/react-native#48032). A "call it twice" workaround was tried
+  first and didn't reliably scroll; a version after that added a
+  delayed follow-up `scrollToLocation` call meant to correct estimate
+  drift once the target section was measured - that call was hitting the
+  #48032 bug specifically, which is why the list would jump to the right
+  letter and then immediately spring back to the very top a moment
+  later. Removing that follow-up call entirely (keeping only the direct
+  `ScrollView.scrollTo` estimate) is what actually works. Tradeoff: it's
+  an estimate, so it can land a little short/long, especially for long
+  book titles that wrap to two lines - there's no further "precision
+  correction" pass anymore, since that's exactly what was breaking it.
+  Not shown for the non-alphabetical Read? sort.
 - **Keyboard doesn't cover fields while typing**: the Add/Edit form is
   wrapped in React Native's built-in `KeyboardAvoidingView`
   (`behavior="padding"` on iOS, `"height"` on Android) plus the

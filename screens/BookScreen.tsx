@@ -241,23 +241,28 @@ export default function BookScreen({ navigation }: any) {
     [isAlpha, sorted, sortField],
   );
 
-  // Tracks the last attempted scroll target, so onScrollToIndexFailed (which
   // The itemIndex:0 double-call workaround (React Native bug
   // facebook/react-native#50143, #48032) turned out not to be reliable
   // enough in practice - still reported as not scrolling at all. Switched
   // to a more direct approach instead: estimate the target section's pixel
   // offset from known row/header heights and scroll the underlying
   // ScrollView there directly via getScrollResponder().scrollTo(), which
-  // fully bypasses scrollToLocation's buggy itemIndex:0 codepath since
-  // it's not using that API at all. This always actually moves the list -
-  // the tradeoff is it's an ESTIMATE (card height varies a little with
-  // title-wrapping and font size), so it can land a little short of exact.
-  // A follow-up scrollToLocation call after a short delay attempts to
-  // correct that drift now that the target section is actually
-  // rendered/measured (which is the condition scrollToLocation needs to
-  // succeed) - if that correction itself hits the same native bug and
-  // no-ops, the user still ends up in roughly the right place from the
-  // estimate, instead of nothing happening at all.
+  // fully bypasses scrollToLocation entirely. This always actually moves
+  // the list - the tradeoff is it's an ESTIMATE (card height varies a
+  // little with title-wrapping and font size), so it can land a little
+  // short of exact.
+  //
+  // An earlier version of this also fired a follow-up scrollToLocation
+  // call after a short delay, meant to correct any drift once the target
+  // section was actually rendered. That made things worse, not better:
+  // itemIndex:0 doesn't just no-op (facebook/react-native#50143) - a
+  // related report (react-native#48032) confirms it unconditionally
+  // scrolls to the FIRST section regardless of which sectionIndex was
+  // requested. So the "correction" call was reliably snapping the list
+  // back to the very top a moment after the estimate had correctly
+  // scrolled to the right place - the exact "jumps there, then springs
+  // back" behavior that was reported. Removed entirely; the estimate
+  // alone is what actually works.
   const estimateSectionOffset = (targetIndex: number) => {
     const headerHeight = 26 * theme.fontScale;
     const cardHeight = 96 * theme.fontScale; // rough: padding + ~3 lines of text + margin
@@ -275,19 +280,6 @@ export default function BookScreen({ navigation }: any) {
     sectionListRef.current?.getScrollResponder()?.scrollTo({
       y: estimateSectionOffset(target),
       animated: true,
-    });
-    setTimeout(() => {
-      sectionListRef.current?.scrollToLocation({ sectionIndex: target, itemIndex: 0, animated: true, viewOffset: 0 });
-    }, 250);
-  };
-
-  const handleScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => {
-    // Belt-and-suspenders for the case above's follow-up correction: if
-    // it targets a section that still isn't measured, land at an
-    // estimated offset rather than doing nothing.
-    sectionListRef.current?.getScrollResponder()?.scrollTo({
-      y: info.averageItemLength * info.index,
-      animated: false,
     });
   };
 
@@ -793,7 +785,6 @@ export default function BookScreen({ navigation }: any) {
               </AppText>
             )}
             renderItem={({ item }) => renderCard(item)}
-            onScrollToIndexFailed={handleScrollToIndexFailed}
           />
         ) : (
           <FlatList
