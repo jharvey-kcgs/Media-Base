@@ -22,10 +22,12 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
@@ -143,6 +145,7 @@ const REQUIRED_SWITCH_LABEL = 'Have you read this book?\u00A0*';
 
 export default function BookScreen({ navigation }: any) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [books, setBooks] = useState<Book[]>([]);
   const [sortField, setSortField] = useState<BookSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
@@ -152,6 +155,9 @@ export default function BookScreen({ navigation }: any) {
   const [lookingUp, setLookingUp] = useState(false);
   const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [isbnGroup, setIsbnGroup] = useState('');
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const scanLockRef = useRef(false);
   const sectionListRef = useRef<SectionList<Book>>(null);
 
   const load = useCallback(async () => {
@@ -284,11 +290,58 @@ export default function BookScreen({ navigation }: any) {
     ]);
   };
 
-  const handleScanPress = () => {
-    // Scanning itself (camera + barcode lookup + the confirm/edit screen
-    // it feeds into) isn't wired up yet - this is a placeholder so the
-    // button exists and manual entry is never blocked on it landing.
-    Alert.alert('Barcode scanning', "Scanning is coming in a future update - for now, try the ISBN field below, or enter the details by hand.");
+  const handleScanPress = async () => {
+    if (cameraPermission?.granted) {
+      scanLockRef.current = false;
+      setScannerVisible(true);
+      return;
+    }
+    if (cameraPermission?.canAskAgain ?? true) {
+      const result = await requestCameraPermission();
+      if (result.granted) {
+        scanLockRef.current = false;
+        setScannerVisible(true);
+      }
+      return;
+    }
+    Alert.alert(
+      'Camera access needed',
+      'Camera access was turned off outside the app - open Phone Settings to turn it back on, or use the ISBN field below instead.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Phone Settings', onPress: () => Linking.openSettings() },
+      ],
+    );
+  };
+
+  // Shared by both typing (handleIsbnChange, below) and the barcode
+  // scanner: given raw digits, reformats with the real hyphen positions
+  // and checks the checksum via isbn3, updating the field + status.
+  // Returns whether the result was a fully-valid ISBN, so callers (the
+  // scanner specifically) know whether it's safe to fire the lookup
+  // immediately rather than waiting for onBlur, which never happens when
+  // a value arrives from a scan instead of typing.
+  const applyIsbnDigits = (digits: string): boolean => {
+    if (digits.length !== 10 && digits.length !== 13) {
+      setIsbnStatus('idle');
+      setDraft((d) => ({ ...d, isbn: digits }));
+      return false;
+    }
+    try {
+      const parsed = ISBN.parse(digits);
+      if (parsed?.isValid) {
+        setIsbnStatus('valid');
+        setIsbnGroup(parsed.groupname ?? '');
+        setDraft((d) => ({ ...d, isbn: (parsed.isIsbn13 ? parsed.isbn13h : parsed.isbn10h) || digits }));
+        return true;
+      }
+      setIsbnStatus('invalid');
+    } catch (err) {
+      console.warn('Media Base: isbn3 parse failed', err);
+      setIsbnStatus('idle');
+    }
+    setDraft((d) => ({ ...d, isbn: digits }));
+    return false;
   };
 
   // Fires on every keystroke in the ISBN field. Once there are enough
@@ -298,26 +351,32 @@ export default function BookScreen({ navigation }: any) {
   // a fixed pattern) and checks the checksum digit, so a typo shows up
   // immediately rather than only failing later at lookup/save time.
   const handleIsbnChange = (text: string) => {
-    const digits = text.replace(/[^0-9Xx]/g, '');
-    if (digits.length !== 10 && digits.length !== 13) {
-      setIsbnStatus('idle');
-      setDraft((d) => ({ ...d, isbn: digits }));
-      return;
+    applyIsbnDigits(text.replace(/[^0-9Xx]/g, ''));
+  };
+
+  // Fires once a barcode is in view long enough to decode. Locked with a
+  // ref (not state, which wouldn't update fast enough) so a single
+  // barcode sitting in frame doesn't fire this dozens of times per
+  // second - onBarcodeScanned keeps firing continuously while a code is
+  // visible, unlike a one-shot "take photo" action. Restricted to EAN-13
+  // starting 978/979 (the actual Bookland ISBN prefixes) so scanning some
+  // unrelated barcode (a snack wrapper, a shipping label) doesn't get
+  // mistaken for a book and silently fill in wrong data.
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scanLockRef.current) return;
+    const digits = data.replace(/[^0-9Xx]/g, '');
+    if (digits.length !== 13 || !(digits.startsWith('978') || digits.startsWith('979'))) return;
+    scanLockRef.current = true;
+    setScannerVisible(false);
+    const isValid = applyIsbnDigits(digits);
+    if (isValid) {
+      runIsbnLookup(digits);
+    } else {
+      Alert.alert(
+        "That barcode's check digit looks off",
+        "Might be a damaged or misprinted barcode - try again, or enter the ISBN by hand below.",
+      );
     }
-    try {
-      const parsed = ISBN.parse(digits);
-      if (parsed?.isValid) {
-        setIsbnStatus('valid');
-        setIsbnGroup(parsed.groupname ?? '');
-        setDraft((d) => ({ ...d, isbn: (parsed.isIsbn13 ? parsed.isbn13h : parsed.isbn10h) || digits }));
-        return;
-      }
-      setIsbnStatus('invalid');
-    } catch (err) {
-      console.warn('Media Base: isbn3 parse failed', err);
-      setIsbnStatus('idle');
-    }
-    setDraft((d) => ({ ...d, isbn: digits }));
   };
 
   // Fires when the (optional) ISBN field loses focus, if it looks like a
@@ -368,10 +427,13 @@ export default function BookScreen({ navigation }: any) {
     return json?.items?.[0]?.volumeInfo ?? null;
   };
 
-  const handleIsbnBlur = async () => {
+  const handleIsbnBlur = () => {
     const digits = draft.isbn.replace(/[^0-9Xx]/g, '');
     if (digits.length !== 10 && digits.length !== 13) return;
+    runIsbnLookup(digits);
+  };
 
+  const runIsbnLookup = async (digits: string) => {
     setLookingUp(true);
     try {
       let info = await lookupOpenLibrary(digits).catch((err) => {
@@ -538,7 +600,39 @@ export default function BookScreen({ navigation }: any) {
       </View>
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+        {scannerVisible ? (
+          // Rendered inside the SAME Modal as the form rather than as a second,
+          // separate <Modal> - iOS doesn't reliably present two independent
+          // modals at once, which was why this used to only open once you'd
+          // already dismissed the Add/Edit form. Switching content within one
+          // modal avoids that entirely.
+          <View style={styles.scannerRoot}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['ean13'] }}
+              onBarcodeScanned={handleBarcodeScanned}
+            />
+            {/* Cancel's position uses insets.top directly rather than a SafeAreaView -
+                same fix as ScreenHeader: SafeAreaView's automatic inset isn't reliable
+                inside a Modal on iOS, which was pinning this button up under the
+                status bar/notch where it couldn't be tapped. */}
+            <View style={[styles.scannerOverlay, { paddingTop: insets.top + 16 }]}>
+              <TouchableOpacity
+                onPress={() => setScannerVisible(false)}
+                style={[styles.scannerCancel, { top: insets.top + 16 }]}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <AppText style={{ color: '#FFFFFF', fontSize: 15 * theme.fontScale }}>Cancel</AppText>
+              </TouchableOpacity>
+              <View style={styles.scannerFrame} />
+              <AppText style={{ color: '#FFFFFF', fontSize: 14 * theme.fontScale, textAlign: 'center', marginTop: 16 }}>
+                Line up the barcode on the back of the book
+              </AppText>
+            </View>
+          </View>
+        ) : (
+          <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
           <ScreenHeader
             title={editingId ? 'Edit Book' : 'Add Book'}
             left={
@@ -691,6 +785,7 @@ export default function BookScreen({ navigation }: any) {
             )}
           </ScrollView>
         </SafeAreaView>
+        )}
       </Modal>
     </SafeAreaView>
   );
@@ -719,4 +814,14 @@ const styles = StyleSheet.create({
   starRow: { flexDirection: 'row', gap: 8 },
   scanButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 8 },
   deleteButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 28 },
+  scannerRoot: { flex: 1, backgroundColor: '#000000' },
+  scannerOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  scannerCancel: { position: 'absolute', top: 16, left: 20 },
+  scannerFrame: {
+    width: '80%',
+    height: 140,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 12,
+  },
 });

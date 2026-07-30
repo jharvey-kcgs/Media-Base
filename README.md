@@ -214,6 +214,35 @@ building Comics/Manga, Movies, etc.:
   and narrows the list to books that have that tag *anywhere* in their
   list, not just as the primary one. The active filter shows next to
   "Sorted by X" and clears with a tap.
+- **Real barcode scanning (Books specifically)**: "📷 Scan barcode
+  instead" switches the Add/Edit Book modal's content over to a
+  full-screen `expo-camera` `CameraView` restricted to `ean13` codes -
+  deliberately *within the same `<Modal>`* rather than as a second,
+  separate one. iOS doesn't reliably present two independent modals at
+  once; stacking a second `<Modal>` on top of the Add/Edit one meant the
+  scanner's presentation got silently queued until the first was
+  dismissed, so it only ever seemed to open right after tapping Cancel.
+  The scanner's own Cancel button positions itself with `insets.top`
+  from `useSafeAreaInsets` directly rather than a `SafeAreaView` - same
+  fix as `ScreenHeader`: `SafeAreaView`'s automatic inset isn't reliable
+  inside a `Modal` on iOS, which had been pinning that Cancel button up
+  under the status bar/notch where it couldn't be tapped at all. Camera
+  permission is requested lazily right here (not on app launch) via
+  `useCameraPermissions` - if already denied outside the app, it routes
+  straight to Phone Settings instead of a native prompt that wouldn't
+  appear anyway, same pattern as Settings → Permissions. Scans are
+  filtered to codes starting `978`/`979` (the real Bookland ISBN
+  prefixes) so scanning something unrelated (a snack wrapper, a shipping
+  label) can't silently fill in wrong data. A `useRef` lock stops
+  `onBarcodeScanned` from firing dozens of times while the same code
+  sits in frame - `useState` would be too slow for that. A valid scan
+  runs through the exact same `applyIsbnDigits`/`runIsbnLookup` path as
+  typing an ISBN by hand, just triggered immediately instead of waiting
+  for the field to lose focus (there's no "blur" event from a scan). Not
+  device-tested from the sandbox this was built in - the `expo-camera`
+  API surface is stable and well-documented for this SDK, but a real
+  scan-to-fill run-through is worth doing before relying on it for bulk
+  entry.
 - **Live ISBN formatting/validation (Books specifically)**: as digits are
   typed, once there are 10 or 13 of them the field reformats itself with
   the real, official hyphen positions (via `isbn3`, which bundles the
@@ -383,8 +412,12 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
   see [Section 6](#6-color-accessibility).
 - **Data safety**: export/import/delete-all all implemented in Settings
   → Data, not yet tested end-to-end on-device.
-- **Permissions**: camera status + Phone Settings link implemented;
-  actual barcode scanning is still stubbed.
+- **Permissions**: camera status + Phone Settings link implemented.
+  Real barcode scanning is now wired up for Books specifically (EAN-13,
+  Bookland-prefix ISBN barcodes) - see the Category screen pattern
+  section above. Other categories that called for scanning (Comics,
+  Movies, Vinyl, Board Games) still need their own barcode-type/lookup
+  wiring since their codes and data sources differ from ISBN.
 - **TypeScript**: not yet verified with `npx tsc --noEmit` (no network
   access when this scaffold was generated, so dependencies haven't been
   installed or type-checked yet — do this first before building further).
@@ -400,8 +433,9 @@ category-by-category build order and entry-method decisions. At a
 glance, still open:
 - Comics/Manga → Puzzles → Music → Movies → TV Shows → Anime → Vinyl →
   Board Games, in that order
-- Real barcode scanning + confirm/edit screen (Books, Comics, Movies,
-  Vinyl, Board Games)
+- Real barcode scanning for Comics, Movies, Vinyl, Board Games (Books is
+  done - see the Category screen pattern section above for the reference
+  implementation to adapt)
 - "Listen on Spotify" (Music) and "Where to Watch" popup (TV Shows,
   Anime)
 - Share sheet wiring (native OS share, per item)
