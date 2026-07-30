@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useFonts, JetBrainsMono_400Regular, JetBrainsMono_800ExtraBold } from '@expo-google-fonts/jetbrains-mono';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import ProfileSettingsScreen from './screens/ProfileSettingsScreen';
@@ -106,8 +107,10 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <RootGate />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <RootGate />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

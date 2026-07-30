@@ -99,7 +99,8 @@ versions here rather than generating them from a live `expo install`.
 |---|---|
 | `expo`, `react`, `react-native` | Core framework |
 | `@react-navigation/native`, `@react-navigation/native-stack` | Screen navigation |
-| `react-native-screens`, `react-native-safe-area-context` | Required by React Navigation |
+| `react-native-screens` | Required by React Navigation |
+| `react-native-safe-area-context` | `SafeAreaProvider` (wraps the whole app in App.tsx), `SafeAreaView`, and `useSafeAreaInsets` - used directly throughout, not just by React Navigation |
 | `@react-native-async-storage/async-storage` | All local data storage — the entire app's data layer runs on this |
 | `react-native-get-random-values`, `uuid` | Generates unique IDs for every stored item |
 | `expo-camera` | Camera access + permission status for the optional barcode-scan shortcut and the Permissions settings page |
@@ -129,8 +130,9 @@ up in about a second.
 ## 4. What's here — project structure
 
 ```
-App.tsx                          Navigation entry point, ThemeProvider,
-                                   first-launch onboarding gate
+App.tsx                          Navigation entry point, SafeAreaProvider,
+                                   ThemeProvider, first-launch onboarding
+                                   gate
 
 screens/
   HomeScreen.tsx                  The dashboard - one widget per selected
@@ -441,6 +443,19 @@ setup mistake. This project targets **SDK 54** for exactly that reason.
 Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 `lib/theme.tsx` is named that way specifically because it renders a
 `<Context.Provider>`.
+
+### Gotcha #5: "No safe area value available"
+
+`[Error: No safe area value available. Make sure you are rendering
+<SafeAreaProvider> at the top of your app.]` on launch means exactly
+what it says - `App.tsx` needs to wrap everything in `<SafeAreaProvider>`
+(from `react-native-safe-area-context`), above `ThemeProvider`. Nearly
+every screen in this app uses `SafeAreaView` or `useSafeAreaInsets`
+directly (not just React Navigation internally), so this isn't optional
+scaffolding - the app can't render at all without it. This was actually
+missing from the very first scaffold and only surfaced once enough
+screens depended on it to trip the error; if this ever comes back after
+a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 
 ---
 
