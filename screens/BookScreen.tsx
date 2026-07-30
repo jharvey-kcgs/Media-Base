@@ -774,6 +774,29 @@ export default function BookScreen({ navigation }: any) {
     [selectedIds, selectionMode, handleCardPress],
   );
 
+  // Stable for the same reason renderItem is: SectionList keeps the current
+  // section header "stuck" at the top while you scroll through that
+  // section's rows (stickySectionHeadersEnabled defaults to true) - an
+  // inline version of this was getting a new identity on every render,
+  // which meant that sticky header was re-rendering continuously for the
+  // entire time you scrolled through a section, not just once. For a large
+  // section (75 books, most starting with "T") that's a much longer stretch
+  // of continuous unnecessary re-rendering than for a small one, which
+  // lines up with scrolling specifically feeling jumpy/resistant there.
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: { title: string } }) => (
+      <AppText
+        style={[
+          styles.sectionHeader,
+          { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, backgroundColor: theme.colors.background },
+        ]}
+      >
+        {section.title}
+      </AppText>
+    ),
+    [theme.colors.textMuted, theme.colors.background, theme.fontScale],
+  );
+
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
       {genreFilter ? `No books tagged "${genreFilter}" yet.` : 'No books yet. Tap ••• to add your first one.'}
@@ -837,12 +860,12 @@ export default function BookScreen({ navigation }: any) {
             contentContainerStyle={[styles.list, { paddingRight: 20 + 22 }]}
             ListEmptyComponent={emptyState}
             onContentSizeChange={(_w, h) => { contentHeightRef.current = h; }}
-            renderSectionHeader={({ section }) => (
-              <AppText style={[styles.sectionHeader, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, backgroundColor: theme.colors.background }]}>
-                {section.title}
-              </AppText>
-            )}
+            renderSectionHeader={renderSectionHeader}
             renderItem={renderItem}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            updateCellsBatchingPeriod={50}
+            windowSize={11}
           />
         ) : (
           <FlatList
@@ -851,6 +874,10 @@ export default function BookScreen({ navigation }: any) {
             contentContainerStyle={styles.list}
             ListEmptyComponent={emptyState}
             renderItem={renderItem}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            updateCellsBatchingPeriod={50}
+            windowSize={11}
           />
         )}
 

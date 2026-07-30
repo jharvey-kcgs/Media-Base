@@ -401,6 +401,39 @@ building Comics/Manga, Movies, etc.:
   distance than actually exists, so it can't overshoot into that bounce
   regardless of how far off the per-row guess is.
 
+  A follow-up report (75 books, most starting with "T") showed *manual*
+  finger-drag scrolling was also jumpy/resistant specifically around that
+  large section - a different problem from the jump-overshoot above,
+  since dragging never calls `jumpToLetter` at all. Two real causes,
+  both about `SectionList` doing more repeated work than it needed to:
+  1. `renderSectionHeader` was an inline arrow function, given a new
+     identity on every render. `SectionList` keeps the current section's
+     header "stuck" at the top while you scroll through it
+     (`stickySectionHeadersEnabled` defaults to true), so that header was
+     re-rendering continuously for the *entire* time spent scrolling
+     through a section - fine for a small section, a real cost for a
+     77-row one. Fixed the same way `renderItem` already was: a stable
+     `useCallback`.
+  2. Default `FlatList`/`SectionList` virtualization settings render a
+     fairly generous window of off-screen content ahead/behind - fine
+     normally, but scrolling fast through a dense section means a burst of
+     brand-new rows mounting (not just re-rendering) in a short window,
+     which is real work even with `BookCard` memoized (memoization
+     avoids unnecessary *re-renders*, not the cost of an *initial* mount).
+     Tuned `windowSize={11}`, `maxToRenderPerBatch={12}`,
+     `updateCellsBatchingPeriod={50}`, and `initialNumToRender={12}`
+     (down from React Native's defaults) on both lists to smooth that
+     out - smaller, more frequent render batches instead of large,
+     infrequent ones.
+
+  If list performance is still an issue as the book count grows well
+  past this, the next lever to pull is `getItemLayout` (lets
+  `FlatList`/`SectionList` skip measuring entirely) - not attempted yet
+  since row height genuinely varies with title/genre-list wrapping, and
+  a wrong `getItemLayout` value causes visible gaps/overlaps rather than
+  just imprecision, so it needs real on-device measurement data to do
+  safely rather than another guess.
+
   Not shown for the non-alphabetical Read? sort.
 - **Keyboard doesn't cover fields while typing**: the Add/Edit form is
   wrapped in React Native's built-in `KeyboardAvoidingView`
