@@ -208,12 +208,15 @@ building Comics/Manga, Movies, etc.:
   item currently being edited - blocks the save with an alert instead of
   creating a second copy.
 - **Multi-genre entries**: a book can carry more than one genre tag
-  (entered comma-separated, e.g. "Romance, Contemporary"). `genres[0]` is
-  treated as the "primary" tag for sorting and the A-Z index; **"Filter by
-  genre..."** in the ••• menu shows every distinct tag currently in use
-  and narrows the list to books that have that tag *anywhere* in their
-  list, not just as the primary one. The active filter shows next to
-  "Sorted by X" and clears with a tap.
+  (entered comma-separated, e.g. "Romance, Contemporary"). Genre isn't
+  one of the "Filter by..." **sort** options (Title/Author/Read?) - it
+  used to be, but that was redundant/confusing once genre got its own
+  dedicated menu item: **"Filter by genre..."** in the ••• menu shows
+  every distinct tag currently in use and narrows the list to books that
+  have that tag *anywhere* in their list, not just a "primary" one. The
+  active filter shows next to "Sorted by X" and clears with a tap.
+  (`genres[0]` is still tracked internally as the nominal first tag, but
+  nothing in the UI sorts or groups by it anymore.)
 - **Real barcode scanning (Books specifically)**: "📷 Scan barcode
   instead" switches the Add/Edit Book modal's content over to a
   full-screen `expo-camera` `CameraView` restricted to `ean13` codes -
@@ -252,36 +255,80 @@ building Comics/Manga, Movies, etc.:
   warning immediately - catching a mistyped digit before it ever reaches
   the lookup below. This doesn't block saving; it's advisory only.
 - **Optional ISBN field (Books specifically)**: filling it in and moving
-  to the next field triggers an automatic lookup - Open Library first
-  (verified reliable for exact-ISBN matches; requires the descriptive
-  `User-Agent` header their API asks for, or requests can be silently
-  rate-limited), falling back to Google Books if Open Library has no
-  match - and fills Title/Author/Genre(s)/Page count. Genre tags get
-  normalized: Google's often-slash-joined BISAC strings ("Fiction /
-  Romance / Contemporary") get split apart, results are capped to the
-  first 3 raw tags (Open Library's subject list gets noisy fast -
-  bestseller-list mentions, character/setting keywords - past the first
-  few), and generic classifications like "Fiction" sort *after* more
-  specific tags like "Romance" rather than crowding them out. Same end
-  result as scanning, without needing the camera wired up yet. Neither
-  database has 100% ISBN coverage on its own (a specific printing/edition
-  can be missing from one but not the other), which is why both get
-  checked rather than just one. Not network-testable from the sandbox
-  this was built in - API errors and "genuinely no match" both log a
-  `console.warn('Media Base: ...')` to help tell those apart if it still
-  comes back empty for a real ISBN. Categories without a clean
-  ISBN-equivalent (Movies use UPC, which is messier - see the Roadmap
-  doc) will need their own lookup approach rather than copying this one
-  directly.
+  to the next field (or a successful scan) triggers an automatic lookup
+  against Open Library and Google Books **in parallel**, merging the two
+  field by field rather than treating the second as an all-or-nothing
+  fallback - if one source has the title but not the author, the other
+  gets checked for just that field instead of being skipped entirely.
+  This is deliberate: an earlier "only check the second source if the
+  first came back completely empty" version was why some books ended up
+  with a blank title even though one of the two databases actually had
+  it. Genre specifically prefers Google Books' categories when available
+  (usually one or two clean BISAC-style entries like "Fiction / Romance")
+  over Open Library's much noisier subject list. Whichever source's genre
+  data gets used goes through `normalizeGenres()`, which:
+  1. Strips Library-of-Congress-style parenthetical qualifiers and
+     trailing era/decade suffixes rather than rejecting the whole tag
+     over them - "Poetry (poetic works by one author)" becomes the
+     legitimately useful "Poetry", and "Fiction, 21st century" becomes
+     "Fiction" instead of both getting discarded entirely (the first
+     over a word-count technicality, the second because the blanket
+     "reject anything with a digit" rule would otherwise throw out the
+     genre along with the date it's attached to).
+  2. Filters out non-genre noise from what's left - anything starting
+     `nyt:`, containing a digit or `:`/`=`/`>`, or matching known
+     administrative-tag patterns (bestseller-list stamps in either
+     "New York Times Bestseller" or "New York Bestseller" phrasing,
+     accessibility/lending-program flags, etc. - real examples that used
+     to get through: "New York Times Bestseller,
+     Nyt:paperback_books=2012-02-25, Families" and
+     "Nyt:trade-fiction-paperback=2020-11-19, New York Bestseller").
+  3. Scans the **entire** subject/category list for survivors rather
+     than an early slice, then caps to a handful. An earlier version
+     capped to the first 15 raw entries *before* filtering, which could
+     come back completely empty for a book whose real genre tags
+     happened to sit further down its subject list than that.
+
+  **If genre is still missing after merging those two**, a third source
+  gets tried: Open Library's *search index* (`search.json?isbn=...`)
+  rather than its single-edition record. The search index is aggregated
+  across every edition/printing of a work, so it's often populated with
+  a genre even when this specific ISBN's own edition record is sparse -
+  though sometimes a book genuinely has no genre data in any of the
+  three sources (confirmed on a real example: Open Library's own edition
+  page for it had a completely empty Subjects section), which isn't a
+  bug, just a real gap in free bibliographic data. This third lookup
+  only fires when actually needed, since it costs an extra network round
+  trip.
+
+  Not network-testable from the sandbox this was built in - not every
+  book is indexed in either free database, especially older or less
+  mainstream titles, so an occasional genuine "couldn't find that ISBN"
+  is an expected limitation rather than a bug; API errors and "genuinely
+  no match" both log a `console.warn('Media Base: ...')` to help tell
+  those apart, and any new junk-genre pattern that slips through is worth
+  reporting with the exact string so a new rule can be added. Categories
+  without a clean ISBN-equivalent (Movies use UPC, which is messier - see
+  the Roadmap doc) will need their own lookup approach rather than
+  copying this one directly.
 - **A-Z index** on the right edge, only shown when sorted by an
-  alphabetical field (Title/Genre/Author here) - tapping a letter jumps
-  to the nearest section at or after it. Not shown for non-alphabetical
-  sorts like Page count or Read?.
+  alphabetical field (Title/Author here) - tapping a letter jumps to the
+  nearest section at or after it. Not shown for the non-alphabetical
+  Read? sort.
+- **Keyboard doesn't cover fields while typing**: the Add/Edit form is
+  wrapped in React Native's built-in `KeyboardAvoidingView`
+  (`behavior="padding"` on iOS, `"height"` on Android) plus the
+  `ScrollView`'s `automaticallyAdjustKeyboardInsets` prop, so fields
+  further down the form (like Author) stay reachable/visible instead of
+  being hidden behind the keyboard. Deliberately used React Native's core
+  component here rather than adding a third-party keyboard-avoiding
+  library, matching this project's preference for reaching for what's
+  already built in before adding a new dependency.
 
 **Known limitation worth knowing before relying on this further:**
 `Alert.alert` shows unlimited buttons on iOS but caps at 3 on Android -
 fine for now since only iOS is targeted, but the Filter/Filter-by-genre/
-Delete menus (5, "however many distinct genre tags exist", and
+Delete menus (3, "however many distinct genre tags exist", and
 up-to-10 options respectively) will need a real action-sheet component
 (e.g. `@expo/react-native-action-sheet`) before this app could support
 Android.

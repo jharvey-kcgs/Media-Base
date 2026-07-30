@@ -43,7 +43,7 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 
 | Category | Entry method | Fields | Lookup source (best available) |
 |---|---|---|---|
-| Books | Enter or scan (ISBN barcode) | Title, genre, author, page count, read switch | Open Library / Google Books API — reliable |
+| Books | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Open Library / Google Books API — reliable |
 | Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author/illustrator, volume/page count, read switch | Same as Books — comics/manga have ISBNs, reliable |
 | Movies | Enter or scan (UPC barcode) | Title, genre, runtime, watched switch | UPC lookup → title match against OMDb/TMDb — decent, not perfect |
 | TV Shows | Enter only (no scan) | Title, genre, seasons/episodes, watched switch | N/A — manual entry; see "where to watch" below |
@@ -69,7 +69,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - Movies: Title / Genre / Runtime / Watched
 - TV Shows: Title / Genre / Seasons / Watched
 - Anime: Title / Genre / Episodes / Watched
-- Books: Title / Genre / Page Count / Author / Read
+- Books: Title / Genre / Author / Read
 - Comics/Manga: Title / Genre / Volume Count / Author / Read
 - Puzzles: Piece Count / Genre / Manufacturer / Completed
 - Music: Title / Genre / Artist / Listened

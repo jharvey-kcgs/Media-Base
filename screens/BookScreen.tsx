@@ -23,6 +23,8 @@ import {
   Modal,
   ScrollView,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,16 +37,17 @@ import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook } from '../lib/storage';
 import { Book, BookSortField } from '../types/models';
 
+// Genre isn't listed here anymore - "Filter by genre..." (its own menu
+// item, below) is the dedicated place to interact with genre, so having
+// it in this sort-field picker too was redundant/confusing.
 const SORT_FIELDS: { field: BookSortField; label: string }[] = [
   { field: 'title', label: 'Title' },
-  { field: 'genre', label: 'Genre' },
-  { field: 'pageCount', label: 'Page count' },
   { field: 'author', label: 'Author' },
   { field: 'read', label: 'Read?' },
 ];
 
 // Sort fields where an A-Z jump index actually makes sense.
-const ALPHA_FIELDS: BookSortField[] = ['title', 'genre', 'author'];
+const ALPHA_FIELDS: BookSortField[] = ['title', 'author'];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 // Broad classifications that should sort *after* more specific genre tags
@@ -52,6 +55,62 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 // "Romance, Contemporary, Fiction" - Fiction on its own tells you nothing
 // useful once you already have a more specific tag).
 const GENERIC_GENRE_TERMS = new Set(['fiction', 'nonfiction', 'non-fiction']);
+
+// Open Library's subject list mixes real genres in with library-internal
+// bookkeeping (bestseller-list membership + date stamps, accessibility
+// flags, lending-program tags) that isn't a genre at all - e.g. real
+// examples that came through: "New York Times Bestseller,
+// Nyt:paperback_books=2012-02-25, Families" and
+// "Nyt:trade-fiction-paperback=2020-11-19, New York Bestseller". These
+// patterns catch the administrative noise specifically rather than
+// guessing at genre words.
+const GENRE_JUNK_PATTERNS = [
+  /new york times/i,
+  /new york bestseller/i,
+  /\bnyt\b/i,
+  /bestseller/i,
+  /accessible book/i,
+  /protected daisy/i,
+  /\bin library\b/i,
+  /lending library/i,
+  /overdrive/i,
+  /internet archive/i,
+  /large type books/i,
+  /large print/i,
+  /staff pick/i,
+  /open library/i,
+];
+
+// Library of Congress subject headings often qualify a real genre with a
+// parenthetical, e.g. "Poetry (poetic works by one author)" - the genre
+// itself (Poetry) is legitimate, only the qualifier is noise. Stripping
+// it out salvages the useful part instead of rejecting the whole tag on
+// a word-count technicality, which an earlier version was doing.
+function stripParenthetical(tag: string): string {
+  return tag.replace(/\([^)]*\)?/g, '').trim();
+}
+
+// Same idea for another very common LCSH pattern this hadn't accounted
+// for yet: a trailing era/decade qualifier like "Fiction, 21st century"
+// or "Mystery fiction, 1990-1999" - the blanket "reject anything with a
+// digit" rule (below) would otherwise throw out "Fiction" or "Mystery
+// fiction" along with the date it's attached to.
+function stripEraSuffix(tag: string): string {
+  return tag
+    .replace(/,?\s*\d{3,4}(-\d{2,4})?\s*$/i, '') // trailing "1990-1999" / "2020" style
+    .replace(/,?\s*\d+(st|nd|rd|th)\s+century\.?\s*$/i, '') // trailing "21st century"
+    .trim();
+}
+
+function isLikelyRealGenre(tag: string): boolean {
+  const trimmed = tag.trim();
+  if (!trimmed) return false;
+  if (/^nyt:/i.test(trimmed)) return false; // "Nyt:trade-fiction-paperback=2020-11-19" etc.
+  if (/[:=><]/.test(trimmed)) return false; // other machine/catalog notation
+  if (/\d/.test(trimmed)) return false; // remaining dates, list ranks, edition years
+  if (trimmed.split(' ').length > 4) return false; // long descriptive subject headings, not genre-like
+  return !GENRE_JUNK_PATTERNS.some((re) => re.test(trimmed));
+}
 
 function titleCaseTag(tag: string): string {
   return tag
@@ -64,18 +123,23 @@ function titleCaseTag(tag: string): string {
 // Turns whatever a lookup API returned into a clean, ordered genre list.
 // Google Books often returns one BISAC-style string per entry ("Fiction /
 // Romance / Contemporary") - those get split apart. Open Library's subject
-// list is long and noisy (bestseller-list mentions, character/setting
-// keywords, foreign-language duplicates of the same tag) with the
-// genuinely useful genre tags consistently appearing first for mainstream
-// titles, so this caps to the first few raw entries rather than pulling in
-// the whole list.
+// list is long and noisy, so this filters out non-genre noise (after
+// stripping parenthetical qualifiers) across the WHOLE list rather than
+// only an early slice, then caps the survivors - an earlier version
+// capped to the first 15 raw entries before filtering, which could come
+// back completely empty for a book whose real genre tags happened to sit
+// further down its subject list than that.
 function normalizeGenres(rawCategories: string[] | undefined): string[] {
   if (!rawCategories || rawCategories.length === 0) return [];
-  const flattened = rawCategories.flatMap((c) => c.split('/').map((part) => part.trim()).filter(Boolean));
-  const capped = flattened.slice(0, 3);
+  const flattened = rawCategories
+    .flatMap((c) => c.split('/').map((part) => part.trim()).filter(Boolean))
+    .map(stripParenthetical)
+    .map(stripEraSuffix)
+    .filter(Boolean);
+  const candidates = flattened.filter(isLikelyRealGenre);
   const seen = new Set<string>();
   const deduped: string[] = [];
-  for (const tag of capped) {
+  for (const tag of candidates) {
     const cased = titleCaseTag(tag);
     const key = cased.toLowerCase();
     if (!seen.has(key)) {
@@ -85,13 +149,12 @@ function normalizeGenres(rawCategories: string[] | undefined): string[] {
   }
   const specific = deduped.filter((t) => !GENERIC_GENRE_TERMS.has(t.toLowerCase()));
   const generic = deduped.filter((t) => GENERIC_GENRE_TERMS.has(t.toLowerCase()));
-  return [...specific, ...generic];
+  return [...specific, ...generic].slice(0, 4);
 }
 
 function sortBooks(books: Book[], field: BookSortField): Book[] {
   const copy = [...books];
   copy.sort((a, b) => {
-    if (field === 'pageCount') return (a.pageCount ?? 0) - (b.pageCount ?? 0);
     if (field === 'read') return Number(a.read) - Number(b.read);
     if (field === 'genre') return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '');
     return String(a[field]).localeCompare(String(b[field]));
@@ -120,7 +183,6 @@ interface DraftState {
   title: string;
   genresText: string; // comma-separated as typed; parsed into an array on save
   author: string;
-  pageCount: string;
   isbn: string;
   read: boolean;
   rating: number;
@@ -131,7 +193,6 @@ const EMPTY_DRAFT: DraftState = {
   title: '',
   genresText: '',
   author: '',
-  pageCount: '',
   isbn: '',
   read: false,
   rating: 0,
@@ -210,7 +271,6 @@ export default function BookScreen({ navigation }: any) {
       title: book.title,
       genresText: book.genres.join(', '),
       author: book.author,
-      pageCount: book.pageCount != null ? String(book.pageCount) : '',
       isbn: book.isbn ?? '',
       read: book.read,
       rating: book.rating ?? 0,
@@ -409,7 +469,6 @@ export default function BookScreen({ navigation }: any) {
       title: info.title as string | undefined,
       authors: Array.isArray(info.authors) ? info.authors.map((a: any) => a.name).filter(Boolean) : undefined,
       categories: Array.isArray(info.subjects) ? info.subjects.map((s: any) => s.name).filter(Boolean) : undefined,
-      pageCount: info.number_of_pages as number | undefined,
     };
   };
 
@@ -427,39 +486,99 @@ export default function BookScreen({ navigation }: any) {
     return json?.items?.[0]?.volumeInfo ?? null;
   };
 
+  // Fallback source, only called when the two primary lookups leave genre
+  // empty. This hits Open Library's *search index* (search.json) instead
+  // of its single-edition record - the search index is aggregated across
+  // every edition/printing of a work, so it's often populated with genre
+  // subjects even when this one specific ISBN's own edition record is
+  // sparse.
+  const lookupOpenLibraryWork = async (digits: string) => {
+    const res = await fetch(`https://openlibrary.org/search.json?isbn=${digits}&fields=title,author_name,subject`, {
+      headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT },
+    });
+    if (!res.ok) {
+      console.warn('Media Base: Open Library search returned', res.status);
+      return null;
+    }
+    const json = await res.json();
+    const doc = json?.docs?.[0];
+    if (!doc) return null;
+    return {
+      title: doc.title as string | undefined,
+      authors: Array.isArray(doc.author_name) ? doc.author_name : undefined,
+      categories: Array.isArray(doc.subject) ? doc.subject : undefined,
+    };
+  };
+
   const handleIsbnBlur = () => {
     const digits = draft.isbn.replace(/[^0-9Xx]/g, '');
     if (digits.length !== 10 && digits.length !== 13) return;
     runIsbnLookup(digits);
   };
 
+  // Runs both primary lookups in parallel and merges them field by field,
+  // rather than only falling back to the second source when the first
+  // came back completely empty. That "all or nothing" fallback was the
+  // actual cause of some books ending up with a missing title even
+  // though one of the two databases actually had it. If genre is STILL
+  // missing after that merge, lookupOpenLibraryWork is tried as a third,
+  // lazy fallback - only fired when actually needed, since it costs an
+  // extra network round trip.
   const runIsbnLookup = async (digits: string) => {
     setLookingUp(true);
     try {
-      let info = await lookupOpenLibrary(digits).catch((err) => {
-        console.warn('Media Base: Open Library lookup threw', err);
-        return null;
-      });
-      if (!info) {
-        info = await lookupGoogleBooks(digits).catch((err) => {
+      const [olInfo, gInfo] = await Promise.all([
+        lookupOpenLibrary(digits).catch((err) => {
+          console.warn('Media Base: Open Library lookup threw', err);
+          return null;
+        }),
+        lookupGoogleBooks(digits).catch((err) => {
           console.warn('Media Base: Google Books lookup threw', err);
           return null;
-        });
-      }
-      if (!info) {
+        }),
+      ]);
+
+      if (!olInfo && !gInfo) {
         Alert.alert(
           "Couldn't find that ISBN",
           'No match in either book database checked - you can still fill in the details by hand.',
         );
         return;
       }
-      const genres = normalizeGenres(info.categories);
+
+      let title = olInfo?.title || gInfo?.title;
+      let author = (olInfo?.authors && olInfo.authors[0]) || (gInfo?.authors && gInfo.authors[0]);
+      // Genre specifically prefers Google Books: its categories are
+      // usually one or two curated BISAC-style entries ("Fiction /
+      // Romance"), while Open Library's subject list is long and noisy -
+      // normalizeGenres cleans up whichever one actually has data.
+      let genres = normalizeGenres(gInfo?.categories?.length ? gInfo.categories : olInfo?.categories);
+
+      if (genres.length === 0) {
+        const workInfo = await lookupOpenLibraryWork(digits).catch((err) => {
+          console.warn('Media Base: Open Library work-search lookup threw', err);
+          return null;
+        });
+        if (workInfo) {
+          genres = normalizeGenres(workInfo.categories);
+          if (!title) title = workInfo.title;
+          if (!author) author = workInfo.authors && workInfo.authors[0];
+        }
+      }
+
+      if (!title && !author && genres.length === 0) {
+        Alert.alert(
+          "Found the ISBN, but couldn't get details",
+          'None of the databases checked have a populated record for it - you can still fill in the details by hand.',
+        );
+        return;
+      }
+
       setDraft((d) => ({
         ...d,
-        title: info.title || d.title,
-        author: (info.authors && info.authors[0]) || d.author,
+        title: title || d.title,
+        author: author || d.author,
         genresText: genres.length > 0 ? genres.join(', ') : d.genresText,
-        pageCount: info.pageCount ? String(info.pageCount) : d.pageCount,
       }));
     } catch (err) {
       console.warn('Media Base: ISBN lookup failed', err);
@@ -475,13 +594,8 @@ export default function BookScreen({ navigation }: any) {
       .map((g) => g.trim())
       .filter(Boolean);
 
-    if (!draft.title.trim() || genres.length === 0 || !draft.author.trim() || !draft.pageCount.trim()) {
-      Alert.alert('Missing info', 'Title, at least one genre, author, and page count are all required.');
-      return;
-    }
-    const pageCount = parseInt(draft.pageCount, 10);
-    if (Number.isNaN(pageCount)) {
-      Alert.alert('Invalid page count', 'Page count needs to be a number.');
+    if (!draft.title.trim() || genres.length === 0 || !draft.author.trim()) {
+      Alert.alert('Missing info', 'Title, at least one genre, and author are all required.');
       return;
     }
 
@@ -499,7 +613,6 @@ export default function BookScreen({ navigation }: any) {
       title: draft.title.trim(),
       genres,
       author: draft.author.trim(),
-      pageCount,
       isbn: draft.isbn.trim(),
       read: draft.read,
       rating: draft.read ? draft.rating || null : null,
@@ -524,7 +637,7 @@ export default function BookScreen({ navigation }: any) {
         {item.title}
       </AppText>
       <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-        {item.author} · {item.genres.join(', ')} · {item.pageCount} pages
+        {item.author} · {item.genres.join(', ')}
       </AppText>
       <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
         {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
@@ -647,7 +760,15 @@ export default function BookScreen({ navigation }: any) {
             }
           />
 
-          <ScrollView contentContainerStyle={styles.form}>
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView
+              contentContainerStyle={styles.form}
+              keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets
+            >
             <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
               * required
             </AppText>
@@ -722,18 +843,6 @@ export default function BookScreen({ navigation }: any) {
               />
             </View>
 
-            <View style={styles.field}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Page count *
-              </AppText>
-              <TextInput
-                value={draft.pageCount}
-                onChangeText={(text) => setDraft((d) => ({ ...d, pageCount: text }))}
-                keyboardType="number-pad"
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              />
-            </View>
-
             <View style={[styles.row, { marginTop: 8 }]}>
               <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>
                 {REQUIRED_SWITCH_LABEL}
@@ -784,6 +893,7 @@ export default function BookScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
         )}
       </Modal>

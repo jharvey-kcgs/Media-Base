@@ -58,7 +58,6 @@ export interface Book {
   title: string;
   genres: string[]; // a book can carry more than one genre tag; index 0 is treated as "primary" for sorting/A-Z grouping
   author: string;
-  pageCount: number | null;
   isbn: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
   read: boolean;
   rating: number | null; // 1-5, only meaningful once read = true
@@ -66,7 +65,7 @@ export interface Book {
   createdAt: string; // ISO timestamp
 }
 
-export type BookSortField = 'title' | 'genre' | 'pageCount' | 'author' | 'read';
+export type BookSortField = 'title' | 'genre' | 'author' | 'read';
 
 export interface AppSettings {
   onboarded: boolean;
