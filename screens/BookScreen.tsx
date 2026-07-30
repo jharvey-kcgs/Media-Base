@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Switch,
   Alert,
+  AlertButton,
   Modal,
   ScrollView,
   Linking,
@@ -302,13 +303,11 @@ export default function BookScreen({ navigation }: any) {
   };
 
   const openSortMenu = () => {
-    Alert.alert(
-      'Sort by',
-      undefined,
-      SORT_FIELDS.map((opt) => ({ text: opt.label, onPress: () => setSortField(opt.field) })).concat([
-        { text: 'Cancel', style: 'cancel' as const, onPress: () => {} },
-      ]),
-    );
+    const buttons: AlertButton[] = [
+      ...SORT_FIELDS.map((opt) => ({ text: opt.label, onPress: () => setSortField(opt.field) })),
+      { text: 'Cancel', style: 'cancel' },
+    ];
+    Alert.alert('Sort by', undefined, buttons);
   };
 
   const openGenreFilterMenu = () => {
@@ -316,13 +315,12 @@ export default function BookScreen({ navigation }: any) {
       Alert.alert('No genres yet', 'Add a book with a genre first.');
       return;
     }
-    Alert.alert(
-      'Filter by genre',
-      'A book shows up if it has this genre among its tags.',
-      [{ text: 'All genres', onPress: () => setGenreFilter(null) }]
-        .concat(allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })))
-        .concat([{ text: 'Cancel', style: 'cancel' as const, onPress: () => {} }]),
-    );
+    const buttons: AlertButton[] = [
+      { text: 'All genres', onPress: () => setGenreFilter(null) },
+      ...allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })),
+      { text: 'Cancel', style: 'cancel' },
+    ];
+    Alert.alert('Filter by genre', 'A book shows up if it has this genre among its tags.', buttons);
   };
 
   const openDeleteMenu = () => {
@@ -330,14 +328,15 @@ export default function BookScreen({ navigation }: any) {
       Alert.alert('No books yet', 'Add a book first.');
       return;
     }
-    Alert.alert(
-      'Delete which book?',
-      undefined,
-      sorted
-        .slice(0, 10)
-        .map((b) => ({ text: b.title, style: 'destructive' as const, onPress: () => confirmDelete(b.id, b.title) }))
-        .concat([{ text: 'Cancel', style: 'cancel' as const, onPress: () => {} }]),
-    );
+    const buttons: AlertButton[] = [
+      ...sorted.slice(0, 10).map((b) => ({
+        text: b.title,
+        style: 'destructive' as const,
+        onPress: () => confirmDelete(b.id, b.title),
+      })),
+      { text: 'Cancel', style: 'cancel' },
+    ];
+    Alert.alert('Delete which book?', undefined, buttons);
   };
 
   const openMenu = () => {
