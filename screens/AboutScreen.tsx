@@ -22,7 +22,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Permissions',
-    body: 'Shows whether camera access is currently granted and links straight to Phone Settings to change it. Camera access is only ever used for the optional scan shortcut - nothing about adding media requires it.',
+    body: "Shows whether camera access is currently granted and links straight to Phone Settings to change it - camera access is only ever used for the optional scan shortcut, nothing about adding media requires it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
   },
 ];
 

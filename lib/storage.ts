@@ -75,6 +75,15 @@ export async function deleteBook(id: string): Promise<void> {
   );
 }
 
+export async function deleteBooks(ids: string[]): Promise<void> {
+  const books = await getBooks();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.books,
+    books.filter((b) => !idSet.has(b.id)),
+  );
+}
+
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar

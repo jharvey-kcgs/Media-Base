@@ -104,6 +104,7 @@ versions here rather than generating them from a live `expo install`.
 | `@react-native-async-storage/async-storage` | All local data storage — the entire app's data layer runs on this |
 | `react-native-get-random-values`, `uuid` | Generates unique IDs for every stored item |
 | `expo-camera` | Camera access + permission status for the optional barcode-scan shortcut and the Permissions settings page |
+| `expo-notifications` | The daily 10am "check today's recommendations" reminder (Settings → Permissions → Daily reminder toggle) |
 | `isbn3` | Real ISBN validation/hyphenation for the Books ISBN field - bundles the official ISBN-agency range data, since hyphen placement isn't a fixed pattern that could be hand-written |
 | `@expo/vector-icons` | Icons used in headers/menus - Home screen's cog (Settings) and play (refresh), Books' "•••" menu |
 | `expo-font`, `@expo-google-fonts/jetbrains-mono` | The app's JetBrains Mono typeface (Extra Bold for titles/headers, Regular for everything else) |
@@ -158,6 +159,9 @@ lib/
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
+  notifications.ts                 Schedules/cancels the daily 10am
+                                     "check today's recommendations"
+                                     reminder (Settings > Permissions).
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -
@@ -209,10 +213,21 @@ building Comics/Manga, Movies, etc.:
 - Header right slot is a **"•••" menu** (`Ionicons ellipsis-horizontal`),
   not a persistent "+ Add" button or a visible filter-chip row - tapping
   it shows **+ Add entry / Filter by... / Filter by genre... / - Delete
-  entry**, keeping the main list screen clean. Each of those opens a
-  second native picker (also `Alert.alert` with one button per option).
-- **Tapping any row opens it for editing** - every field is editable, and
-  a **Delete** button lives inside that same edit screen.
+  entries**. "Add"/"Filter by..."/"Filter by genre..." each open a
+  second native picker (`Alert.alert` with one button per option).
+  "Delete entries" instead switches the whole screen into a **selection
+  mode**: the header becomes Cancel / "N selected" / Delete, tapping a
+  row toggles a checkmark instead of opening it for editing, and Delete
+  bulk-removes everything selected in one call
+  (`storage.deleteBooks(ids)` - one read/write instead of one per item).
+  This replaced an earlier version where "Delete entries" opened a
+  picker listing up to 10 book titles as buttons, one delete at a time -
+  selection mode is both more capable (delete many at once) and doesn't
+  hit the same Android `Alert.alert` 3-button cap that a long title list
+  would.
+- **Tapping any row opens it for editing** (outside selection mode) -
+  every field is editable, and a **Delete** button lives inside that same
+  edit screen for removing just that one entry.
 - **No duplicate entries**: on save, a same-title match (trimmed,
   case-insensitive) against anything already tracked - other than the
   item currently being edited - blocks the save with an alert instead of
@@ -313,16 +328,31 @@ building Comics/Manga, Movies, etc.:
   mainstream titles, so an occasional genuine "couldn't find that ISBN"
   is an expected limitation rather than a bug; API errors and "genuinely
   no match" both log a `console.warn('Media Base: ...')` to help tell
-  those apart. Categories without a clean ISBN-equivalent (Movies use
-  UPC, which is messier - see the Roadmap doc) will need their own
-  lookup approach rather than copying this one directly.
+  those apart. One exception: Google Books returning a 429 (rate-limited)
+  is deliberately *not* logged - it happens routinely during a bulk
+  scanning session since there's no API key (a shared, low quota), and
+  Open Library is the primary source anyway, so it isn't worth surfacing
+  as if it were unexpected. Categories without a clean ISBN-equivalent
+  (Movies use UPC, which is messier - see the Roadmap doc) will need
+  their own lookup approach rather than copying this one directly.
 - **A-Z index** on the right edge, only shown when sorted by an
-  alphabetical field (Title/Author here) - tapping a letter jumps to the
-  nearest section at or after it (via a small retry/workaround for a real
-  React Native bug where `scrollToLocation` silently no-ops the first
-  time when `itemIndex` is 0 - facebook/react-native#50143, #48032; the
-  fix is to call it twice, immediately). Not shown for the
-  non-alphabetical Read? sort.
+  alphabetical field (Title/Author here). Tapping a letter scrolls the
+  underlying `ScrollView` directly to an *estimated* pixel offset
+  (`estimateSectionOffset()`, based on rough row/header height guesses),
+  rather than relying on `SectionList.scrollToLocation`. That's a
+  deliberate workaround for a real, confirmed React Native bug
+  (facebook/react-native#50143, #48032): `scrollToLocation` silently
+  does nothing when `itemIndex` is 0, which every letter-jump was
+  passing - a "call it twice" workaround was tried first and still
+  didn't reliably scroll in practice, so this switched to bypassing that
+  API entirely. A follow-up `scrollToLocation` call after a short delay
+  attempts to correct any drift now that the target section is actually
+  rendered (which is what that API needs to succeed) - if that
+  correction itself no-ops, the user still lands roughly in the right
+  place from the estimate rather than nothing happening at all. The
+  tradeoff: it's an estimate, so it can land a little short/long,
+  especially for long book titles that wrap to two lines. Not shown for
+  the non-alphabetical Read? sort.
 - **Keyboard doesn't cover fields while typing**: the Add/Edit form is
   wrapped in React Native's built-in `KeyboardAvoidingView`
   (`behavior="padding"` on iOS, `"height"` on Android) plus the
@@ -394,6 +424,27 @@ worth knowing before changing anything in
   allow" previously, `canAskAgain` comes back `false`, and tapping the
   switch back on also routes to Phone Settings rather than a native
   prompt that would never appear.
+
+**Also on this screen: a "Daily reminder" toggle**, below Camera access.
+One repeating local notification at 10:00 AM: `"Come check out today's
+recommendations!"` - deliberately generic, no specific book/item named,
+since it's a nudge to open the app rather than a preview of what's
+there. Toggling it on requests notification permission if not already
+granted (same lazy-request, route-to-Phone-Settings-if-denied pattern as
+camera above) and calls `scheduleDailyRecommendationNotification()` from
+`lib/notifications.ts`; toggling off cancels it. The enabled/disabled
+state itself is stored in `AppSettings.notificationsEnabled` (not
+derived from OS permission status), since the two can drift independently
+- e.g. permission could be revoked externally later while the app still
+"thinks" it's enabled, in which case the scheduled notification just
+silently won't fire; nothing currently re-syncs that automatically.
+
+Not device-tested from the sandbox this was built in - `expo-notifications`
+API surface (`SchedulableTriggerInputTypes`, the exact trigger object
+shape, the notification-handler field names in `App.tsx`) has changed
+across SDK versions, so this is worth confirming end-to-end (permission
+prompt, notification actually firing at 10am, toggling off actually
+canceling it) on a real device before relying on it.
 
 ---
 

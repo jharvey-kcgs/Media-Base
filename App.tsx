@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, StatusBar } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useFonts, JetBrainsMono_400Regular, JetBrainsMono_800ExtraBold } from '@expo-google-fonts/jetbrains-mono';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -26,6 +27,16 @@ const Stack = createNativeStackNavigator();
 // without this, Expo hides it as soon as the JS bundle starts, which is
 // before the font is ready and would show a flash of the system font first.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Show the daily recommendation reminder as a normal alert+sound even if
+// the app happens to already be open at 10am, rather than staying silent.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 function RootGate() {
   const { theme, refreshSettings } = useTheme();

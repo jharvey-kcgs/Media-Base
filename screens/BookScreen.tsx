@@ -35,7 +35,7 @@ import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { getBooks, addBook, updateBook, deleteBook } from '../lib/storage';
+import { getBooks, addBook, updateBook, deleteBook, deleteBooks } from '../lib/storage';
 import { Book, BookSortField } from '../types/models';
 
 // Genre isn't listed here anymore - "Filter by genre..." (its own menu
@@ -198,6 +198,8 @@ export default function BookScreen({ navigation }: any) {
   const [books, setBooks] = useState<Book[]>([]);
   const [sortField, setSortField] = useState<BookSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
@@ -240,44 +242,53 @@ export default function BookScreen({ navigation }: any) {
   );
 
   // Tracks the last attempted scroll target, so onScrollToIndexFailed (which
-  // only receives a flattened item index, not our sectionIndex/itemIndex
-  // pair) knows what to retry.
-  const pendingScrollRef = useRef<{ sectionIndex: number; itemIndex: number } | null>(null);
-
-  const scrollToBookLocation = (sectionIndex: number, itemIndex: number) => {
-    pendingScrollRef.current = { sectionIndex, itemIndex };
-    sectionListRef.current?.scrollToLocation({ sectionIndex, itemIndex, animated: true, viewOffset: 0 });
+  // The itemIndex:0 double-call workaround (React Native bug
+  // facebook/react-native#50143, #48032) turned out not to be reliable
+  // enough in practice - still reported as not scrolling at all. Switched
+  // to a more direct approach instead: estimate the target section's pixel
+  // offset from known row/header heights and scroll the underlying
+  // ScrollView there directly via getScrollResponder().scrollTo(), which
+  // fully bypasses scrollToLocation's buggy itemIndex:0 codepath since
+  // it's not using that API at all. This always actually moves the list -
+  // the tradeoff is it's an ESTIMATE (card height varies a little with
+  // title-wrapping and font size), so it can land a little short of exact.
+  // A follow-up scrollToLocation call after a short delay attempts to
+  // correct that drift now that the target section is actually
+  // rendered/measured (which is the condition scrollToLocation needs to
+  // succeed) - if that correction itself hits the same native bug and
+  // no-ops, the user still ends up in roughly the right place from the
+  // estimate, instead of nothing happening at all.
+  const estimateSectionOffset = (targetIndex: number) => {
+    const headerHeight = 26 * theme.fontScale;
+    const cardHeight = 96 * theme.fontScale; // rough: padding + ~3 lines of text + margin
+    let offset = 0;
+    for (let i = 0; i < targetIndex; i++) {
+      offset += headerHeight + sections[i].data.length * cardHeight;
+    }
+    return offset;
   };
 
   const jumpToLetter = (letter: string) => {
     const index = sections.findIndex((s) => s.title >= letter);
     const target = index === -1 ? sections.length - 1 : index;
     if (target < 0 || !sections[target]) return;
-    // React Native has a long-standing bug (facebook/react-native#50143,
-    // #48032) where scrollToLocation silently does nothing the first time
-    // when itemIndex is 0 - no error, onScrollToIndexFailed doesn't even
-    // fire. Calling it a second time immediately after is the commonly
-    // used workaround and reliably scrolls on the second attempt.
-    scrollToBookLocation(target, 0);
-    requestAnimationFrame(() => scrollToBookLocation(target, 0));
+    sectionListRef.current?.getScrollResponder()?.scrollTo({
+      y: estimateSectionOffset(target),
+      animated: true,
+    });
+    setTimeout(() => {
+      sectionListRef.current?.scrollToLocation({ sectionIndex: target, itemIndex: 0, animated: true, viewOffset: 0 });
+    }, 250);
   };
 
   const handleScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => {
-    // Real failure case (distinct from the itemIndex:0 bug above): the
-    // target section hasn't been measured/rendered yet, which can happen
-    // jumping to a letter far down a long list. Scroll to an estimated
-    // offset first so that section actually renders, then retry the exact
-    // scrollToLocation call - the standard workaround for this class of
-    // SectionList/FlatList bug.
+    // Belt-and-suspenders for the case above's follow-up correction: if
+    // it targets a section that still isn't measured, land at an
+    // estimated offset rather than doing nothing.
     sectionListRef.current?.getScrollResponder()?.scrollTo({
       y: info.averageItemLength * info.index,
       animated: false,
     });
-    const pending = pendingScrollRef.current;
-    if (!pending) return;
-    setTimeout(() => {
-      sectionListRef.current?.scrollToLocation({ ...pending, animated: true, viewOffset: 0 });
-    }, 80);
   };
 
   const openAdd = () => {
@@ -323,6 +334,46 @@ export default function BookScreen({ navigation }: any) {
     ]);
   };
 
+  const enterSelectionMode = () => {
+    if (sorted.length === 0) {
+      Alert.alert('No books yet', 'Add a book first.');
+      return;
+    }
+    setSelectedIds(new Set());
+    setSelectionMode(true);
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const confirmBulkDelete = () => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+    Alert.alert(`Delete ${count} ${count === 1 ? 'book' : 'books'}?`, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteBooks(Array.from(selectedIds));
+          exitSelectionMode();
+          load();
+        },
+      },
+    ]);
+  };
+
   const openSortMenu = () => {
     const buttons: AlertButton[] = [
       ...SORT_FIELDS.map((opt) => ({ text: opt.label, onPress: () => setSortField(opt.field) })),
@@ -344,28 +395,12 @@ export default function BookScreen({ navigation }: any) {
     Alert.alert('Filter by genre', 'A book shows up if it has this genre among its tags.', buttons);
   };
 
-  const openDeleteMenu = () => {
-    if (sorted.length === 0) {
-      Alert.alert('No books yet', 'Add a book first.');
-      return;
-    }
-    const buttons: AlertButton[] = [
-      ...sorted.slice(0, 10).map((b) => ({
-        text: b.title,
-        style: 'destructive' as const,
-        onPress: () => confirmDelete(b.id, b.title),
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ];
-    Alert.alert('Delete which book?', undefined, buttons);
-  };
-
   const openMenu = () => {
     Alert.alert('Books', undefined, [
       { text: '+ Add entry', onPress: openAdd },
       { text: 'Filter by...', onPress: openSortMenu },
       { text: 'Filter by genre...', onPress: openGenreFilterMenu },
-      { text: '- Delete entry', style: 'destructive', onPress: openDeleteMenu },
+      { text: '- Delete entries', style: 'destructive', onPress: enterSelectionMode },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -495,7 +530,13 @@ export default function BookScreen({ navigation }: any) {
   const lookupGoogleBooks = async (digits: string) => {
     const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${digits}`);
     if (!res.ok) {
-      console.warn('Media Base: Google Books returned', res.status);
+      // 429 = rate-limited, which happens routinely during a bulk scanning
+      // session (no API key means a shared, low quota) - Open Library is
+      // the primary source anyway, so this isn't worth logging as if it
+      // were unexpected. Other non-ok statuses still get logged.
+      if (res.status !== 429) {
+        console.warn('Media Base: Google Books returned', res.status);
+      }
       return null;
     }
     const json = await res.json();
@@ -648,22 +689,41 @@ export default function BookScreen({ navigation }: any) {
     load();
   };
 
-  const renderCard = (item: Book) => (
-    <TouchableOpacity
-      onPress={() => openEdit(item)}
-      style={[styles.card, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-    >
-      <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
-        {item.title}
-      </AppText>
-      <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-        {item.author} · {item.genres.join(', ')}
-      </AppText>
-      <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
-        {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
-      </AppText>
-    </TouchableOpacity>
-  );
+  const renderCard = (item: Book) => {
+    const selected = selectedIds.has(item.id);
+    return (
+      <TouchableOpacity
+        onPress={() => (selectionMode ? toggleSelected(item.id) : openEdit(item))}
+        style={[
+          styles.card,
+          { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
+          selected && styles.cardSelected,
+        ]}
+      >
+        <View style={styles.cardRow}>
+          {selectionMode && (
+            <Ionicons
+              name={selected ? 'checkmark-circle' : 'ellipse-outline'}
+              size={22}
+              color={selected ? theme.colors.accentReadable : theme.colors.textMuted}
+              style={styles.cardCheckbox}
+            />
+          )}
+          <View style={styles.flex}>
+            <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
+              {item.title}
+            </AppText>
+            <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
+              {item.author} · {item.genres.join(', ')}
+            </AppText>
+            <AppText style={{ color: item.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
+              {item.read ? `Read${item.rating ? ` · ${item.rating}★` : ''}` : 'Not read yet'}
+            </AppText>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
@@ -674,13 +734,37 @@ export default function BookScreen({ navigation }: any) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader
-        title="Books"
-        onBack={() => navigation.goBack()}
+        title={selectionMode ? `${selectedIds.size} selected` : 'Books'}
+        onBack={selectionMode ? undefined : () => navigation.goBack()}
         backLabel="Home"
+        left={
+          selectionMode ? (
+            <TouchableOpacity onPress={exitSelectionMode} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
+            </TouchableOpacity>
+          ) : undefined
+        }
         right={
-          <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.accentReadable} />
-          </TouchableOpacity>
+          selectionMode ? (
+            <TouchableOpacity
+              onPress={confirmBulkDelete}
+              disabled={selectedIds.size === 0}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <AppText
+                style={{
+                  color: selectedIds.size === 0 ? theme.colors.textMuted : theme.colors.danger,
+                  fontSize: 15 * theme.fontScale,
+                }}
+              >
+                Delete
+              </AppText>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.accentReadable} />
+            </TouchableOpacity>
+          )
         }
       />
 
@@ -927,6 +1011,9 @@ const styles = StyleSheet.create({
   list: { padding: 20, paddingTop: 0 },
   sectionHeader: { paddingVertical: 4, marginBottom: 4 },
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
+  cardSelected: { borderWidth: 2 },
+  cardRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  cardCheckbox: { marginRight: 10, marginTop: 2 },
   azBar: {
     position: 'absolute',
     right: 4,

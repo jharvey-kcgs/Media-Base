@@ -1,21 +1,29 @@
 // screens/PermissionsSettingsScreen.tsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
+import * as Notifications from 'expo-notifications';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
+import { getSettings, saveSettings } from '../lib/storage';
+import { scheduleDailyRecommendationNotification, cancelDailyRecommendationNotification } from '../lib/notifications';
 
 export default function PermissionsSettingsScreen({ navigation }: any) {
-  const { theme } = useTheme();
+  const { theme, settings, refreshSettings } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
+  const [notifStatus, setNotifStatus] = useState<Notifications.PermissionStatus | null>(null);
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then((p) => setNotifStatus(p.status));
+  }, []);
 
   const granted = permission?.granted ?? false;
   const canAskAgain = permission?.canAskAgain ?? true;
 
-  const handleToggle = async (wantsOn: boolean) => {
+  const handleCameraToggle = async (wantsOn: boolean) => {
     if (wantsOn) {
       if (!canAskAgain) {
         Alert.alert(
@@ -41,6 +49,34 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
     }
   };
 
+  const handleNotificationToggle = async (wantsOn: boolean) => {
+    if (wantsOn) {
+      let status = notifStatus;
+      if (status !== 'granted') {
+        const result = await Notifications.requestPermissionsAsync();
+        status = result.status;
+        setNotifStatus(status);
+      }
+      if (status !== 'granted') {
+        Alert.alert(
+          'Notifications needed',
+          'Notification access was turned off - open Phone Settings to allow it, then try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Phone Settings', onPress: () => Linking.openSettings() },
+          ],
+        );
+        return;
+      }
+      await scheduleDailyRecommendationNotification();
+    } else {
+      await cancelDailyRecommendationNotification();
+    }
+    const current = await getSettings();
+    await saveSettings({ ...current, notificationsEnabled: wantsOn });
+    await refreshSettings();
+  };
+
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader title="Permissions" onBack={() => navigation.goBack()} backLabel="Settings" />
@@ -55,7 +91,21 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
           </View>
           <Switch
             value={granted}
-            onValueChange={handleToggle}
+            onValueChange={handleCameraToggle}
+            trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+          />
+        </View>
+
+        <View style={[styles.row, { borderColor: theme.colors.border }]}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Daily reminder</AppText>
+            <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
+              One notification at 10:00 AM: "Come check out today's recommendations!" - no specific pick is named.
+            </AppText>
+          </View>
+          <Switch
+            value={settings.notificationsEnabled}
+            onValueChange={handleNotificationToggle}
             trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
           />
         </View>

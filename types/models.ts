@@ -73,6 +73,7 @@ export interface AppSettings {
   themeColor: string; // hex
   themeMode: 'light' | 'dark';
   fontSize: 'small' | 'default' | 'large';
+  notificationsEnabled: boolean; // daily 10am "check today's recommendations" reminder
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -81,4 +82,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   themeColor: '#378ADD',
   themeMode: 'light',
   fontSize: 'default',
+  notificationsEnabled: false,
 };
