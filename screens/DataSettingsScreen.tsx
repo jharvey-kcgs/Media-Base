@@ -1,7 +1,19 @@
 // screens/DataSettingsScreen.tsx
 
 import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, TextInput, Share, Alert } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  Share,
+  Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
@@ -52,51 +64,62 @@ export default function DataSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader title="Data" onBack={() => navigation.goBack()} backLabel="Settings" />
 
-      <View style={styles.content}>
-        <TouchableOpacity
-          onPress={handleExport}
-          style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
         >
-          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Export data</AppText>
-        </TouchableOpacity>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View>
+              <TouchableOpacity
+                onPress={handleExport}
+                style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+              >
+                <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Export data</AppText>
+              </TouchableOpacity>
 
-        <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
-          Paste a Media Base backup below to import it
-        </AppText>
-        <TextInput
-          value={importText}
-          onChangeText={setImportText}
-          multiline
-          placeholder="Paste backup JSON here"
-          placeholderTextColor={theme.colors.textMuted}
-          style={[
-            styles.input,
-            {
-              color: theme.colors.text,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surface,
-              fontFamily: FONT_FAMILY.body,
-            },
-          ]}
-        />
-        <TouchableOpacity
-          onPress={handleImport}
-          disabled={!importText.trim()}
-          style={[
-            styles.button,
-            { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, opacity: importText.trim() ? 1 : 0.5 },
-          ]}
-        >
-          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Import data</AppText>
-        </TouchableOpacity>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+                Paste a Media Base backup below to import it
+              </AppText>
+              <TextInput
+                value={importText}
+                onChangeText={setImportText}
+                multiline
+                placeholder="Paste backup JSON here"
+                placeholderTextColor={theme.colors.textMuted}
+                style={[
+                  styles.input,
+                  {
+                    color: theme.colors.text,
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                    fontFamily: FONT_FAMILY.body,
+                  },
+                ]}
+              />
+              <TouchableOpacity
+                onPress={handleImport}
+                disabled={!importText.trim()}
+                style={[
+                  styles.button,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, opacity: importText.trim() ? 1 : 0.5 },
+                ]}
+              >
+                <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Import data</AppText>
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleDelete}
-          style={[styles.button, styles.dangerButton, { borderColor: theme.colors.danger }]}
-        >
-          <AppText style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</AppText>
-        </TouchableOpacity>
-      </View>
+              <TouchableOpacity
+                onPress={handleDelete}
+                style={[styles.button, styles.dangerButton, { borderColor: theme.colors.danger }]}
+              >
+                <AppText style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</AppText>
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

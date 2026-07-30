@@ -366,7 +366,15 @@ building Comics/Manga, Movies, etc.:
   being hidden behind the keyboard. Deliberately used React Native's core
   component here rather than adding a third-party keyboard-avoiding
   library, matching this project's preference for reaching for what's
-  already built in before adding a new dependency.
+  already built in before adding a new dependency. `DataSettingsScreen`
+  needed the exact same fix for the same reason - its backup-import
+  paste box was inside a plain `View` with no scroll at all, so with the
+  keyboard up there was no way to reach the Import button below it *or*
+  dismiss the keyboard by tapping away. Fixed the same way, plus a
+  `TouchableWithoutFeedback` wrapping the screen's content that calls
+  `Keyboard.dismiss()` on an outside tap (the Add/Edit form doesn't need
+  this addition since Cancel/Save in its header are always reachable
+  regardless of keyboard state).
 
 **Known limitation worth knowing before relying on this further:**
 `Alert.alert` shows unlimited buttons on iOS but caps at 3 on Android -
