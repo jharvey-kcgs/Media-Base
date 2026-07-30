@@ -21,7 +21,7 @@ import { useTheme } from '../lib/theme';
 import { exportAllData, importAllData, deleteAllData } from '../lib/storage';
 
 export default function DataSettingsScreen({ navigation }: any) {
-  const { theme } = useTheme();
+  const { theme, refreshSettings } = useTheme();
   const [importText, setImportText] = useState('');
 
   const handleExport = async () => {
@@ -32,6 +32,13 @@ export default function DataSettingsScreen({ navigation }: any) {
   const handleImport = async () => {
     try {
       await importAllData(importText);
+      // importAllData writes the restored settings to disk correctly, but
+      // the running app's ThemeProvider still holds whatever settings it
+      // loaded at launch in memory - without this, the imported theme
+      // color/dark mode/text size (and enabled Home categories, which
+      // live in that same settings object) wouldn't visibly take effect
+      // until the app was fully restarted.
+      await refreshSettings();
       Alert.alert('Import complete', 'Your data has been restored.');
       setImportText('');
     } catch (err: any) {
@@ -52,7 +59,13 @@ export default function DataSettingsScreen({ navigation }: any) {
           onPress: () => {
             Alert.alert('Are you sure?', 'Last chance - this cannot be undone.', [
               { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: () => deleteAllData() },
+              { text: 'Delete', style: 'destructive', onPress: async () => {
+                  await deleteAllData();
+                  // Same reason as the import fix above - deleteAllData
+                  // wipes settings on disk too, but the running app needs
+                  // to be told to reload them back to defaults.
+                  await refreshSettings();
+                } },
             ]);
           },
         },

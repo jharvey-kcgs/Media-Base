@@ -147,7 +147,15 @@ screens/
   SettingsScreen.tsx               Settings nav list
   ProfileSettingsScreen.tsx        Toggle which categories show on Home
   ThemeSettingsScreen.tsx          Theme color, Light/Dark, text size
-  DataSettingsScreen.tsx           Export / import / delete-all
+  DataSettingsScreen.tsx           Export / import / delete-all - both
+                                     import and delete-all call
+                                     refreshSettings() from ThemeContext
+                                     afterward, since restoring/wiping
+                                     settings on disk doesn't by itself
+                                     update the app's already-loaded,
+                                     in-memory copy (theme color, Light/
+                                     Dark mode, text size, enabled Home
+                                     categories all live there)
   PermissionsSettingsScreen.tsx    Camera access status + Phone Settings link
   AboutScreen.tsx                  What each setting/screen does
   FAQScreen.tsx                    Common questions, split out from About
