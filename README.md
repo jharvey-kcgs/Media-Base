@@ -47,13 +47,15 @@ or transmits about you.
   Phone Settings, since apps can't grant or revoke OS permissions on
   their own
 
-**Where this stands right now:** first working slice covers Onboarding,
-Home, all of Settings, and Books end-to-end (add, edit, sort/filter, rate,
-review, delete). Every other category widget shows "Coming soon" until
-its own screen is built, following the confirmed build order in
-[Media-Base-Roadmap.md](./Media-Base-Roadmap.md). Barcode scanning itself
-is stubbed (shows an alert) — the actual camera + lookup wiring comes in
-a later pass, per category.
+**Where this stands right now:** Onboarding, Home, all of Settings, and
+two categories - Books and Comics/Manga - are working end-to-end (add,
+edit, sort/filter, rate, review, delete, real barcode scanning). Every
+other category widget shows "Coming soon" until its own screen is built,
+following the confirmed build order in
+[Media-Base-Roadmap.md](./Media-Base-Roadmap.md). ISBN lookup and the
+A-Z index are shared between Books and Comics/Manga via `lib/isbnLookup.ts`
+and `lib/useAlphabetScroll.ts` rather than duplicated - see the Category
+screen pattern section for what to reuse vs. rebuild per category.
 
 ---
 
@@ -141,6 +143,13 @@ screens/
   OnboardingScreen.tsx             First-launch category picker
 
   BookScreen.tsx                   Books (widget 1 - working)
+  ComicScreen.tsx                  Comics/Manga (widget 2 - working) -
+                                     built on the same shared
+                                     lib/isbnLookup.ts and
+                                     lib/useAlphabetScroll.ts as Books,
+                                     with its own genre allowlist that
+                                     adds manga demographic labels
+                                     (Shonen/Shoujo/Seinen/Josei)
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
@@ -170,6 +179,29 @@ lib/
   notifications.ts                 Schedules/cancels the daily 10am
                                      "check today's recommendations"
                                      reminder (Settings > Permissions).
+  isbnLookup.ts                     Category-agnostic ISBN lookup (Open
+                                     Library primary, Google Books
+                                     fallback, Open Library search-index
+                                     as a third genre-only fallback) plus
+                                     the genre-allowlist matching engine.
+                                     Extracted out of BookScreen.tsx so
+                                     Comics/Manga (and any future
+                                     ISBN-based category) share the same
+                                     already-debugged logic instead of a
+                                     second copy needing every future fix
+                                     applied twice. Each category still
+                                     supplies its own genre allowlist.
+  useAlphabetScroll.ts              The A-Z index jump hook, also
+                                     extracted out of BookScreen.tsx -
+                                     carries forward three rounds of real
+                                     React Native bugs found and fixed
+                                     there (two different scrollToLocation
+                                     bugs on itemIndex:0, then a
+                                     scroll-overshoot rubber-band bounce
+                                     on letters near the end of the
+                                     alphabet). Any future category with
+                                     an A-Z index should use this rather
+                                     than reimplementing it.
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -
@@ -217,7 +249,15 @@ assets/
 ### Category screen pattern (applies to every future category, not just Books)
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
-building Comics/Manga, Movies, etc.:
+building the remaining categories (Movies, TV Shows, etc.) - and
+`screens/ComicScreen.tsx` is a real example of that copy already done,
+built on the same two extracted shared modules
+(`lib/isbnLookup.ts`, `lib/useAlphabetScroll.ts`) rather than a second
+copy of that logic, with only the genre allowlist and user-facing wording
+actually differing between the two. A future category screen should
+follow that same split: reuse the shared modules for ISBN lookup and the
+A-Z index, and only duplicate what's genuinely category-specific (the
+form fields, the row component, the allowlist).
 - **The row component (`BookCard`) is defined at module scope and wrapped
   in `React.memo`** - not as a plain function inside the screen's body.
   This is what actually fixes React Native's "VirtualizedList: You have a
@@ -635,11 +675,17 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 - **Data safety**: export/import/delete-all all implemented in Settings
   → Data, not yet tested end-to-end on-device.
 - **Permissions**: camera status + Phone Settings link implemented.
-  Real barcode scanning is now wired up for Books specifically (EAN-13,
-  Bookland-prefix ISBN barcodes) - see the Category screen pattern
-  section above. Other categories that called for scanning (Comics,
-  Movies, Vinyl, Board Games) still need their own barcode-type/lookup
-  wiring since their codes and data sources differ from ISBN.
+  Real barcode scanning is wired up for both Books and Comics/Manga
+  (EAN-13, Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`)
+  - see the Category screen pattern section above. Other categories that
+  called for scanning (Movies, Vinyl, Board Games) still need their own
+  barcode-type/lookup wiring since their codes and data sources differ
+  from ISBN.
+- **Notifications**: daily 10am reminder implemented (Settings →
+  Permissions → Daily reminder), not yet device-tested from this sandbox.
+- **Home screen**: generalized to load widget data (count + daily pick)
+  for any implemented category rather than a Books-only special case,
+  now that Comics/Manga is a second one.
 - **TypeScript**: not yet verified with `npx tsc --noEmit` (no network
   access when this scaffold was generated, so dependencies haven't been
   installed or type-checked yet — do this first before building further).
@@ -653,11 +699,11 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Comics/Manga → Puzzles → Music → Movies → TV Shows → Anime → Vinyl →
-  Board Games, in that order
-- Real barcode scanning for Comics, Movies, Vinyl, Board Games (Books is
-  done - see the Category screen pattern section above for the reference
-  implementation to adapt)
+- Puzzles → Music → Movies → TV Shows → Anime → Vinyl → Board Games, in
+  that order (Books and Comics/Manga are both done)
+- Real barcode scanning for Movies, Vinyl, Board Games (Books and
+  Comics/Manga are done, sharing `lib/isbnLookup.ts` - see the Category
+  screen pattern section above for the reference implementation to adapt)
 - "Listen on Spotify" (Music) and "Where to Watch" popup (TV Shows,
   Anime)
 - Share sheet wiring (native OS share, per item)

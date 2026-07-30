@@ -44,7 +44,7 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 | Category | Entry method | Fields | Lookup source (best available) |
 |---|---|---|---|
 | Books | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Open Library / Google Books API — reliable |
-| Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author/illustrator, volume/page count, read switch | Same as Books — comics/manga have ISBNs, reliable |
+| Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Same as Books — comics/manga have ISBNs, reliable |
 | Movies | Enter or scan (UPC barcode) | Title, genre, runtime, watched switch | UPC lookup → title match against OMDb/TMDb — decent, not perfect |
 | TV Shows | Enter only (no scan) | Title, genre, seasons/episodes, watched switch | N/A — manual entry; see "where to watch" below |
 | Anime | Enter only (no scan) | Title, genre, episodes, watched switch | N/A — manual entry; see "where to watch" below |
@@ -70,15 +70,15 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - TV Shows: Title / Genre / Seasons / Watched
 - Anime: Title / Genre / Episodes / Watched
 - Books: Title / Genre / Author / Read
-- Comics/Manga: Title / Genre / Volume Count / Author / Read
+- Comics/Manga: Title / Genre / Author / Read
 - Puzzles: Piece Count / Genre / Manufacturer / Completed
 - Music: Title / Genre / Artist / Listened
 - Vinyl/Records: Title / Genre / Artist / Listened
 - Board Games: Genre / Play Time / Manufacturer / Title / Played
 
 ## Build order
-1. **Books** — most reliable lookup, simplest way to prove the entry → confirm → rate → recommend pattern end to end
-2. Comics/Manga (same ISBN pattern, near-zero extra lookup work)
+1. **Books** — most reliable lookup, simplest way to prove the entry → confirm → rate → recommend pattern end to end ✅ done
+2. **Comics/Manga** (same ISBN pattern, near-zero extra lookup work) ✅ done — built on shared lib/isbnLookup.ts and lib/useAlphabetScroll.ts rather than a second copy, with its own genre allowlist that adds manga demographic labels (Shonen/Shoujo/Seinen/Josei) alongside standard genres
 3. Puzzles (manual-only, good simple second target)
 4. Music (link-paste + developer API keys)
 5. Movies → TV Shows → Anime (same UPC/title-search family)

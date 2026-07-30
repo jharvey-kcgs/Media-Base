@@ -67,6 +67,25 @@ export interface Book {
 
 export type BookSortField = 'title' | 'genre' | 'author' | 'read';
 
+// Structurally identical to Book by design - Comics/Manga entries work the
+// same way (multi-genre, ISBN lookup/scan, a read switch), just with
+// Comics/Manga's own genre allowlist (see screens/ComicScreen.tsx) since
+// manga in particular is often filed by demographic (Shonen/Seinen/etc.)
+// as much as by traditional genre.
+export interface Comic {
+  id: string;
+  title: string;
+  genres: string[];
+  author: string; // covers writer/illustrator both - typed as one field, same as Book's Author
+  isbn: string;
+  read: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type ComicSortField = 'title' | 'genre' | 'author' | 'read';
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home

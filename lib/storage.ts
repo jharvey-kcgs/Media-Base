@@ -3,11 +3,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { AppSettings, DEFAULT_SETTINGS, Book } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic } from '../types/models';
 
 const KEYS = {
   settings: 'mediabase:settings',
   books: 'mediabase:books',
+  comics: 'mediabase:comics',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -81,6 +82,45 @@ export async function deleteBooks(ids: string[]): Promise<void> {
   await saveAll(
     KEYS.books,
     books.filter((b) => !idSet.has(b.id)),
+  );
+}
+
+// --- Comics/Manga ---
+
+export async function getComics(): Promise<Comic[]> {
+  const raw = await getAll<any>(KEYS.comics);
+  // Same migration safety net as getBooks(), in case this shape ever
+  // changes the way Book's genre field once did.
+  return raw.map((c) => (Array.isArray(c.genres) ? (c as Comic) : { ...c, genres: c.genre ? [c.genre] : [] }));
+}
+
+export async function addComic(input: Omit<Comic, 'id' | 'createdAt'>): Promise<Comic> {
+  const comics = await getComics();
+  const comic: Comic = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.comics, [...comics, comic]);
+  return comic;
+}
+
+export async function updateComic(id: string, updates: Partial<Comic>): Promise<void> {
+  const comics = await getComics();
+  const next = comics.map((c) => (c.id === id ? { ...c, ...updates } : c));
+  await saveAll(KEYS.comics, next);
+}
+
+export async function deleteComic(id: string): Promise<void> {
+  const comics = await getComics();
+  await saveAll(
+    KEYS.comics,
+    comics.filter((c) => c.id !== id),
+  );
+}
+
+export async function deleteComics(ids: string[]): Promise<void> {
+  const comics = await getComics();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.comics,
+    comics.filter((c) => !idSet.has(c.id)),
   );
 }
 

@@ -17,6 +17,7 @@ import PermissionsSettingsScreen from './screens/PermissionsSettingsScreen';
 import AboutScreen from './screens/AboutScreen';
 import FAQScreen from './screens/FAQScreen';
 import BookScreen from './screens/BookScreen';
+import ComicScreen from './screens/ComicScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { getSettings } from './lib/storage';
 import { ThemeProvider, useTheme } from './lib/theme';
@@ -94,6 +95,7 @@ function ThemedApp() {
           <Stack.Screen name="About" component={AboutScreen} />
           <Stack.Screen name="FAQ" component={FAQScreen} />
           <Stack.Screen name="Book" component={BookScreen} />
+          <Stack.Screen name="Comic" component={ComicScreen} />
         </Stack.Navigator>
       </View>
     </NavigationContainer>

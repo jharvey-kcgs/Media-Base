@@ -1,14 +1,13 @@
-// screens/BookScreen.tsx
+// screens/ComicScreen.tsx
 //
-// This is the reference pattern for every future category screen
-// (Comics/Manga, Movies, TV Shows, etc.): a clean list with all actions
-// tucked behind a "•••" menu (Add / Filter by sort field / Filter by
-// genre / Delete) rather than visible buttons/chips, tap-to-edit on any
-// row (with Delete living inside that edit screen too), a same-title
-// duplicate guard on save, multi-genre entries (a book can carry more
-// than one genre tag, and a genre filter matches if any tag fits), and -
-// for alphabetical sort fields - a right-edge A-Z index for jumping
-// around a long list.
+// Built directly on the Books pattern (screens/BookScreen.tsx) - Comics/
+// Manga entries work identically (multi-genre, ISBN lookup/scan since
+// graphic novels and manga volumes are cataloged with real ISBNs same as
+// any other book, a read switch), sharing the ISBN-lookup and A-Z-scroll
+// logic via lib/isbnLookup.ts and lib/useAlphabetScroll.ts. The one real
+// difference is GENRE_ALLOWLIST below: manga in particular is as often
+// filed by demographic (Shonen/Seinen/Shoujo/Josei) as by traditional
+// genre, so those are included alongside genre terms.
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -35,42 +34,42 @@ import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { getBooks, addBook, updateBook, deleteBook, deleteBooks } from '../lib/storage';
+import { getComics, addComic, updateComic, deleteComic, deleteComics } from '../lib/storage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
-import { Book, BookSortField } from '../types/models';
+import { Comic, ComicSortField } from '../types/models';
 
 // Genre isn't listed here anymore - "Filter by genre..." (its own menu
 // item, below) is the dedicated place to interact with genre, so having
 // it in this sort-field picker too was redundant/confusing.
-const SORT_FIELDS: { field: BookSortField; label: string }[] = [
+const SORT_FIELDS: { field: ComicSortField; label: string }[] = [
   { field: 'title', label: 'Title' },
   { field: 'author', label: 'Author' },
   { field: 'read', label: 'Read?' },
 ];
 
 // Sort fields where an A-Z jump index actually makes sense.
-const ALPHA_FIELDS: BookSortField[] = ['title', 'author'];
+const ALPHA_FIELDS: ComicSortField[] = ['title', 'author'];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-// The ONLY genres the ISBN lookup is allowed to auto-fill - anything a
-// lookup returns that isn't on this list gets dropped entirely, no matter
-// how it's phrased. See lib/isbnLookup.ts for how this gets applied
-// (shared with Comics/Manga and any future ISBN-based category, each with
-// its own allowlist here).
+// The ONLY genres the ISBN lookup is allowed to auto-fill - see
+// lib/isbnLookup.ts for how this gets applied, and Book's own version of
+// this list for the general rationale (an allowlist, not reactive
+// blocking). This one differs from Books' by including manga demographic
+// labels (Shonen/Shoujo/Seinen/Josei) alongside traditional genres, since
+// manga readers filter by demographic just as often as by genre.
 const GENRE_ALLOWLIST = [
-  'Fiction', 'Nonfiction', 'Romance', 'Mystery', 'Thriller', 'Suspense',
-  'Science Fiction', 'Fantasy', 'Horror', 'Historical Fiction', 'Contemporary',
-  'Literary Fiction', 'Young Adult', "Children's", 'Classics', 'Adventure',
-  'Crime', 'Dystopian', 'Paranormal', 'Biography', 'Memoir', 'Self-Help',
-  'Poetry', 'Humor', 'Graphic Novel', 'Comics', 'Short Stories', 'Essays',
-  'True Crime', 'Western', 'War', 'Drama', 'Philosophy', 'Psychology',
-  'Religion', 'Spirituality', 'History', 'Science', 'Business', 'Health',
-  'Cooking', 'Travel', 'Art', 'Music', 'Sports', 'Politics', 'Technology',
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Science Fiction',
+  'Horror', 'Mystery', 'Thriller', 'Suspense', 'Romance', 'Slice Of Life',
+  'Historical', 'Sports', 'Supernatural', 'Mecha', 'Isekai',
+  'Post-Apocalyptic', 'Dystopian', 'Crime', 'War', 'Superhero', 'Satire',
+  'Anthology', 'Biography', 'Memoir', 'Fiction', 'Nonfiction', 'Western',
+  'Psychological', 'Shonen', 'Shoujo', 'Seinen', 'Josei', 'Manga',
+  'Manhwa', 'Manhua', 'Graphic Novel',
 ];
 
-function sortBooks(books: Book[], field: BookSortField): Book[] {
-  const copy = [...books];
+function sortComics(comics: Comic[], field: ComicSortField): Comic[] {
+  const copy = [...comics];
   copy.sort((a, b) => {
     if (field === 'read') return Number(a.read) - Number(b.read);
     if (field === 'genre') return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '');
@@ -80,10 +79,10 @@ function sortBooks(books: Book[], field: BookSortField): Book[] {
 }
 
 // Genre grouping/sorting uses genres[0] ("primary" tag) as the key -
-// Title/Author still read directly off the book.
-function groupByFirstLetter(sorted: Book[], field: 'title' | 'genre' | 'author'): { title: string; data: Book[] }[] {
-  const getKey = (item: Book) => (field === 'genre' ? item.genres[0] ?? '' : String(item[field] ?? ''));
-  const groups: Record<string, Book[]> = {};
+// Title/Author still read directly off the comic.
+function groupByFirstLetter(sorted: Comic[], field: 'title' | 'genre' | 'author'): { title: string; data: Comic[] }[] {
+  const getKey = (item: Comic) => (field === 'genre' ? item.genres[0] ?? '' : String(item[field] ?? ''));
+  const groups: Record<string, Comic[]> = {};
   for (const item of sorted) {
     const raw = getKey(item).trim();
     const letter = raw[0]?.toUpperCase() ?? '#';
@@ -119,35 +118,26 @@ const EMPTY_DRAFT: DraftState = {
 const INPUT_FONT = { fontFamily: FONT_FAMILY.body };
 // Non-breaking space keeps the trailing "*" glued to the last word instead
 // of wrapping onto its own line at larger text sizes.
-const REQUIRED_SWITCH_LABEL = 'Have you read this book?\u00A0*';
+const REQUIRED_SWITCH_LABEL = 'Have you read this comic/manga?\u00A0*';
 
-// Memoized row component, defined at module scope (never recreated) - this
-// is the actual fix for the "large list slow to update" warning and
-// sluggish scrolling/filtering at 65+ books. The previous version defined
-// row rendering as a plain function inside BookScreen's body, recreated on
-// every render; even though FlatList/SectionList's data itself was
-// memoized, a fresh renderItem function identity on every parent render
-// (from any state change anywhere on the screen, including typing in a
-// filter) meant every visible row got fully re-rendered every time, not
-// just the ones that actually changed. Wrapping the row itself in
-// React.memo means a row only re-renders when ITS OWN props (book, selected,
-// selectionMode) actually change - unaffected rows are skipped even if the
-// list's outer renderItem callback gets a new identity.
-const BookCard = React.memo(function BookCard({
-  book,
+// Memoized row component, defined at module scope (never recreated) - see
+// BookScreen.tsx's BookCard for the full story on why this matters (the
+// fix for sluggish scrolling/filtering once a list has 50+ entries).
+const ComicCard = React.memo(function ComicCard({
+  comic,
   selected,
   selectionMode,
   onPress,
 }: {
-  book: Book;
+  comic: Comic;
   selected: boolean;
   selectionMode: boolean;
-  onPress: (book: Book) => void;
+  onPress: (comic: Comic) => void;
 }) {
   const { theme } = useTheme();
   return (
     <TouchableOpacity
-      onPress={() => onPress(book)}
+      onPress={() => onPress(comic)}
       style={[
         styles.card,
         { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
@@ -165,13 +155,13 @@ const BookCard = React.memo(function BookCard({
         )}
         <View style={styles.flex}>
           <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
-            {book.title}
+            {comic.title}
           </AppText>
           <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-            {book.author} · {book.genres.join(', ')}
+            {comic.author} · {comic.genres.join(', ')}
           </AppText>
-          <AppText style={{ color: book.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
-            {book.read ? `Read${book.rating ? ` · ${book.rating}★` : ''}` : 'Not read yet'}
+          <AppText style={{ color: comic.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
+            {comic.read ? `Read${comic.rating ? ` · ${comic.rating}★` : ''}` : 'Not read yet'}
           </AppText>
         </View>
       </View>
@@ -179,11 +169,11 @@ const BookCard = React.memo(function BookCard({
   );
 });
 
-export default function BookScreen({ navigation }: any) {
+export default function ComicScreen({ navigation }: any) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [books, setBooks] = useState<Book[]>([]);
-  const [sortField, setSortField] = useState<BookSortField>('title');
+  const [comics, setComics] = useState<Comic[]>([]);
+  const [sortField, setSortField] = useState<ComicSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -198,7 +188,7 @@ export default function BookScreen({ navigation }: any) {
   const scanLockRef = useRef(false);
 
   const load = useCallback(async () => {
-    setBooks(await getBooks());
+    setComics(await getComics());
   }, []);
 
   useFocusEffect(
@@ -209,17 +199,17 @@ export default function BookScreen({ navigation }: any) {
 
   const allGenres = useMemo(() => {
     const set = new Set<string>();
-    books.forEach((b) => b.genres.forEach((g) => set.add(g)));
+    comics.forEach((c) => c.genres.forEach((g) => set.add(g)));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [books]);
+  }, [comics]);
 
-  const filteredBooks = useMemo(
+  const filteredComics = useMemo(
     () =>
-      genreFilter ? books.filter((b) => b.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : books,
-    [books, genreFilter],
+      genreFilter ? comics.filter((c) => c.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : comics,
+    [comics, genreFilter],
   );
 
-  const sorted = useMemo(() => sortBooks(filteredBooks, sortField), [filteredBooks, sortField]);
+  const sorted = useMemo(() => sortComics(filteredComics, sortField), [filteredComics, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
   const isAlpha = ALPHA_FIELDS.includes(sortField);
   const sections = useMemo(
@@ -227,10 +217,9 @@ export default function BookScreen({ navigation }: any) {
     [isAlpha, sorted, sortField],
   );
 
-  // A-Z index scroll handling (estimate + overshoot-safe clamping, plus the
-  // fixes for two real React Native scrollToLocation bugs along the way)
-  // now lives in a shared hook - see lib/useAlphabetScroll.ts for the full
-  // history of why it works this way.
+  // A-Z index scroll handling - see lib/useAlphabetScroll.ts for the full
+  // history of why it works this way (three rounds of real bugs found and
+  // fixed on Books first).
   const { listRef: sectionListRef, onLayout: onListLayout, onContentSizeChange, jumpToLetter } = useAlphabetScroll(
     sections,
     theme.fontScale,
@@ -243,18 +232,18 @@ export default function BookScreen({ navigation }: any) {
     setModalVisible(true);
   };
 
-  const openEdit = (book: Book) => {
-    setEditingId(book.id);
+  const openEdit = (comic: Comic) => {
+    setEditingId(comic.id);
     setDraft({
-      title: book.title,
-      genresText: book.genres.join(', '),
-      author: book.author,
-      isbn: book.isbn ?? '',
-      read: book.read,
-      rating: book.rating ?? 0,
-      review: book.review,
+      title: comic.title,
+      genresText: comic.genres.join(', '),
+      author: comic.author,
+      isbn: comic.isbn ?? '',
+      read: comic.read,
+      rating: comic.rating ?? 0,
+      review: comic.review,
     });
-    const digits = (book.isbn ?? '').replace(/[^0-9Xx]/g, '');
+    const digits = (comic.isbn ?? '').replace(/[^0-9Xx]/g, '');
     if (digits.length === 10 || digits.length === 13) {
       const parsed = ISBN.parse(digits);
       setIsbnStatus(parsed?.isValid ? 'valid' : 'invalid');
@@ -272,7 +261,7 @@ export default function BookScreen({ navigation }: any) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteBook(id);
+          await deleteComic(id);
           load();
         },
       },
@@ -281,7 +270,7 @@ export default function BookScreen({ navigation }: any) {
 
   const enterSelectionMode = () => {
     if (sorted.length === 0) {
-      Alert.alert('No books yet', 'Add a book first.');
+      Alert.alert('No comics yet', 'Add a comic or manga first.');
       return;
     }
     setSelectedIds(new Set());
@@ -305,13 +294,13 @@ export default function BookScreen({ navigation }: any) {
   const confirmBulkDelete = () => {
     const count = selectedIds.size;
     if (count === 0) return;
-    Alert.alert(`Delete ${count} ${count === 1 ? 'book' : 'books'}?`, undefined, [
+    Alert.alert(`Delete ${count} ${count === 1 ? 'entry' : 'entries'}?`, undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          await deleteBooks(Array.from(selectedIds));
+          await deleteComics(Array.from(selectedIds));
           exitSelectionMode();
           load();
         },
@@ -329,7 +318,7 @@ export default function BookScreen({ navigation }: any) {
 
   const openGenreFilterMenu = () => {
     if (allGenres.length === 0) {
-      Alert.alert('No genres yet', 'Add a book with a genre first.');
+      Alert.alert('No genres yet', 'Add a comic or manga with a genre first.');
       return;
     }
     const buttons: AlertButton[] = [
@@ -337,11 +326,11 @@ export default function BookScreen({ navigation }: any) {
       ...allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })),
       { text: 'Cancel', style: 'cancel' },
     ];
-    Alert.alert('Filter by genre', 'A book shows up if it has this genre among its tags.', buttons);
+    Alert.alert('Filter by genre', 'An entry shows up if it has this genre among its tags.', buttons);
   };
 
   const openMenu = () => {
-    Alert.alert('Books', undefined, [
+    Alert.alert('Comics/Manga', undefined, [
       { text: '+ Add entry', onPress: openAdd },
       { text: 'Filter by...', onPress: openSortMenu },
       { text: 'Filter by genre...', onPress: openGenreFilterMenu },
@@ -377,10 +366,6 @@ export default function BookScreen({ navigation }: any) {
   // Shared by both typing (handleIsbnChange, below) and the barcode
   // scanner: given raw digits, reformats with the real hyphen positions
   // and checks the checksum via isbn3, updating the field + status.
-  // Returns whether the result was a fully-valid ISBN, so callers (the
-  // scanner specifically) know whether it's safe to fire the lookup
-  // immediately rather than waiting for onBlur, which never happens when
-  // a value arrives from a scan instead of typing.
   const applyIsbnDigits = (digits: string): boolean => {
     if (digits.length !== 10 && digits.length !== 13) {
       setIsbnStatus('idle');
@@ -404,24 +389,16 @@ export default function BookScreen({ navigation }: any) {
     return false;
   };
 
-  // Fires on every keystroke in the ISBN field. Once there are enough
-  // digits for a real ISBN (10 or 13), reformats with the *official*
-  // hyphen positions via isbn3 (which bundles the real ISBN-agency range
-  // data - hand-rolling this wasn't possible since hyphen placement isn't
-  // a fixed pattern) and checks the checksum digit, so a typo shows up
-  // immediately rather than only failing later at lookup/save time.
   const handleIsbnChange = (text: string) => {
     applyIsbnDigits(text.replace(/[^0-9Xx]/g, ''));
   };
 
   // Fires once a barcode is in view long enough to decode. Locked with a
-  // ref (not state, which wouldn't update fast enough) so a single
-  // barcode sitting in frame doesn't fire this dozens of times per
-  // second - onBarcodeScanned keeps firing continuously while a code is
-  // visible, unlike a one-shot "take photo" action. Restricted to EAN-13
-  // starting 978/979 (the actual Bookland ISBN prefixes) so scanning some
-  // unrelated barcode (a snack wrapper, a shipping label) doesn't get
-  // mistaken for a book and silently fill in wrong data.
+  // ref (not state) so a single barcode sitting in frame doesn't fire this
+  // dozens of times per second. Restricted to EAN-13 starting 978/979 (the
+  // actual Bookland ISBN prefixes) - graphic novels and manga volumes are
+  // cataloged with real ISBNs the same as any other book, so this is the
+  // same check BookScreen uses.
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (scanLockRef.current) return;
     const digits = data.replace(/[^0-9Xx]/g, '');
@@ -439,22 +416,14 @@ export default function BookScreen({ navigation }: any) {
     }
   };
 
-  // ISBN lookup itself (Open Library primary, Google Books fallback, Open
-  // Library search-index as a third genre-only fallback) now lives in
-  // lib/isbnLookup.ts, shared with Comics/Manga and any future ISBN-based
-  // category - see runIsbnLookup below for the screen-specific wrapper.
-
   const handleIsbnBlur = () => {
     const digits = draft.isbn.replace(/[^0-9Xx]/g, '');
     if (digits.length !== 10 && digits.length !== 13) return;
     runIsbnLookup(digits);
   };
 
-  // Thin wrapper around the shared lib/isbnLookup.runIsbnLookup: this is
-  // just the screen-specific part (loading state, populating the draft,
-  // deciding which alert to show), all the actual network/merge/fallback
-  // logic lives in the shared module now so Comics/Manga (and any future
-  // ISBN-based category) get the same behavior for free.
+  // Thin wrapper around the shared lib/isbnLookup.runIsbnLookup - see
+  // BookScreen.tsx's version of this for the full rationale.
   const runIsbnLookup = async (digits: string) => {
     setLookingUp(true);
     try {
@@ -499,12 +468,18 @@ export default function BookScreen({ navigation }: any) {
     }
 
     // Failsafe against duplicate entries: same title (trimmed, case-
-    // insensitive) already tracked, excluding the item currently being edited.
-    const isDuplicate = books.some(
-      (b) => b.id !== editingId && b.title.trim().toLowerCase() === draft.title.trim().toLowerCase(),
+    // insensitive) already tracked, excluding the item currently being
+    // edited. Worth knowing for manga specifically: publishers usually
+    // bake the volume number into the title itself (e.g. "One Piece,
+    // Vol. 42"), which is what keeps each volume from colliding with this
+    // check - if a series' ISBN lookups ever come back with just the
+    // bare series name for every volume, that's what to fix rather than
+    // this guard itself.
+    const isDuplicate = comics.some(
+      (c) => c.id !== editingId && c.title.trim().toLowerCase() === draft.title.trim().toLowerCase(),
     );
     if (isDuplicate) {
-      Alert.alert('Already tracking this book', 'A book with this title is already in your list.');
+      Alert.alert('Already tracking this one', 'An entry with this title is already in your list.');
       return;
     }
 
@@ -519,47 +494,32 @@ export default function BookScreen({ navigation }: any) {
     };
 
     if (editingId) {
-      await updateBook(editingId, payload);
+      await updateComic(editingId, payload);
     } else {
-      await addBook(payload);
+      await addComic(payload);
     }
     setModalVisible(false);
     load();
   };
 
   const handleCardPress = useCallback(
-    (book: Book) => {
+    (comic: Comic) => {
       if (selectionMode) {
-        toggleSelected(book.id);
+        toggleSelected(comic.id);
       } else {
-        openEdit(book);
+        openEdit(comic);
       }
     },
-    // Deliberately just selectionMode - not selectedIds, books, or anything
-    // that changes during routine scrolling/sorting/filtering, since any of
-    // those would give renderItem (below) a new identity on every such
-    // interaction and defeat BookCard's memoization for no reason. Taking
-    // the full `book` object (rather than an id to look up in `books`)
-    // is what makes leaving `books` out of this list safe.
     [selectionMode],
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Book }) => (
-      <BookCard book={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+    ({ item }: { item: Comic }) => (
+      <ComicCard comic={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
     ),
     [selectedIds, selectionMode, handleCardPress],
   );
 
-  // Stable for the same reason renderItem is: SectionList keeps the current
-  // section header "stuck" at the top while you scroll through that
-  // section's rows (stickySectionHeadersEnabled defaults to true) - an
-  // inline version of this was getting a new identity on every render,
-  // which meant that sticky header was re-rendering continuously for the
-  // entire time you scrolled through a section, not just once. For a large
-  // section (75 books, most starting with "T") that's a much longer stretch
-  // of continuous unnecessary re-rendering than for a small one, which
-  // lines up with scrolling specifically feeling jumpy/resistant there.
   const renderSectionHeader = useCallback(
     ({ section }: { section: { title: string } }) => (
       <AppText
@@ -576,14 +536,14 @@ export default function BookScreen({ navigation }: any) {
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
-      {genreFilter ? `No books tagged "${genreFilter}" yet.` : 'No books yet. Tap ••• to add your first one.'}
+      {genreFilter ? `No entries tagged "${genreFilter}" yet.` : 'No comics or manga yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader
-        title={selectionMode ? `${selectedIds.size} selected` : 'Books'}
+        title={selectionMode ? `${selectedIds.size} selected` : 'Comics/Manga'}
         onBack={selectionMode ? undefined : () => navigation.goBack()}
         backLabel="Home"
         left={
@@ -671,11 +631,6 @@ export default function BookScreen({ navigation }: any) {
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         {scannerVisible ? (
-          // Rendered inside the SAME Modal as the form rather than as a second,
-          // separate <Modal> - iOS doesn't reliably present two independent
-          // modals at once, which was why this used to only open once you'd
-          // already dismissed the Add/Edit form. Switching content within one
-          // modal avoids that entirely.
           <View style={styles.scannerRoot}>
             <CameraView
               style={StyleSheet.absoluteFill}
@@ -683,10 +638,6 @@ export default function BookScreen({ navigation }: any) {
               barcodeScannerSettings={{ barcodeTypes: ['ean13'] }}
               onBarcodeScanned={handleBarcodeScanned}
             />
-            {/* Cancel's position uses insets.top directly rather than a SafeAreaView -
-                same fix as ScreenHeader: SafeAreaView's automatic inset isn't reliable
-                inside a Modal on iOS, which was pinning this button up under the
-                status bar/notch where it couldn't be tapped. */}
             <View style={[styles.scannerOverlay, { paddingTop: insets.top + 16 }]}>
               <TouchableOpacity
                 onPress={() => setScannerVisible(false)}
@@ -697,14 +648,14 @@ export default function BookScreen({ navigation }: any) {
               </TouchableOpacity>
               <View style={styles.scannerFrame} />
               <AppText style={{ color: '#FFFFFF', fontSize: 14 * theme.fontScale, textAlign: 'center', marginTop: 16 }}>
-                Line up the barcode on the back of the book
+                Line up the barcode on the back of the comic/manga
               </AppText>
             </View>
           </View>
         ) : (
           <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
           <ScreenHeader
-            title={editingId ? 'Edit Book' : 'Add Book'}
+            title={editingId ? 'Edit Entry' : 'Add Entry'}
             left={
               <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
@@ -746,7 +697,7 @@ export default function BookScreen({ navigation }: any) {
                 onChangeText={handleIsbnChange}
                 onBlur={handleIsbnBlur}
                 keyboardType="number-pad"
-                placeholder="e.g. 978-1-4767-5318-8"
+                placeholder="e.g. 978-1-4215-0146-6"
                 placeholderTextColor={theme.colors.textMuted}
                 style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
               />
@@ -780,7 +731,7 @@ export default function BookScreen({ navigation }: any) {
 
             <View style={styles.field}>
               <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Genre(s) * (comma-separated, e.g. Romance, Contemporary)
+                Genre(s) * (comma-separated, e.g. Shonen, Action)
               </AppText>
               <TextInput
                 value={draft.genresText}
@@ -842,11 +793,11 @@ export default function BookScreen({ navigation }: any) {
               <TouchableOpacity
                 onPress={() => {
                   setModalVisible(false);
-                  confirmDelete(editingId, draft.title || 'this book');
+                  confirmDelete(editingId, draft.title || 'this entry');
                 }}
                 style={[styles.deleteButton, { borderColor: theme.colors.danger }]}
               >
-                <AppText style={{ color: theme.colors.danger, fontSize: 15 * theme.fontScale }}>Delete book</AppText>
+                <AppText style={{ color: theme.colors.danger, fontSize: 15 * theme.fontScale }}>Delete entry</AppText>
               </TouchableOpacity>
             )}
           </ScrollView>

@@ -8,53 +8,81 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { getBooks, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
-import { Book, CATEGORY_LABELS, MediaCategory } from '../types/models';
+import { getBooks, getComics, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
 // Onboarding shows a "coming soon" widget until its screen is built.
 const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   books: 'Book',
+  comics: 'Comic',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
 // only the couple of route names this screen actually navigates to matter here.
 type RootStackParamList = {
   Book: undefined;
+  Comic: undefined;
   Settings: undefined;
 };
 
-function pickRandomUnread(books: Book[]): Book | null {
-  const unread = books.filter((b) => !b.read);
+interface TrackedItem {
+  id: string;
+  title: string;
+  read: boolean;
+}
+
+interface WidgetData {
+  count: number;
+  suggestion: string | null;
+  unitSingular: string;
+  unitPlural: string;
+}
+
+function pickRandomUnread<T extends TrackedItem>(items: T[]): T | null {
+  const unread = items.filter((i) => !i.read);
   if (unread.length === 0) return null;
   return unread[Math.floor(Math.random() * unread.length)];
 }
 
+// One implemented category's full widget data: count, plus today's "try
+// this" suggestion, which stays fixed for the whole calendar day (even
+// across manual refreshes/app reopens) unless the day changes or the
+// previous pick got marked done/deleted since it was chosen. Generic over
+// any category whose items look like { id, title, read } - which is every
+// implemented category so far (Books, Comics/Manga).
+async function loadWidgetData<T extends TrackedItem>(
+  category: string,
+  items: T[],
+  unitSingular: string,
+  unitPlural: string,
+  today: string,
+): Promise<WidgetData> {
+  const stored = await getDailyPick(category);
+  let pick: T | null = null;
+  if (stored && stored.date === today) {
+    const stillValid = items.find((i) => i.id === stored.itemId && !i.read);
+    if (stillValid) pick = stillValid;
+  }
+  if (!pick) {
+    pick = pickRandomUnread(items);
+    if (pick) await saveDailyPick(category, pick.id);
+  }
+  return { count: items.length, suggestion: pick?.title ?? null, unitSingular, unitPlural };
+}
+
 export default function HomeScreen({ navigation }: any) {
   const { theme, settings } = useTheme();
-  const [suggestedBook, setSuggestedBook] = useState<Book | null>(null);
-  const [bookCount, setBookCount] = useState(0);
+  const [widgetData, setWidgetData] = useState<Partial<Record<MediaCategory, WidgetData>>>({});
 
   const load = useCallback(async () => {
-    const books = await getBooks();
-    setBookCount(books.length);
-
-    // A "try today" suggestion should stay the same all calendar day,
-    // even across manual refreshes/app reopens - only actually re-rolling
-    // once the day changes, or if today's stored pick got marked read or
-    // deleted since it was chosen.
     const today = toLocalDateString(new Date());
-    const stored = await getDailyPick('books');
-    let pick: Book | null = null;
-    if (stored && stored.date === today) {
-      const stillValid = books.find((b) => b.id === stored.itemId && !b.read);
-      if (stillValid) pick = stillValid;
-    }
-    if (!pick) {
-      pick = pickRandomUnread(books);
-      if (pick) await saveDailyPick('books', pick.id);
-    }
-    setSuggestedBook(pick);
+    const [books, comics] = await Promise.all([getBooks(), getComics()]);
+    const [booksData, comicsData] = await Promise.all([
+      loadWidgetData('books', books, 'book', 'books', today),
+      loadWidgetData('comics', comics, 'entry', 'entries', today),
+    ]);
+    setWidgetData({ books: booksData, comics: comicsData });
   }, []);
 
   useFocusEffect(
@@ -88,7 +116,7 @@ export default function HomeScreen({ navigation }: any) {
 
         {settings.categories.map((cat) => {
           const route = IMPLEMENTED[cat];
-          const isBooks = cat === 'books';
+          const data = widgetData[cat];
 
           return (
             <TouchableOpacity
@@ -101,14 +129,14 @@ export default function HomeScreen({ navigation }: any) {
                 {CATEGORY_LABELS[cat]}
               </AppText>
 
-              {isBooks ? (
+              {data ? (
                 <>
                   <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
-                    {bookCount} {bookCount === 1 ? 'book' : 'books'} tracked
+                    {data.count} {data.count === 1 ? data.unitSingular : data.unitPlural} tracked
                   </AppText>
-                  {suggestedBook && (
+                  {data.suggestion && (
                     <AppText style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
-                      Try today: {suggestedBook.title}
+                      Try today: {data.suggestion}
                     </AppText>
                   )}
                 </>
