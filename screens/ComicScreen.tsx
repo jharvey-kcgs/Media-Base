@@ -233,10 +233,13 @@ export default function ComicScreen({ navigation }: any) {
   // A-Z index scroll handling - see lib/useAlphabetScroll.ts for the full
   // history of why it works this way (three rounds of real bugs found and
   // fixed on Books first).
-  const { listRef: sectionListRef, onLayout: onListLayout, onContentSizeChange, jumpToLetter } = useAlphabetScroll(
-    sections,
-    theme.fontScale,
-  );
+  const {
+    listRef: sectionListRef,
+    onLayout: onListLayout,
+    onContentSizeChange,
+    jumpToLetter,
+    recordRowHeight,
+  } = useAlphabetScroll(sections, theme.fontScale);
 
   const openAdd = () => {
     setEditingId(null);
@@ -528,9 +531,11 @@ export default function ComicScreen({ navigation }: any) {
 
   const renderItem = useCallback(
     ({ item }: { item: Comic }) => (
-      <ComicCard comic={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+      <View onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}>
+        <ComicCard comic={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+      </View>
     ),
-    [selectedIds, selectionMode, handleCardPress],
+    [selectedIds, selectionMode, handleCardPress, recordRowHeight],
   );
 
   const renderSectionHeader = useCallback(

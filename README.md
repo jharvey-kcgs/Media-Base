@@ -214,6 +214,25 @@ lib/
                                      `renderSectionHeader` fails to
                                      type-check ("Property 'title' is
                                      missing in type SectionBase<...>").
+                                     A fourth round of scroll issues (real
+                                     jumpiness reported specifically near
+                                     the END of the alphabet, on Comics/
+                                     Manga at 45 entries) traced to the
+                                     row-height used in the jump estimate
+                                     being a hardcoded guess rather than a
+                                     real measurement - guess-error
+                                     compounds with every row summed, so
+                                     it's worst exactly at the letters
+                                     with the most rows counted before
+                                     them. Fixed by measuring real
+                                     rendered rows (`recordRowHeight`,
+                                     wired to an `onLayout` on each row in
+                                     both screens' `renderItem`) and using
+                                     the running average instead of the
+                                     guess - any future category screen
+                                     should wire this the same way rather
+                                     than skipping it "since the guess
+                                     was probably fine."
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -

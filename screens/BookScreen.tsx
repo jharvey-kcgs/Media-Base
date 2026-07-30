@@ -258,10 +258,13 @@ export default function BookScreen({ navigation }: any) {
   // fixes for two real React Native scrollToLocation bugs along the way)
   // now lives in a shared hook - see lib/useAlphabetScroll.ts for the full
   // history of why it works this way.
-  const { listRef: sectionListRef, onLayout: onListLayout, onContentSizeChange, jumpToLetter } = useAlphabetScroll(
-    sections,
-    theme.fontScale,
-  );
+  const {
+    listRef: sectionListRef,
+    onLayout: onListLayout,
+    onContentSizeChange,
+    jumpToLetter,
+    recordRowHeight,
+  } = useAlphabetScroll(sections, theme.fontScale);
 
   const openAdd = () => {
     setEditingId(null);
@@ -573,9 +576,11 @@ export default function BookScreen({ navigation }: any) {
 
   const renderItem = useCallback(
     ({ item }: { item: Book }) => (
-      <BookCard book={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+      <View onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}>
+        <BookCard book={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
+      </View>
     ),
-    [selectedIds, selectionMode, handleCardPress],
+    [selectedIds, selectionMode, handleCardPress, recordRowHeight],
   );
 
   // Stable for the same reason renderItem is: SectionList keeps the current
