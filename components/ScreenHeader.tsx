@@ -18,6 +18,16 @@
 // the same top edge but landed at different visual centers - the title
 // consistently rendered a few pixels lower than the back button. Giving
 // them an identical height and centering both within it fixes that.
+//
+// The side columns are capped at a fixed SIDE_MAX_WIDTH (not a screen-width
+// percentage) so a long back label like "Settings" can't grow wide enough
+// at larger text sizes to run into the title's box - which is exactly
+// what was happening: the title paints on top (later in the tree), so an
+// overlap didn't look like visual clipping, it looked like the two labels'
+// text running directly into each other with no gap. The title also gets
+// adjustsFontSizeToFit so a long title (e.g. "Permissions") shrinks
+// gracefully to fit its remaining space instead of overflowing, if a long
+// title and a long back label both land on the same screen at once.
 
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
@@ -36,6 +46,8 @@ interface ScreenHeaderProps {
 }
 
 const CONTENT_HEIGHT = 34;
+const SIDE_MAX_WIDTH = 120;
+const TITLE_INSET = 125;
 
 export default function ScreenHeader({ title, onBack, backLabel, left, right }: ScreenHeaderProps) {
   const { theme } = useTheme();
@@ -45,7 +57,11 @@ export default function ScreenHeader({ title, onBack, backLabel, left, right }: 
     left ??
     (onBack ? (
       <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-        <AppText style={{ color: theme.colors.accentReadable, fontSize: 13 * theme.fontScale }}>
+        <AppText
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{ color: theme.colors.accentReadable, fontSize: 13 * theme.fontScale }}
+        >
           ‹ {backLabel}
         </AppText>
       </TouchableOpacity>
@@ -61,6 +77,8 @@ export default function ScreenHeader({ title, onBack, backLabel, left, right }: 
         <AppText
           variant="header"
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
           style={[styles.title, { color: theme.colors.text, fontSize: 22 * theme.fontScale }]}
         >
           {title}
@@ -82,12 +100,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: CONTENT_HEIGHT,
   },
-  side: { maxWidth: '38%', justifyContent: 'center' },
+  side: { maxWidth: SIDE_MAX_WIDTH, justifyContent: 'center' },
   sideRight: { alignItems: 'flex-end' },
   titleWrap: {
     position: 'absolute',
-    left: 100,
-    right: 100,
+    left: TITLE_INSET,
+    right: TITLE_INSET,
     height: CONTENT_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',

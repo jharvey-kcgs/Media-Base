@@ -51,51 +51,49 @@ const SORT_FIELDS: { field: BookSortField; label: string }[] = [
 const ALPHA_FIELDS: BookSortField[] = ['title', 'author'];
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+// The ONLY genres the ISBN lookup is allowed to auto-fill - anything a
+// lookup returns that isn't on this list gets dropped entirely, no matter
+// how it's phrased. This replaces an earlier approach of reactively
+// blocking known-bad patterns (bestseller-list stamps, LCSH administrative
+// tags, etc.) one at a time as new examples turned up - which was still
+// letting through real subject-heading noise like "Futurology," "Girl
+// Next Door," "Hieros Gamos," or "Mechanical Hound" (all real examples
+// that came through - Open Library's raw subject data includes plot
+// keywords, character names, and settings alongside actual genres, with
+// no reliable way to tell them apart algorithmically). An allowlist is a
+// much stronger guarantee: whatever list this is, that's what can ever
+// show up - nothing else gets through by definition, and the list itself
+// is just this array, so anything missing that you want included is a
+// one-line edit here rather than a code change.
+const GENRE_ALLOWLIST = [
+  'Fiction', 'Nonfiction', 'Romance', 'Mystery', 'Thriller', 'Suspense',
+  'Science Fiction', 'Fantasy', 'Horror', 'Historical Fiction', 'Contemporary',
+  'Literary Fiction', 'Young Adult', "Children's", 'Classics', 'Adventure',
+  'Crime', 'Dystopian', 'Paranormal', 'Biography', 'Memoir', 'Self-Help',
+  'Poetry', 'Humor', 'Graphic Novel', 'Comics', 'Short Stories', 'Essays',
+  'True Crime', 'Western', 'War', 'Drama', 'Philosophy', 'Psychology',
+  'Religion', 'Spirituality', 'History', 'Science', 'Business', 'Health',
+  'Cooking', 'Travel', 'Art', 'Music', 'Sports', 'Politics', 'Technology',
+];
+
 // Broad classifications that should sort *after* more specific genre tags
-// (e.g. a book auto-tagged "Fiction, Romance, Contemporary" should show as
+// (e.g. a book auto-tagged Fiction + Romance + Contemporary should show as
 // "Romance, Contemporary, Fiction" - Fiction on its own tells you nothing
 // useful once you already have a more specific tag).
-const GENERIC_GENRE_TERMS = new Set(['fiction', 'nonfiction', 'non-fiction']);
-
-// Open Library's subject list mixes real genres in with library-internal
-// bookkeeping (bestseller-list membership + date stamps, accessibility
-// flags, lending-program tags) that isn't a genre at all - e.g. real
-// examples that came through: "New York Times Bestseller,
-// Nyt:paperback_books=2012-02-25, Families" and
-// "Nyt:trade-fiction-paperback=2020-11-19, New York Bestseller". These
-// patterns catch the administrative noise specifically rather than
-// guessing at genre words.
-const GENRE_JUNK_PATTERNS = [
-  /new york times/i,
-  /new york bestseller/i,
-  /\bnyt\b/i,
-  /bestseller/i,
-  /accessible book/i,
-  /protected daisy/i,
-  /\bin library\b/i,
-  /lending library/i,
-  /overdrive/i,
-  /internet archive/i,
-  /large type books/i,
-  /large print/i,
-  /staff pick/i,
-  /open library/i,
-];
+const GENERIC_GENRE_TERMS = new Set(['fiction', 'nonfiction']);
 
 // Library of Congress subject headings often qualify a real genre with a
 // parenthetical, e.g. "Poetry (poetic works by one author)" - the genre
 // itself (Poetry) is legitimate, only the qualifier is noise. Stripping
-// it out salvages the useful part instead of rejecting the whole tag on
-// a word-count technicality, which an earlier version was doing.
+// it before allowlist-matching salvages the useful part.
 function stripParenthetical(tag: string): string {
   return tag.replace(/\([^)]*\)?/g, '').trim();
 }
 
-// Same idea for another very common LCSH pattern this hadn't accounted
-// for yet: a trailing era/decade qualifier like "Fiction, 21st century"
-// or "Mystery fiction, 1990-1999" - the blanket "reject anything with a
-// digit" rule (below) would otherwise throw out "Fiction" or "Mystery
-// fiction" along with the date it's attached to.
+// Same idea for another very common LCSH pattern: a trailing era/decade
+// qualifier like "Fiction, 21st century" or "Mystery fiction, 1990-1999" -
+// stripping the date first lets the genre part underneath still match the
+// allowlist normally.
 function stripEraSuffix(tag: string): string {
   return tag
     .replace(/,?\s*\d{3,4}(-\d{2,4})?\s*$/i, '') // trailing "1990-1999" / "2020" style
@@ -103,33 +101,24 @@ function stripEraSuffix(tag: string): string {
     .trim();
 }
 
-function isLikelyRealGenre(tag: string): boolean {
-  const trimmed = tag.trim();
-  if (!trimmed) return false;
-  if (/^nyt:/i.test(trimmed)) return false; // "Nyt:trade-fiction-paperback=2020-11-19" etc.
-  if (/[:=><]/.test(trimmed)) return false; // other machine/catalog notation
-  if (/\d/.test(trimmed)) return false; // remaining dates, list ranks, edition years
-  if (trimmed.split(' ').length > 4) return false; // long descriptive subject headings, not genre-like
-  return !GENRE_JUNK_PATTERNS.some((re) => re.test(trimmed));
+const ALLOWLIST_MATCHERS = GENRE_ALLOWLIST.map(
+  (g) => [g, new RegExp(`\\b${g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')] as const,
+);
+
+/** Returns the allowlist's own canonical spelling if this tag matches one of
+ * them as a whole word/phrase (so "romance fiction" still matches "Romance"),
+ * or null if it doesn't match anything on the list at all. */
+function matchAllowlistGenre(tag: string): string | null {
+  for (const [canonical, re] of ALLOWLIST_MATCHERS) {
+    if (re.test(tag)) return canonical;
+  }
+  return null;
 }
 
-function titleCaseTag(tag: string): string {
-  return tag
-    .trim()
-    .split(' ')
-    .map((w) => (w.length ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ');
-}
-
-// Turns whatever a lookup API returned into a clean, ordered genre list.
-// Google Books often returns one BISAC-style string per entry ("Fiction /
-// Romance / Contemporary") - those get split apart. Open Library's subject
-// list is long and noisy, so this filters out non-genre noise (after
-// stripping parenthetical qualifiers) across the WHOLE list rather than
-// only an early slice, then caps the survivors - an earlier version
-// capped to the first 15 raw entries before filtering, which could come
-// back completely empty for a book whose real genre tags happened to sit
-// further down its subject list than that.
+// Turns whatever a lookup API returned into a clean, ordered genre list -
+// every entry guaranteed to be one of GENRE_ALLOWLIST's own terms, nothing
+// else. Google Books often returns one BISAC-style string per entry
+// ("Fiction / Romance / Contemporary") - those get split apart first.
 function normalizeGenres(rawCategories: string[] | undefined): string[] {
   if (!rawCategories || rawCategories.length === 0) return [];
   const flattened = rawCategories
@@ -137,15 +126,13 @@ function normalizeGenres(rawCategories: string[] | undefined): string[] {
     .map(stripParenthetical)
     .map(stripEraSuffix)
     .filter(Boolean);
-  const candidates = flattened.filter(isLikelyRealGenre);
   const seen = new Set<string>();
   const deduped: string[] = [];
-  for (const tag of candidates) {
-    const cased = titleCaseTag(tag);
-    const key = cased.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push(cased);
+  for (const tag of flattened) {
+    const match = matchAllowlistGenre(tag);
+    if (match && !seen.has(match.toLowerCase())) {
+      seen.add(match.toLowerCase());
+      deduped.push(match);
     }
   }
   const specific = deduped.filter((t) => !GENERIC_GENRE_TERMS.has(t.toLowerCase()));
@@ -252,11 +239,45 @@ export default function BookScreen({ navigation }: any) {
     [isAlpha, sorted, sortField],
   );
 
+  // Tracks the last attempted scroll target, so onScrollToIndexFailed (which
+  // only receives a flattened item index, not our sectionIndex/itemIndex
+  // pair) knows what to retry.
+  const pendingScrollRef = useRef<{ sectionIndex: number; itemIndex: number } | null>(null);
+
+  const scrollToBookLocation = (sectionIndex: number, itemIndex: number) => {
+    pendingScrollRef.current = { sectionIndex, itemIndex };
+    sectionListRef.current?.scrollToLocation({ sectionIndex, itemIndex, animated: true, viewOffset: 0 });
+  };
+
   const jumpToLetter = (letter: string) => {
     const index = sections.findIndex((s) => s.title >= letter);
     const target = index === -1 ? sections.length - 1 : index;
     if (target < 0 || !sections[target]) return;
-    sectionListRef.current?.scrollToLocation({ sectionIndex: target, itemIndex: 0, animated: true, viewOffset: 0 });
+    // React Native has a long-standing bug (facebook/react-native#50143,
+    // #48032) where scrollToLocation silently does nothing the first time
+    // when itemIndex is 0 - no error, onScrollToIndexFailed doesn't even
+    // fire. Calling it a second time immediately after is the commonly
+    // used workaround and reliably scrolls on the second attempt.
+    scrollToBookLocation(target, 0);
+    requestAnimationFrame(() => scrollToBookLocation(target, 0));
+  };
+
+  const handleScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => {
+    // Real failure case (distinct from the itemIndex:0 bug above): the
+    // target section hasn't been measured/rendered yet, which can happen
+    // jumping to a letter far down a long list. Scroll to an estimated
+    // offset first so that section actually renders, then retry the exact
+    // scrollToLocation call - the standard workaround for this class of
+    // SectionList/FlatList bug.
+    sectionListRef.current?.getScrollResponder()?.scrollTo({
+      y: info.averageItemLength * info.index,
+      animated: false,
+    });
+    const pending = pendingScrollRef.current;
+    if (!pending) return;
+    setTimeout(() => {
+      sectionListRef.current?.scrollToLocation({ ...pending, animated: true, viewOffset: 0 });
+    }, 80);
   };
 
   const openAdd = () => {
@@ -688,7 +709,7 @@ export default function BookScreen({ navigation }: any) {
               </AppText>
             )}
             renderItem={({ item }) => renderCard(item)}
-            onScrollToIndexFailed={() => {}}
+            onScrollToIndexFailed={handleScrollToIndexFailed}
           />
         ) : (
           <FlatList

@@ -8,6 +8,7 @@ import { AppSettings, DEFAULT_SETTINGS, Book } from '../types/models';
 const KEYS = {
   settings: 'mediabase:settings',
   books: 'mediabase:books',
+  dailyPicks: 'mediabase:dailyPicks',
 };
 
 const newId = () => uuidv4();
@@ -72,6 +73,50 @@ export async function deleteBook(id: string): Promise<void> {
     KEYS.books,
     books.filter((b) => b.id !== id),
   );
+}
+
+// --- Daily recommendation ("try this today" on Home) ---
+//
+// One category's own random pick should stay fixed for the whole calendar
+// day rather than re-rolling every time Home loads/refreshes - this is
+// what makes that possible, keyed generically by category so future
+// categories (Movies, Comics, etc.) can reuse it rather than each needing
+// their own version.
+
+/** Local calendar date as YYYY-MM-DD - deliberately not toISOString(),
+ * which is UTC and can silently roll the date forward once local evening
+ * time crosses midnight UTC. */
+export function toLocalDateString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+interface DailyPick {
+  date: string;
+  itemId: string;
+}
+
+async function getDailyPicks(): Promise<Record<string, DailyPick>> {
+  const raw = await AsyncStorage.getItem(KEYS.dailyPicks);
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+export async function getDailyPick(category: string): Promise<DailyPick | null> {
+  const picks = await getDailyPicks();
+  return picks[category] ?? null;
+}
+
+export async function saveDailyPick(category: string, itemId: string): Promise<void> {
+  const picks = await getDailyPicks();
+  picks[category] = { date: toLocalDateString(new Date()), itemId };
+  await AsyncStorage.setItem(KEYS.dailyPicks, JSON.stringify(picks));
 }
 
 // --- Data (Settings > Data) ---

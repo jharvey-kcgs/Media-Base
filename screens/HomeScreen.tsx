@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { getBooks } from '../lib/storage';
+import { getBooks, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { Book, CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -38,7 +38,23 @@ export default function HomeScreen({ navigation }: any) {
   const load = useCallback(async () => {
     const books = await getBooks();
     setBookCount(books.length);
-    setSuggestedBook(pickRandomUnread(books));
+
+    // A "try today" suggestion should stay the same all calendar day,
+    // even across manual refreshes/app reopens - only actually re-rolling
+    // once the day changes, or if today's stored pick got marked read or
+    // deleted since it was chosen.
+    const today = toLocalDateString(new Date());
+    const stored = await getDailyPick('books');
+    let pick: Book | null = null;
+    if (stored && stored.date === today) {
+      const stillValid = books.find((b) => b.id === stored.itemId && !b.read);
+      if (stillValid) pick = stillValid;
+    }
+    if (!pick) {
+      pick = pickRandomUnread(books);
+      if (pick) await saveDailyPick('books', pick.id);
+    }
+    setSuggestedBook(pick);
   }, []);
 
   useFocusEffect(

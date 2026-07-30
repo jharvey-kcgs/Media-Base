@@ -182,7 +182,15 @@ components/
                                      a <Modal> on iOS, which is what made
                                      Cancel/Save unreachable under the
                                      status bar on the Add/Edit Book
-                                     screen before this existed.
+                                     screen before this existed. The back
+                                     label and title columns are also
+                                     width-capped against each other
+                                     (SIDE_MAX_WIDTH / TITLE_INSET) - a
+                                     long back label ("Settings") and a
+                                     long title ("Permissions") together
+                                     at larger text sizes could otherwise
+                                     visually run into each other with no
+                                     gap, since the title paints on top.
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book
@@ -268,28 +276,25 @@ building Comics/Manga, Movies, etc.:
   it. Genre specifically prefers Google Books' categories when available
   (usually one or two clean BISAC-style entries like "Fiction / Romance")
   over Open Library's much noisier subject list. Whichever source's genre
-  data gets used goes through `normalizeGenres()`, which:
-  1. Strips Library-of-Congress-style parenthetical qualifiers and
-     trailing era/decade suffixes rather than rejecting the whole tag
-     over them - "Poetry (poetic works by one author)" becomes the
-     legitimately useful "Poetry", and "Fiction, 21st century" becomes
-     "Fiction" instead of both getting discarded entirely (the first
-     over a word-count technicality, the second because the blanket
-     "reject anything with a digit" rule would otherwise throw out the
-     genre along with the date it's attached to).
-  2. Filters out non-genre noise from what's left - anything starting
-     `nyt:`, containing a digit or `:`/`=`/`>`, or matching known
-     administrative-tag patterns (bestseller-list stamps in either
-     "New York Times Bestseller" or "New York Bestseller" phrasing,
-     accessibility/lending-program flags, etc. - real examples that used
-     to get through: "New York Times Bestseller,
-     Nyt:paperback_books=2012-02-25, Families" and
-     "Nyt:trade-fiction-paperback=2020-11-19, New York Bestseller").
-  3. Scans the **entire** subject/category list for survivors rather
-     than an early slice, then caps to a handful. An earlier version
-     capped to the first 15 raw entries *before* filtering, which could
-     come back completely empty for a book whose real genre tags
-     happened to sit further down its subject list than that.
+  data gets used goes through `normalizeGenres()`, which strips
+  Library-of-Congress-style parenthetical qualifiers and trailing
+  era/decade suffixes ("Poetry (poetic works by one author)" → "Poetry",
+  "Fiction, 21st century" → "Fiction") and then matches what's left
+  against `GENRE_ALLOWLIST` - a fixed, curated list of real genre terms.
+  **Only a match against that list can ever become a filled-in genre** -
+  everything else gets dropped, no matter how it's phrased. This replaced
+  an earlier approach of reactively blocking known-bad patterns
+  (bestseller-list stamps, administrative tags) one at a time as new bad
+  examples turned up, which was still letting real subject-heading noise
+  through - confirmed real examples: "Futurology," "Girl Next Door,"
+  "Hieros Gamos," "Mechanical Hound," "Mob Mentality" - because Open
+  Library's raw subject data mixes plot keywords, character names, and
+  settings in with actual genres, with no reliable way to tell them apart
+  algorithmically. An allowlist sidesteps that entirely: whatever's in
+  `GENRE_ALLOWLIST` (in `screens/BookScreen.tsx`) is what can show up,
+  full stop - adding a missing genre or removing one you don't want is a
+  one-line edit to that array, not a new filtering rule to write and
+  test.
 
   **If genre is still missing after merging those two**, a third source
   gets tried: Open Library's *search index* (`search.json?isbn=...`)
@@ -308,15 +313,16 @@ building Comics/Manga, Movies, etc.:
   mainstream titles, so an occasional genuine "couldn't find that ISBN"
   is an expected limitation rather than a bug; API errors and "genuinely
   no match" both log a `console.warn('Media Base: ...')` to help tell
-  those apart, and any new junk-genre pattern that slips through is worth
-  reporting with the exact string so a new rule can be added. Categories
-  without a clean ISBN-equivalent (Movies use UPC, which is messier - see
-  the Roadmap doc) will need their own lookup approach rather than
-  copying this one directly.
+  those apart. Categories without a clean ISBN-equivalent (Movies use
+  UPC, which is messier - see the Roadmap doc) will need their own
+  lookup approach rather than copying this one directly.
 - **A-Z index** on the right edge, only shown when sorted by an
   alphabetical field (Title/Author here) - tapping a letter jumps to the
-  nearest section at or after it. Not shown for the non-alphabetical
-  Read? sort.
+  nearest section at or after it (via a small retry/workaround for a real
+  React Native bug where `scrollToLocation` silently no-ops the first
+  time when `itemIndex` is 0 - facebook/react-native#50143, #48032; the
+  fix is to call it twice, immediately). Not shown for the
+  non-alphabetical Read? sort.
 - **Keyboard doesn't cover fields while typing**: the Add/Edit form is
   wrapped in React Native's built-in `KeyboardAvoidingView`
   (`behavior="padding"` on iOS, `"height"` on Android) plus the
@@ -334,6 +340,19 @@ Delete menus (3, "however many distinct genre tags exist", and
 up-to-10 options respectively) will need a real action-sheet component
 (e.g. `@expo/react-native-action-sheet`) before this app could support
 Android.
+
+### Home screen daily recommendation
+
+The "Try today" suggestion on each widget is meant to stay fixed for the
+whole calendar day, not re-roll on every refresh/app reopen - handled by
+`getDailyPick`/`saveDailyPick` in `lib/storage.ts` (generic, keyed by
+category, so future categories can reuse it rather than each rolling
+their own version) plus `toLocalDateString()`, which is a plain local
+Y-M-D string rather than `toISOString()` - the same UTC-rollover bug
+documented in Home Base's README applies here too. `HomeScreen.tsx`'s
+`load()` reuses today's stored pick if it's still valid (same date,
+book still exists and still unread), and only rolls a new one if the day
+has changed or the previous pick got marked read/deleted since.
 
 ### Where to make common changes
 
