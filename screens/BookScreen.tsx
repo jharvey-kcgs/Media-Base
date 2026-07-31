@@ -496,6 +496,19 @@ export default function BookScreen({ navigation }: any) {
         );
         return;
       }
+      // This is a reliable check specifically in this direction: publishers
+      // consistently tag comics/graphic novels/manga with BISAC's own
+      // "COMICS & GRAPHIC NOVELS" heading (or Open Library's equivalent),
+      // so a positive match here is trustworthy. Only blocks the auto-fill
+      // - manual entry is never blocked, same as everywhere else in this
+      // app; this just stops a comic's data from landing in the Books form.
+      if (result.isLikelyComic) {
+        Alert.alert(
+          'That looks like a Comic/Manga',
+          "This ISBN is classified as a comic or manga, not a regular book - add it from the Comics/Manga screen instead. Nothing was filled in here.",
+        );
+        return;
+      }
       if (!result.title && !result.author && result.genres.length === 0) {
         Alert.alert(
           "Found the ISBN, but couldn't get details",

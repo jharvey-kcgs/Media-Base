@@ -451,6 +451,21 @@ export default function ComicScreen({ navigation }: any) {
         );
         return;
       }
+      // Weaker evidence than the reverse check on BookScreen: this is
+      // "no comic/manga signal was found," not "we confirmed this is a
+      // regular book" - genuinely different confidence levels, so it only
+      // fires when there's real genre data to go on at all (an ISBN with
+      // no classification data isn't confidently "not a comic," it's just
+      // unclassified) and the message says so rather than asserting it
+      // flatly. Only blocks the auto-fill, same as the reverse check -
+      // manual entry is never blocked.
+      if (result.genres.length > 0 && !result.isLikelyComic) {
+        Alert.alert(
+          "That doesn't look like a Comic/Manga",
+          "Its listed categories don't show any comic/graphic novel/manga classification, so this looks like a regular book - add it from the Books screen instead. Nothing was filled in here. (This check is less certain than the other direction - if you're sure this is a comic/manga, its listing may just be missing that classification, and you can still enter the details by hand.)",
+        );
+        return;
+      }
       if (!result.title && !result.author && result.genres.length === 0) {
         Alert.alert(
           "Found the ISBN, but couldn't get details",

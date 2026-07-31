@@ -89,6 +89,32 @@ export interface IsbnLookupResult {
   title?: string;
   author?: string;
   genres: string[];
+  // True if the RAW category/subject data (before any allowlist filtering)
+  // contains an explicit comics/graphic-novel/manga signal - publishers
+  // reliably tag these works with BISAC's own "COMICS & GRAPHIC NOVELS"
+  // heading (or Open Library's equivalent subjects), so this is checked
+  // against the unfiltered source data rather than the already-processed
+  // genre list, which would have thrown away that distinguishing context
+  // in favor of canonicalized general genre terms. Lets Books and Comics/
+  // Manga each detect when an ISBN was scanned/entered in the wrong
+  // screen - see COMIC_SIGNAL_PATTERN below.
+  isLikelyComic: boolean;
+}
+
+// Matches BISAC's own "COMICS & GRAPHIC NOVELS" heading and its common
+// real-world variants in raw category/subject strings - not matched
+// against the already-allowlist-filtered genre list, since that's a much
+// weaker signal (Books' own allowlist legitimately includes "Graphic
+// Novel"/"Comics" as real BISAC categories a PROSE book about comics
+// could have, and Comics/Manga's allowlist legitimately includes general
+// fiction genres like "Romance"/"Fantasy" that overlap with regular
+// novels - neither list alone can reliably tell "is this actually a
+// comic" the way the raw category string can).
+const COMIC_SIGNAL_PATTERN = /\b(comics?|graphic novels?|manga|manhwa|manhua|bandes? dessin[ée]e?s?|light novels?)\b/i;
+
+function detectsComicSignal(categories: string[] | undefined): boolean {
+  if (!categories) return false;
+  return categories.some((c) => COMIC_SIGNAL_PATTERN.test(c));
 }
 
 /** Runs both primary lookups in parallel and merges them field by field
@@ -119,6 +145,7 @@ export async function runIsbnLookup(digits: string, genreAllowlist: string[]): P
   // Open Library's subject list is long and noisy - normalizeGenres cleans
   // up whichever one actually has data.
   let genres = normalizeGenres(gInfo?.categories?.length ? gInfo.categories : olInfo?.categories, genreAllowlist);
+  let isLikelyComic = detectsComicSignal(gInfo?.categories) || detectsComicSignal(olInfo?.categories);
 
   if (genres.length === 0) {
     const workInfo = await lookupOpenLibraryWork(digits).catch((err) => {
@@ -127,11 +154,17 @@ export async function runIsbnLookup(digits: string, genreAllowlist: string[]): P
     });
     if (workInfo) {
       genres = normalizeGenres(workInfo.categories, genreAllowlist);
-      return { title: title || workInfo.title, author: author || (workInfo.authors && workInfo.authors[0]), genres };
+      isLikelyComic = isLikelyComic || detectsComicSignal(workInfo.categories);
+      return {
+        title: title || workInfo.title,
+        author: author || (workInfo.authors && workInfo.authors[0]),
+        genres,
+        isLikelyComic,
+      };
     }
   }
 
-  return { title, author, genres };
+  return { title, author, genres, isLikelyComic };
 }
 
 // --- Genre allowlist matching ---
