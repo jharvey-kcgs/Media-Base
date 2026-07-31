@@ -867,7 +867,9 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
   fix for the Modal issue) and `accentReadable` for foreground color -
   see [Section 6](#6-color-accessibility).
 - **Data safety**: export/import/delete-all all implemented in Settings
-  → Data, not yet tested end-to-end on-device.
+  → Data. Import/delete-all confirmed working on-device, including a
+  fixed bug where restored/reset settings (theme, dark mode, text size)
+  didn't visibly take effect until refreshSettings() was added to both.
 - **Permissions**: camera status + Phone Settings link implemented.
   Real barcode scanning is wired up for both Books and Comics/Manga
   (EAN-13, Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`)
@@ -875,14 +877,19 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
   called for scanning (Movies, Vinyl, Board Games) still need their own
   barcode-type/lookup wiring since their codes and data sources differ
   from ISBN.
-- **Notifications**: daily 10am reminder implemented (Settings →
-  Permissions → Daily reminder), not yet device-tested from this sandbox.
+- **Notifications**: daily 10am reminder confirmed working on-device,
+  including the badge (fixed - the scheduled notification wasn't
+  setting one at all).
 - **Home screen**: generalized to load widget data (count + daily pick)
   for any implemented category rather than a Books-only special case,
   now that Comics/Manga is a second one.
-- **TypeScript**: not yet verified with `npx tsc --noEmit` (no network
-  access when this scaffold was generated, so dependencies haven't been
-  installed or type-checked yet — do this first before building further).
+- **TypeScript**: can't be run directly from this sandbox (no network
+  access to install dependencies), but real errors have been caught via
+  VS Code's own checking and fixed as they came up - an `Alert.alert`
+  button-array typing issue, and a `SectionList` generic-parameter issue
+  affecting both `BookScreen`/`ComicScreen`. Worth an occasional
+  `npx tsc --noEmit` locally to catch anything that slips through
+  between VS Code sessions.
 - **Apple Developer Program enrollment**: in progress, tracked
   separately.
 

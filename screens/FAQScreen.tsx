@@ -20,6 +20,18 @@ const FAQS: { q: string; a: string }[] = [
     q: 'What happens to my rating after I mark something as done?',
     a: 'It opens a place to rate (1-5 stars) and leave a written review, and the item stops showing up as a suggestion.',
   },
+  {
+    q: 'Can an entry have more than one genre?',
+    a: "Yes - up to 4. They're matched against a built-in list of real genre terms so results stay clean rather than picking up stray keywords. Filter by any of them from the ••• menu → Filter by genre...",
+  },
+  {
+    q: 'Can I delete more than one entry at a time?',
+    a: 'Yes - tap ••• → Delete entries to switch into a selection mode, tap as many entries as you want, then Delete.',
+  },
+  {
+    q: 'Can a Comic/Manga end up under Books, or a Book under Comics/Manga?',
+    a: "No - they're stored completely separately, so nothing added under one screen can ever show up in the other. If you scan or enter an ISBN that's clearly classified as the wrong type, the app won't auto-fill it and tells you which screen to use instead.",
+  },
 ];
 
 export default function FAQScreen({ navigation }: any) {

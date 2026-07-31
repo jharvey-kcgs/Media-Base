@@ -14,7 +14,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Category screens',
-    body: "Each one lists what you've added, with sorting and filtering options specific to that category. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
+    body: "Each category screen (Books, Comics/Manga) lists what you've added, with sorting options and a dedicated genre filter, plus an A-Z index to jump around a longer list. Adding an entry supports typing everything by hand, scanning a barcode, or entering an ISBN directly - whichever you use, you get a chance to review and edit every field before saving, and the same title can't be added twice. The ••• menu (top right) has Add entry / Filter by... / Filter by genre... / Delete entries - Delete switches the screen into a selection mode so you can remove one or many entries at once. Books and Comics/Manga are stored completely separately, so nothing added under one can ever end up in the other. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
   },
   {
     title: 'Data',
