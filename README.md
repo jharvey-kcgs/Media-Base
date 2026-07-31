@@ -770,6 +770,66 @@ badge back to 0 on cold launch and every time the app returns to the
 foreground (`AppState` listener in `App.tsx`), so it doesn't just sit
 there indefinitely once you've already seen it.
 
+The badge still didn't appear after that fix, on-device, even though the
+notification content/timing were both correct. Checked against Expo's
+own current docs rather than assume it's a hard Expo Go limitation -
+it isn't: local (non-push) notifications and badges are both explicitly
+supported in Expo Go; only *remote* push notifications were dropped from
+Expo Go in SDK 53+, which isn't what this app uses. The much more likely
+explanation, at first: **Expo Go hosts every project you test under one
+shared native app**, so iOS's notification permission - including the
+separate "Badges" toggle - is granted to Expo Go itself, not
+per-project. If a different project (e.g. Home Base) triggered the
+permission prompt first without badges specifically included, this
+app's own permission check already reads `'granted'` and never
+re-prompts, since iOS won't automatically re-ask once a decision is on
+file for that app. What the code *can* do regardless, and now does:
+`requestPermissionsAsync` explicitly asks for `allowBadge: true` (rather
+than relying on ambient defaults), and both that call and the
+`AppState`-triggered `setBadgeCountAsync` in `App.tsx` now log a
+`console.warn` pointing at Settings → Notifications → Expo Go → Badges
+when the OS reports badge access isn't currently authorized - turning a
+silent "it just never shows up" into an actual diagnostic signal.
+
+That shared-permission theory was then directly ruled out: Home Base's
+badge, also running under Expo Go, works fine - if the shared OS
+permission itself were the blocker, Home Base's badge would fail too.
+So the cause is something specific to this app's own notification code,
+not a platform/permission-sharing quirk. Added an explicit
+`Notifications.addNotificationReceivedListener` in `App.tsx` that calls
+`setBadgeCountAsync(1)` directly the moment the notification fires - the
+same class of fix already working for Home Base. Important honest
+caveat noted in that same comment: this listener only fires if the app
+happens to be open or recently backgrounded right when the notification
+arrives. Per Expo's own notes, there's no way to react to a notification
+via JS listeners when the app is fully closed/killed - which is exactly
+the state the app is most likely in at 10am, since that's the whole
+point of the reminder. For that case, the badge is applied entirely at
+the OS level by reading the notification's own `content.badge` field,
+with zero JS involvement - so if the badge is still missing specifically
+when the app was fully closed at notification time, this listener
+addition isn't what fixes that, and the real cause is more likely in how
+`content.badge` itself gets read for a background-delivered *local* (not
+push) notification specifically - not yet resolved as of this writing.
+
+**A follow-up report ("notification fired correctly, but still no
+badge") wasn't actually the same bug** - this is worth understanding
+since it'll recur for any future change to the notification's
+content/trigger otherwise. `scheduleNotificationAsync` is a one-time
+registration with iOS - the OS doesn't re-check the app's JS code before
+firing an already-scheduled notification each day, so updating the code
+(like adding `badge: 1`) never retroactively touches a notification that
+was scheduled *before* that change existed; only actually calling
+`scheduleDailyRecommendationNotification()` again re-registers it with
+whatever the current code says. Confirmed this wasn't a device/Expo Go
+limitation first, since Home Base successfully shows badges in the exact
+same dev environment. Fixed two ways: `ThemedApp` in `App.tsx` now
+re-runs the schedule call on every app launch whenever the reminder is
+enabled, so it can never drift more than one app-open behind the code -
+and toggling Settings → Permissions → Daily reminder off and back on
+does the same thing immediately, which is the fastest way to pick up any
+future change to this notification without waiting for a relaunch.
+
 ---
 
 ## 6. Color accessibility

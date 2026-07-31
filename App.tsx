@@ -20,6 +20,7 @@ import BookScreen from './screens/BookScreen';
 import ComicScreen from './screens/ComicScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { getSettings } from './lib/storage';
+import { scheduleDailyRecommendationNotification } from './lib/notifications';
 import { ThemeProvider, useTheme } from './lib/theme';
 
 const Stack = createNativeStackNavigator();
@@ -48,12 +49,55 @@ Notifications.setNotificationHandler({
 // reminder would just sit there indefinitely once you've already seen
 // it. Same approach Home Base already uses successfully for its own
 // notifications.
+//
+// setBadgeCountAsync resolves to a boolean (not just void) - per Expo's
+// own docs, false specifically means the OS isn't currently authorizing
+// badge access. Worth checking Settings > Notifications > Expo Go >
+// Badges if this ever logs - though on its own that's probably NOT what
+// explains a missing badge here specifically, since Home Base's badge
+// (also running under Expo Go) works fine, which rules out a shared,
+// Expo-Go-wide permission gap as the sole cause.
 function clearBadge() {
-  Notifications.setBadgeCountAsync(0).catch(() => {});
+  Notifications.setBadgeCountAsync(0)
+    .then((success) => {
+      if (!success) {
+        console.warn(
+          'Media Base: setBadgeCountAsync reported the OS is not currently authorizing badge access - check Settings > Notifications > Expo Go > Badges.',
+        );
+      }
+    })
+    .catch(() => {});
 }
 clearBadge();
 AppState.addEventListener('change', (state) => {
   if (state === 'active') clearBadge();
+});
+
+// Sets the badge directly at the moment the daily reminder fires -
+// but only helps if the app happens to be open/recently backgrounded
+// right then. Per Expo's own notes, there's no way to react to a
+// notification via JS listeners when the app is fully closed/killed -
+// which is exactly the state the app is most likely in at 10am, since
+// that's the whole point of the reminder. For THAT case, the badge is
+// applied entirely at the OS level by reading the notification's own
+// content.badge field (lib/notifications.ts) - zero JS involvement, so
+// this listener genuinely doesn't help there. Kept anyway since it's a
+// real improvement for the case where the app IS open, and mirrors the
+// same class of fix already working for Home Base - but if the badge is
+// still missing specifically when the app was fully closed at 10am, this
+// addition isn't what fixes that; the real cause is more likely in how
+// content.badge itself is being read for a background-delivered LOCAL
+// (not push) notification.
+Notifications.addNotificationReceivedListener(() => {
+  Notifications.setBadgeCountAsync(1)
+    .then((success) => {
+      if (!success) {
+        console.warn(
+          'Media Base: setBadgeCountAsync(1) on notification-received reported the OS is not currently authorizing badge access.',
+        );
+      }
+    })
+    .catch(() => {});
 });
 
 function RootGate() {
@@ -88,7 +132,20 @@ function RootGate() {
 }
 
 function ThemedApp() {
-  const { theme } = useTheme();
+  const { theme, settings } = useTheme();
+
+  // A scheduled notification is a one-time registration with iOS/Android -
+  // the OS doesn't re-check the app's code before firing it each day, so a
+  // code change to content/trigger (like adding the badge field) never
+  // retroactively updates a notification that was already scheduled before
+  // that change existed. Re-running the schedule call on every launch when
+  // enabled keeps it in sync with whatever the current code actually says,
+  // rather than silently drifting from it until the next manual toggle.
+  useEffect(() => {
+    if (settings.notificationsEnabled) {
+      scheduleDailyRecommendationNotification().catch(() => {});
+    }
+  }, [settings.notificationsEnabled]);
 
   const navTheme = {
     ...(theme.mode === 'dark' ? DarkTheme : DefaultTheme),

@@ -53,9 +53,27 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
     if (wantsOn) {
       let status = notifStatus;
       if (status !== 'granted') {
-        const result = await Notifications.requestPermissionsAsync();
+        // Explicit rather than relying on requestPermissionsAsync()'s
+        // defaults - Expo Go shares ONE OS-level notification permission
+        // across every project you test in it (it's a single native app
+        // hosting many JS projects), so if a different project already
+        // triggered the permission prompt at some point without the
+        // badge option granted, status here can already read 'granted'
+        // and this call never re-prompts - the badge then just silently
+        // never appears. Being explicit here doesn't fix that (iOS won't
+        // re-prompt once a decision is on file either way - Settings app
+        // is the only fix then), but it does mean a genuinely fresh
+        // first-time prompt always asks for badge specifically.
+        const result = await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        });
         status = result.status;
         setNotifStatus(status);
+        if (status === 'granted' && result.ios?.allowsBadge === false) {
+          console.warn(
+            'Media Base: notification permission granted, but badges specifically are not authorized - check Settings > Notifications > Expo Go > Badges.',
+          );
+        }
       }
       if (status !== 'granted') {
         Alert.alert(
