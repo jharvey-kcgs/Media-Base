@@ -255,7 +255,93 @@ lib/
                                      native view per row. Any future
                                      category's card component should
                                      accept `onLayout` the same way rather
-                                     than reintroducing a wrapper.
+                                     than reintroducing a wrapper. Even
+                                     after that, real stutter persisted
+                                     specifically on Comics/Manga - a
+                                     sixth fix, and the one that actually
+                                     addressed the true root cause:
+                                     without `getItemLayout`, RN has to
+                                     *measure* each row as it scrolls into
+                                     view rather than calculate its
+                                     position, and Comics/Manga rows
+                                     genuinely varied in height far more
+                                     than Books' - 3-4 genres wrapping to
+                                     a second line was common (manga
+                                     format + genre + demographic tags
+                                     naturally co-occur on real subject
+                                     data), plus a real duplicate-genre
+                                     bug ("Superheroes, Superhero, Fiction"
+                                     - both singular and plural forms of
+                                     the same BISAC term ended up on the
+                                     allowlist) was inflating that further.
+                                     Fixed at the source in
+                                     `BookCard`/`ComicCard`: removed the
+                                     redundant `'Superhero'` from Comics'
+                                     allowlist (kept `'Superheroes'`, the
+                                     actual BISAC term), capped the
+                                     genre display to 2 (`+N` for the
+                                     rest - full list still shown/
+                                     editable in the Add/Edit form), and
+                                     added `numberOfLines={1}` to all
+                                     three text lines on every card. That
+                                     last part is the real fix - it
+                                     forces every row to a genuinely
+                                     fixed height instead of a shorter
+                                     *average* one, which is what
+                                     virtualized-list measurement
+                                     actually needs to stay smooth
+                                     without `getItemLayout`. Deliberate
+                                     visible tradeoff: long titles/
+                                     author-genre lines now truncate with
+                                     an ellipsis instead of wrapping.
+
+                                     That confident "this is the real fix"
+                                     claim turned out to be wrong too - a
+                                     clean --clear build confirmed it
+                                     genuinely didn't help, and the report
+                                     got more specific: the screen went
+                                     fully **blank** while scrolling, and
+                                     specifically failed jumping to
+                                     letters near the end (S-Z). The
+                                     diagnostic that actually cracked it,
+                                     seventh round: sorting by "Read?"
+                                     (which renders the exact same
+                                     `ComicCard`/`renderItem` via plain
+                                     `FlatList` - no sections, no sticky
+                                     headers, no A-Z bar at all) scrolled
+                                     perfectly fine. Since the ROWS are
+                                     identical in both list modes, that
+                                     single test proved the rows were
+                                     never the problem - all three prior
+                                     rounds (the onLayout wrapper, then
+                                     row-height uniformity) had been
+                                     fixing the wrong layer. The real
+                                     differentiator is `SectionList`
+                                     itself: **sticky section headers**
+                                     have real overhead that scales with
+                                     how many section boundaries you
+                                     cross while scrolling, not with row
+                                     content - and Comics/Manga's real
+                                     data has many more small sections
+                                     (mostly 1-2 items per starting
+                                     letter, per a real screenshot) than
+                                     Books' denser, more clustered
+                                     sections, making it a genuinely
+                                     harder case for sticky headers
+                                     specifically even with identical row
+                                     rendering. Fixed with
+                                     `stickySectionHeadersEnabled={false}`
+                                     on both `<SectionList>` tags (Books
+                                     included, for consistency and in
+                                     case its own section distribution
+                                     ever spreads out more). Lesson for
+                                     next time a symptom doesn't match
+                                     the fix: compare the two list modes
+                                     BEFORE changing anything, rather
+                                     than reasoning from code alone - the
+                                     three earlier rounds could have been
+                                     skipped entirely with that one test
+                                     upfront.
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -

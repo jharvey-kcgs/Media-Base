@@ -70,7 +70,7 @@ const GENRE_ALLOWLIST = [
   'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy', 'Science Fiction',
   'Horror', 'Mystery', 'Thriller', 'Suspense', 'Romance', 'Slice Of Life',
   'Historical', 'Sports', 'Supernatural', 'Mecha', 'Isekai',
-  'Post-Apocalyptic', 'Dystopian', 'Crime', 'War', 'Superhero', 'Satire',
+  'Post-Apocalyptic', 'Dystopian', 'Crime', 'War', 'Satire',
   'Anthology', 'Biography', 'Memoir', 'Fiction', 'Nonfiction', 'Western',
   'Psychological', 'Shonen', 'Shoujo', 'Seinen', 'Josei', 'Manga',
   'Manhwa', 'Manhua', 'Graphic Novel',
@@ -170,18 +170,51 @@ const ComicCard = React.memo(function ComicCard({
           />
         )}
         <View style={styles.flex}>
-          <AppText variant="header" style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>
+          <AppText
+            variant="header"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}
+          >
             {comic.title}
           </AppText>
-          <AppText style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}>
-            {comic.author} · {comic.genres.join(', ')}
+          <AppText
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}
+          >
+            {comic.author} · {comic.genres.slice(0, 2).join(', ')}
+            {comic.genres.length > 2 ? ` +${comic.genres.length - 2}` : ''}
           </AppText>
-          <AppText style={{ color: comic.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}>
+          <AppText
+            numberOfLines={1}
+            style={{ color: comic.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}
+          >
             {comic.read ? `Read${comic.rating ? ` · ${comic.rating}★` : ''}` : 'Not read yet'}
           </AppText>
         </View>
       </View>
     </TouchableOpacity>
+  );
+});
+
+const AlphabetBar = React.memo(function AlphabetBar({
+  color,
+  fontScale,
+  onPressLetter,
+}: {
+  color: string;
+  fontScale: number;
+  onPressLetter: (letter: string) => void;
+}) {
+  return (
+    <View style={styles.azBar} pointerEvents="box-none">
+      {ALPHABET.map((letter) => (
+        <TouchableOpacity key={letter} onPress={() => onPressLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 6, right: 6 }}>
+          <AppText style={{ color, fontSize: 10 * fontScale }}>{letter}</AppText>
+        </TouchableOpacity>
+      ))}
+    </View>
   );
 });
 
@@ -643,6 +676,7 @@ export default function ComicScreen({ navigation }: any) {
             maxToRenderPerBatch={12}
             updateCellsBatchingPeriod={50}
             windowSize={11}
+            stickySectionHeadersEnabled={false}
           />
         ) : (
           <FlatList
@@ -659,13 +693,7 @@ export default function ComicScreen({ navigation }: any) {
         )}
 
         {isAlpha && sections.length > 0 && (
-          <View style={styles.azBar} pointerEvents="box-none">
-            {ALPHABET.map((letter) => (
-              <TouchableOpacity key={letter} onPress={() => jumpToLetter(letter)} hitSlop={{ top: 1, bottom: 1, left: 6, right: 6 }}>
-                <AppText style={{ color: theme.colors.accentReadable, fontSize: 10 * theme.fontScale }}>{letter}</AppText>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <AlphabetBar color={theme.colors.accentReadable} fontScale={theme.fontScale} onPressLetter={jumpToLetter} />
         )}
       </View>
 
