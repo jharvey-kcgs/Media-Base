@@ -232,7 +232,30 @@ lib/
                                      guess - any future category screen
                                      should wire this the same way rather
                                      than skipping it "since the guess
-                                     was probably fine."
+                                     was probably fine." That fix itself
+                                     then caused a fifth, separate scroll
+                                     bug: it wired `recordRowHeight` via
+                                     an extra `<View onLayout={...}>`
+                                     wrapped around each row, and that
+                                     extra native view plus an `onLayout`
+                                     dispatch per row as cells recycle
+                                     during scroll was enough to cause
+                                     real continuous stutter while
+                                     actively scrolling (reported right
+                                     after, same screen). Fixed two ways:
+                                     `recordRowHeight` now caps itself at
+                                     `MAX_ROW_HEIGHT_SAMPLES` instead of
+                                     doing this work for the screen's
+                                     whole lifetime, and `BookCard`/
+                                     `ComicCard` now accept `onLayout` as
+                                     a prop and attach it directly to
+                                     their existing outer `TouchableOpacity`
+                                     - a prop on an element that already
+                                     exists, instead of an entirely new
+                                     native view per row. Any future
+                                     category's card component should
+                                     accept `onLayout` the same way rather
+                                     than reintroducing a wrapper.
 
 components/
   AppText.tsx                      Drop-in replacement for RN's <Text> -
@@ -441,6 +464,32 @@ form fields, the row component, the allowlist).
   bug, just a real gap in free bibliographic data. This third lookup
   only fires when actually needed, since it costs an extra network round
   trip.
+
+  **Cross-category ISBN mismatch detection**: scanning/entering a comic
+  or manga's ISBN inside Books gets denied ("That looks like a
+  Comic/Manga"), and vice versa inside Comics/Manga - in both cases
+  nothing gets auto-filled, and the alert points at the correct screen.
+  This works off `isLikelyComic` in `IsbnLookupResult`
+  (`lib/isbnLookup.ts`), computed by checking the RAW category/subject
+  strings for an explicit comics/graphic-novel/manga signal
+  (`COMIC_SIGNAL_PATTERN`) - deliberately checked against the raw,
+  unfiltered data rather than the already-allowlist-matched genre list,
+  since that list is a much weaker signal in both directions: Books'
+  allowlist legitimately includes "Graphic Novel"/"Comics" (a prose book
+  *about* comics could have that genre), and Comics/Manga's allowlist
+  legitimately includes general fiction genres like "Romance"/"Fantasy"
+  that a real comic could equally have. **The two directions have
+  genuinely different confidence levels** - flagged honestly rather than
+  treated as symmetric: a *positive* comic-signal match (Books' side) is
+  reliable, since publishers consistently tag comics/graphic novels/manga
+  with BISAC's own "COMICS & GRAPHIC NOVELS" heading. The *absence* of
+  that signal (Comics/Manga's side) is weaker evidence - it only means
+  "no comic classification was found," not "this is confirmed to be a
+  regular book" - so that check only fires when there's real genre data
+  to go on at all (an ISBN with no classification data isn't confidently
+  "not a comic," it's just unclassified), and its alert says so rather
+  than asserting it flatly. Both directions only block the *auto-fill* -
+  manual entry is never blocked, same as everywhere else in this app.
 
   Not network-testable from the sandbox this was built in - not every
   book is indexed in either free database, especially older or less

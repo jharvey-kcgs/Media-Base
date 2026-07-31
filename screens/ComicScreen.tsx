@@ -141,16 +141,19 @@ const ComicCard = React.memo(function ComicCard({
   selected,
   selectionMode,
   onPress,
+  onLayout,
 }: {
   comic: Comic;
   selected: boolean;
   selectionMode: boolean;
   onPress: (comic: Comic) => void;
+  onLayout?: (e: any) => void;
 }) {
   const { theme } = useTheme();
   return (
     <TouchableOpacity
       onPress={() => onPress(comic)}
+      onLayout={onLayout}
       style={[
         styles.card,
         { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
@@ -546,9 +549,13 @@ export default function ComicScreen({ navigation }: any) {
 
   const renderItem = useCallback(
     ({ item }: { item: Comic }) => (
-      <View onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}>
-        <ComicCard comic={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
-      </View>
+      <ComicCard
+        comic={item}
+        selected={selectedIds.has(item.id)}
+        selectionMode={selectionMode}
+        onPress={handleCardPress}
+        onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
+      />
     ),
     [selectedIds, selectionMode, handleCardPress, recordRowHeight],
   );

@@ -12,8 +12,11 @@
 // back everything needed to wire one up: a ref for the SectionList itself,
 // onLayout/onContentSizeChange handlers to feed it real measurements, a
 // jumpToLetter(letter) function for the A-Z bar's onPress, and
-// recordRowHeight - wire this to an onLayout on each rendered row so the
-// jump estimate uses a real measured average instead of a guessed constant.
+// recordRowHeight - pass this as the `onLayout` prop directly on each
+// row's own outer element (not a wrapper View around it - an earlier
+// version used a wrapper, which turned out to cause real scroll stutter,
+// see the note below) so the jump estimate uses a real measured average
+// instead of a guessed constant.
 
 import { useRef, useCallback } from 'react';
 import { SectionList } from 'react-native';
@@ -24,6 +27,7 @@ interface Section<T> {
 }
 
 const FALLBACK_ROW_HEIGHT = 96; // used only until the first few real rows have been measured
+const MAX_ROW_HEIGHT_SAMPLES = 40; // plenty for a stable average - no need to keep measuring every row forever
 
 export function useAlphabetScroll<T>(sections: Section<T>[], fontScale: number) {
   // The second generic parameter tells TypeScript our sections have a
@@ -45,18 +49,32 @@ export function useAlphabetScroll<T>(sections: Section<T>[], fontScale: number) 
     viewportHeightRef.current = e.nativeEvent.layout.height;
   }, []);
 
-  // Wire this to an onLayout on each rendered row. A guessed constant row
-  // height was the actual root cause of a real reported bug: with 45
-  // Comics/Manga entries, scrolling/jumping specifically got glitchy near
-  // the END of the alphabet (U-Z) - exactly where the guess's error has
-  // accumulated the most, since every row before that point gets summed
-  // into the jump estimate. Measuring real rows as they render and using
-  // the running average instead fixes the error at its source rather than
-  // continuing to re-tune a constant that can never be right for every
-  // category (title length, genre-list length, and font scale all affect
-  // real row height differently).
+  // Pass this as the `onLayout` prop directly on each row's own outer
+  // element. A guessed constant row height was the actual root cause of
+  // one real reported bug: with 45 Comics/Manga entries, scrolling/
+  // jumping specifically got glitchy near the END of the alphabet (U-Z) -
+  // exactly where the guess's error has accumulated the most, since every
+  // row before that point gets summed into the jump estimate. Measuring
+  // real rows as they render and using the running average fixes the
+  // error at its source rather than continuing to re-tune a constant that
+  // can never be right for every category (title length, genre-list
+  // length, and font scale all affect real row height differently).
+  //
+  // The FIRST version of this fix wrapped each row in an extra <View
+  // onLayout={...}> - which then caused a SEPARATE real bug: continuous
+  // stutter while actively scrolling, reported on the same screen right
+  // after. An extra native view per row, plus an onLayout event dispatch
+  // for every row as cells get recycled during scroll, adds real
+  // per-frame cost at list sizes where it starts to matter. Two fixes
+  // together: (1) recordRowHeight below now caps itself at
+  // MAX_ROW_HEIGHT_SAMPLES instead of doing this work for the life of the
+  // screen, and (2) callers now pass this directly as the `onLayout` prop
+  // on the row's own existing outer element (see BookCard/ComicCard)
+  // instead of adding a wrapper View - a prop on an element that already
+  // exists is much cheaper than an entirely new native view per row.
   const recordRowHeight = useCallback((height: number) => {
     if (height <= 0) return; // sometimes reported during initial mount, before layout settles
+    if (rowHeightCountRef.current >= MAX_ROW_HEIGHT_SAMPLES) return;
     rowHeightSumRef.current += height;
     rowHeightCountRef.current += 1;
   }, []);

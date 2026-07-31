@@ -165,16 +165,19 @@ const BookCard = React.memo(function BookCard({
   selected,
   selectionMode,
   onPress,
+  onLayout,
 }: {
   book: Book;
   selected: boolean;
   selectionMode: boolean;
   onPress: (book: Book) => void;
+  onLayout?: (e: any) => void;
 }) {
   const { theme } = useTheme();
   return (
     <TouchableOpacity
       onPress={() => onPress(book)}
+      onLayout={onLayout}
       style={[
         styles.card,
         { borderColor: selected ? theme.colors.accentReadable : theme.colors.border, backgroundColor: theme.colors.surface },
@@ -589,9 +592,13 @@ export default function BookScreen({ navigation }: any) {
 
   const renderItem = useCallback(
     ({ item }: { item: Book }) => (
-      <View onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}>
-        <BookCard book={item} selected={selectedIds.has(item.id)} selectionMode={selectionMode} onPress={handleCardPress} />
-      </View>
+      <BookCard
+        book={item}
+        selected={selectedIds.has(item.id)}
+        selectionMode={selectionMode}
+        onPress={handleCardPress}
+        onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
+      />
     ),
     [selectedIds, selectionMode, handleCardPress, recordRowHeight],
   );
