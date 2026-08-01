@@ -3,3 +3,8 @@ node_modules
 .DS_Store
 *.log
 npm-debug.*
+
+# Holds the real TMDB_API_KEY - this repo is public, so the real key
+# stays local-only. See lib/config.example.ts for the tracked template/
+# setup instructions.
+lib/config.ts
