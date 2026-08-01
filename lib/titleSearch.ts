@@ -6,12 +6,22 @@
 // scan/ISBN-or-UPC-entry can't cover - no working camera, a damaged or
 // unknown barcode, a thrifted book with a sticker over part of it.
 //
-// Books/Comics both search Google Books (the same source runIsbnLookup
-// already uses) by title instead of ISBN - reuses normalizeGenres() from
-// lib/isbnLookup.ts so results go through the exact same genre-allowlist
-// matching. Movies reuses lib/upcLookup.ts's tmdbSearchMovies() directly,
-// since that's the same TMDb search the UPC pipeline's second step
-// already calls, just asking for several results instead of one.
+// Books/Comics search Google Books first, falling back to Open Library
+// if that comes back empty or rate-limited - the same multi-source
+// resilience pattern lib/isbnLookup.ts already uses for ISBN lookup,
+// applied here for the same reason: real testing confirmed Google
+// Books' free keyless quota getting rate-limited (429) specifically on
+// title search, which fires on nearly every keystroke pause and hits
+// that shared quota far harder than the occasional ISBN-blur lookup
+// ever does. Open Library is a fully independent source with its own
+// quota, so it keeps working even while Google Books is throttled.
+// Reuses normalizeGenres() from lib/isbnLookup.ts either way, so results
+// go through the exact same genre-allowlist matching regardless of
+// which source actually answered.
+//
+// Movies reuses lib/upcLookup.ts's tmdbSearchMovies() directly, since
+// that's the same TMDb search the UPC pipeline's second step already
+// calls, just asking for several results instead of one.
 //
 // Deliberately different result shapes per category rather than one
 // forced-generic type: Movies results never carry a UPC at all - UPC
@@ -24,43 +34,34 @@
 import { normalizeGenres } from './isbnLookup';
 import { tmdbSearchMovies, UpcMovieLookupResult } from './upcLookup';
 
+const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
+
 export interface BookTitleSearchResult {
-  key: string; // Google Books volume ID - always present, stable, unique
+  key: string; // stable, unique per result (Google Books volume ID, or Open Library work key)
   isbn: string; // '' if this record has no ISBN on file (common, even for well-known titles - see below)
   title: string;
   author?: string;
   genres: string[];
 }
 
-/** Searches Google Books by title (shared by Books and Comics/Manga -
- * pass each screen's own genre allowlist). Returns up to `maxResults`
- * candidates. ISBN is NOT required to be present - an earlier version of
- * this filtered out every result missing one, reasoning "the whole point
- * is filling that field in too", but that was a real bug: Google Books'
- * title-search results frequently omit industryIdentifiers entirely,
- * even for extremely well-known titles - confirmed as the actual cause
- * of a reported 100% failure rate on real searches (Harry Potter, The
- * Hunger Games, etc.). A result without an ISBN is still genuinely
- * useful - title/author/genre still fill in correctly, the ISBN field
- * just stays whatever it was, same as manual entry. */
-export async function searchBooksByTitle(
-  query: string,
+async function searchGoogleBooksByTitle(
+  trimmed: string,
   genreAllowlist: string[],
-  maxResults = 8,
+  maxResults: number,
 ): Promise<BookTitleSearchResult[]> {
-  const trimmed = query.trim();
-  if (trimmed.length < 2) return [];
-
   const res = await fetch(
     `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(`intitle:"${trimmed}"`)}&maxResults=${maxResults}`,
   );
   if (!res.ok) {
-    if (res.status !== 429) {
-      // Same reasoning as lookupGoogleBooks in isbnLookup.ts - 429 is
-      // routine during a busy search session, not worth logging as if
-      // unexpected.
-      console.warn('Media Base: Google Books title search returned', res.status);
-    }
+    // Deliberately NOT suppressing 429 here the way lookupGoogleBooks
+    // (isbnLookup.ts) does for the occasional ISBN-blur lookup - title
+    // search fires on nearly every keystroke pause while typing, which
+    // hits Google Books' free keyless quota far harder and far more
+    // often. Silencing it would hide exactly the evidence needed to
+    // tell "genuinely no matches" apart from "got rate-limited" - which
+    // is precisely what a real 429 turned out to be, confirmed via this
+    // exact log line.
+    console.warn('Media Base: Google Books title search returned', res.status);
     return [];
   }
   const json = await res.json();
@@ -81,11 +82,74 @@ export async function searchBooksByTitle(
       genres: normalizeGenres(info.categories, genreAllowlist),
     });
   }
-  // Diagnostic, not a warning about anything wrong - helps confirm at a
-  // glance whether a "no matches" report is genuinely zero raw results
-  // from Google Books, versus something being filtered out afterward.
-  console.warn('Media Base: title search for', `"${trimmed}"`, '->', items.length, 'raw,', results.length, 'usable');
+  console.warn('Media Base: Google Books title search for', `"${trimmed}"`, '->', items.length, 'raw,', results.length, 'usable');
   return results;
+}
+
+// Independent fallback, tried only when Google Books comes back empty
+// (including rate-limited) - a completely separate service with its own
+// quota, so it isn't affected by whatever's throttling Google Books.
+async function searchOpenLibraryByTitle(
+  trimmed: string,
+  genreAllowlist: string[],
+  maxResults: number,
+): Promise<BookTitleSearchResult[]> {
+  const res = await fetch(
+    `https://openlibrary.org/search.json?title=${encodeURIComponent(trimmed)}&limit=${maxResults}&fields=key,title,author_name,isbn,subject`,
+    { headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT } },
+  );
+  if (!res.ok) {
+    console.warn('Media Base: Open Library title search returned', res.status);
+    return [];
+  }
+  const json = await res.json();
+  const docs = Array.isArray(json?.docs) ? json.docs : [];
+
+  const results: BookTitleSearchResult[] = [];
+  for (const doc of docs) {
+    if (!doc?.title || !doc?.key) continue;
+    const isbn = Array.isArray(doc.isbn) && doc.isbn.length > 0 ? doc.isbn[0] : '';
+    results.push({
+      key: doc.key as string,
+      isbn,
+      title: doc.title as string,
+      author: Array.isArray(doc.author_name) ? doc.author_name[0] : undefined,
+      genres: normalizeGenres(doc.subject, genreAllowlist),
+    });
+  }
+  console.warn('Media Base: Open Library title search for', `"${trimmed}"`, '->', docs.length, 'raw,', results.length, 'usable');
+  return results;
+}
+
+/** Searches for books/comics by title (shared by both - pass each
+ * screen's own genre allowlist). Tries Google Books first, falls back to
+ * Open Library if that source comes back with nothing at all. ISBN is
+ * NOT required to be present on a result - an earlier version filtered
+ * out every result missing one, reasoning "the whole point is filling
+ * that field in too", but that was a real bug: both sources frequently
+ * omit it entirely, even for extremely well-known titles - confirmed as
+ * the actual cause of a reported 100% failure rate on real searches
+ * (Harry Potter, The Hunger Games, etc.). A result without an ISBN is
+ * still genuinely useful - title/author/genre still fill in correctly,
+ * the ISBN field just stays whatever it was, same as manual entry. */
+export async function searchBooksByTitle(
+  query: string,
+  genreAllowlist: string[],
+  maxResults = 8,
+): Promise<BookTitleSearchResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  const googleResults = await searchGoogleBooksByTitle(trimmed, genreAllowlist, maxResults).catch((err) => {
+    console.warn('Media Base: Google Books title search threw', err);
+    return [];
+  });
+  if (googleResults.length > 0) return googleResults;
+
+  return searchOpenLibraryByTitle(trimmed, genreAllowlist, maxResults).catch((err) => {
+    console.warn('Media Base: Open Library title search threw', err);
+    return [];
+  });
 }
 
 /** Searches TMDb by movie title - thin wrapper around

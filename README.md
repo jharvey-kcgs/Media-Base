@@ -329,7 +329,30 @@ lib/
                                      console.warn, to make "why no
                                      matches" easy to diagnose going
                                      forward without re-deriving this
-                                     from scratch. Movies reuses
+                                     from scratch. That logging paid off
+                                     immediately: a follow-up report of
+                                     zero results with zero console
+                                     output turned out to be Google
+                                     Books returning 429 (rate-limited) -
+                                     the logging had been suppressing 429
+                                     specifically, copying reasoning from
+                                     isbnLookup.ts's occasional ISBN-blur
+                                     lookup that doesn't hold for title
+                                     search, which fires on nearly every
+                                     keystroke pause and hits that same
+                                     free keyless quota far harder. Fixed
+                                     two ways: the suppression is gone
+                                     (429 now always logs), and
+                                     Open Library is now a genuine
+                                     independent fallback - tried
+                                     whenever Google Books comes back
+                                     with nothing at all, including when
+                                     rate-limited, since it's a
+                                     completely separate service with
+                                     its own quota. Same multi-source
+                                     resilience pattern isbnLookup.ts
+                                     already uses for ISBN lookup, now
+                                     applied here too. Movies reuses
                                      upcLookup.ts's tmdbSearchMovies()
                                      directly (the same TMDb search its
                                      UPC pipeline already calls) - but
