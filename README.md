@@ -186,7 +186,27 @@ screens/
                                      Dark mode, text size, enabled Home
                                      categories all live there)
   PermissionsSettingsScreen.tsx    Camera access status + Phone Settings link
-  AboutScreen.tsx                  What each setting/screen does
+  AboutScreen.tsx                  What each setting/screen does. Also
+                                     has the Credits section required by
+                                     TMDb's API terms of use to keep
+                                     using their free (non-commercial)
+                                     key - the required text notice is
+                                     there, but their terms also call for
+                                     the actual TMDb logo somewhere in
+                                     this section, which needs their
+                                     approved image asset downloaded from
+                                     themoviedb.org's brand page and
+                                     added manually - not something
+                                     fetchable from this sandbox. TMDb's
+                                     own free tier is genuinely fine for
+                                     this app long-term as long as it
+                                     stays free/non-commercial (confirmed
+                                     directly against their API terms and
+                                     community answers) - the $149/mo
+                                     commercial key is only required once
+                                     an app generates revenue, not merely
+                                     for being distributed on the App
+                                     Store.
   FAQScreen.tsx                    Common questions, split out from About
 
 lib/
