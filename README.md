@@ -1108,6 +1108,25 @@ and toggling Settings → Permissions → Daily reminder off and back on
 does the same thing immediately, which is the fastest way to pick up any
 future change to this notification without waiting for a relaunch.
 
+**A third follow-up report: two identical notifications fired at the
+same 10am trigger** (badge working correctly by this point). Given how
+many times this feature had been toggled on/off and rebuilt across all
+the rounds above, the most likely explanation was an orphaned scheduled
+notification left over from an earlier test - possibly registered under
+a different identifier, or from before `identifier` was even part of
+this code - that `cancelDailyRecommendationNotification()` could never
+have cleared, since it only cancelled `DAILY_NOTIFICATION_ID`
+specifically. Fixed by switching both the schedule and cancel functions
+to `Notifications.cancelAllScheduledNotificationsAsync()` instead -
+clearing everything regardless of identifier before (re-)scheduling, or
+before turning the reminder off. Safe since this app only ever schedules
+this one notification type. Self-healing, not something needing a manual
+toggle: the existing `App.tsx` effect above already re-runs the schedule
+call on every launch while the reminder is enabled, so simply reopening
+the app picks up this fix automatically and flushes any existing
+duplicate - confirmed this superseded an earlier (wrong) instruction to
+toggle the setting off and back on manually.
+
 ---
 
 ## 6. Color accessibility

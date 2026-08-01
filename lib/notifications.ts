@@ -16,9 +16,18 @@ import * as Notifications from 'expo-notifications';
 const DAILY_NOTIFICATION_ID = 'media-base-daily-recommendation';
 
 export async function scheduleDailyRecommendationNotification(): Promise<void> {
-  // Cancel any existing one first so toggling on twice (or re-enabling
-  // after an app update) doesn't stack duplicate notifications.
-  await cancelDailyRecommendationNotification();
+  // Cancel EVERYTHING scheduled first, not just our own identifier -
+  // real reported bug: two identical notifications fired at the same
+  // 10am trigger. Most likely explanation: this feature has been
+  // toggled on/off and rebuilt many times across testing, and an
+  // earlier test run left an orphaned scheduled notification under a
+  // different identifier (or from before `identifier` was even part of
+  // this code) that cancelDailyRecommendationNotification() - which only
+  // cancels DAILY_NOTIFICATION_ID specifically - could never clear.
+  // Since this app only ever schedules this one notification type,
+  // clearing everything is completely safe and far more thorough than
+  // hoping every past schedule call used the exact same identifier.
+  await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_NOTIFICATION_ID,
     content: {
@@ -41,5 +50,9 @@ export async function scheduleDailyRecommendationNotification(): Promise<void> {
 }
 
 export async function cancelDailyRecommendationNotification(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(DAILY_NOTIFICATION_ID).catch(() => {});
+  // Same reasoning as scheduleDailyRecommendationNotification() above -
+  // clearing everything (not just DAILY_NOTIFICATION_ID) guarantees
+  // turning the reminder off actually leaves nothing scheduled, safe
+  // since this is the only notification type this app ever creates.
+  await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
 }
