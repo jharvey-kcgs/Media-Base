@@ -56,6 +56,7 @@ export interface UpcMovieLookupResult {
   title?: string;
   genres: string[];
   releaseYear?: string;
+  coverUrl?: string;
 }
 
 // An ISBN is structurally just an EAN-13 barcode in the reserved
@@ -133,6 +134,10 @@ export async function tmdbSearchMovies(query: string, maxResults: number): Promi
       title: match.title as string | undefined,
       genres,
       releaseYear: match.release_date ? String(match.release_date).slice(0, 4) : undefined,
+      // TMDb's documented, stable image CDN base URL - w500 is a
+      // reasonable fixed size for a poster that only ever gets displayed
+      // small (list thumbnail) or medium (edit screen).
+      coverUrl: match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : undefined,
     };
   });
 }

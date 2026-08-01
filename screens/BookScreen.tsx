@@ -35,8 +35,11 @@ import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
+import CoverThumbnail from '../components/CoverThumbnail';
+import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
-import { getBooks, addBook, updateBook, deleteBook, deleteBooks } from '../lib/storage';
+import { getBooks, addBook, updateBook, deleteBook, deleteBooks, newId } from '../lib/storage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
 import { searchBooksByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -131,6 +134,7 @@ interface DraftState {
   genresText: string; // comma-separated as typed; parsed into an array on save
   author: string;
   isbn: string;
+  coverImage: string | null;
   read: boolean;
   rating: number;
   review: string;
@@ -141,6 +145,7 @@ const EMPTY_DRAFT: DraftState = {
   genresText: '',
   author: '',
   isbn: '',
+  coverImage: null,
   read: false,
   rating: 0,
   review: '',
@@ -196,6 +201,7 @@ const BookCard = React.memo(function BookCard({
             style={styles.cardCheckbox}
           />
         )}
+        <CoverThumbnail uri={book.coverImage} iconName="book-outline" />
         <View style={styles.flex}>
           <AppText
             variant="header"
@@ -256,6 +262,11 @@ export default function BookScreen({ navigation }: any) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The id cover operations use while the form is open - a freshly
+  // pre-generated one in Add mode (so a photo picked before Save still
+  // lands under the item's real, final id), or the existing item's own
+  // id in Edit mode.
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
@@ -313,6 +324,7 @@ export default function BookScreen({ navigation }: any) {
 
   const openAdd = () => {
     setEditingId(null);
+    setActiveItemId(newId());
     setDraft(EMPTY_DRAFT);
     setIsbnStatus('idle');
     setModalVisible(true);
@@ -320,11 +332,13 @@ export default function BookScreen({ navigation }: any) {
 
   const openEdit = (book: Book) => {
     setEditingId(book.id);
+    setActiveItemId(book.id);
     setDraft({
       title: book.title,
       genresText: book.genres.join(', '),
       author: book.author,
       isbn: book.isbn ?? '',
+      coverImage: book.coverImage ?? null,
       read: book.read,
       rating: book.rating ?? 0,
       review: book.review,
@@ -352,6 +366,37 @@ export default function BookScreen({ navigation }: any) {
         },
       },
     ]);
+  };
+
+  // Tapping the cover in the Add/Edit form. activeItemId is always set by
+  // this point (openAdd/openEdit both set it before the form can open),
+  // so cover files always land under a real, final id from the start -
+  // no need to move anything once the item is actually saved.
+  const handleCoverPress = () => {
+    const buttons: AlertButton[] = [
+      { text: 'Take Photo', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await takeCoverPhoto('books', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+      { text: 'Choose from Library', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await pickCoverFromLibrary('books', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+    ];
+    if (draft.coverImage) {
+      buttons.push({
+        text: 'Remove Photo',
+        style: 'destructive',
+        onPress: async () => {
+          if (activeItemId) await deleteCover('books', activeItemId);
+          setDraft((d) => ({ ...d, coverImage: null }));
+        },
+      });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Cover photo', undefined, buttons);
   };
 
   const enterSelectionMode = () => {
@@ -567,6 +612,15 @@ export default function BookScreen({ navigation }: any) {
         author: result.author || d.author,
         genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
       }));
+      // Fire-and-forget: doesn't block the fields above from filling in
+      // immediately. Only overwrites an existing cover if this lookup
+      // actually found one - a prior manually-picked photo isn't
+      // clobbered by a lookup that came back with nothing.
+      if (result.coverUrl && activeItemId) {
+        downloadRemoteCover('books', activeItemId, result.coverUrl).then((uri) => {
+          if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+        });
+      }
     } catch (err) {
       console.warn('Media Base: ISBN lookup failed', err);
       Alert.alert('Lookup failed', 'Could not reach the book database - check your connection, or fill in the details by hand.');
@@ -601,6 +655,7 @@ export default function BookScreen({ navigation }: any) {
       genres,
       author: draft.author.trim(),
       isbn: draft.isbn.trim(),
+      coverImage: draft.coverImage,
       read: draft.read,
       rating: draft.read ? draft.rating || null : null,
       review: draft.read ? draft.review : '',
@@ -609,10 +664,22 @@ export default function BookScreen({ navigation }: any) {
     if (editingId) {
       await updateBook(editingId, payload);
     } else {
-      await addBook(payload);
+      await addBook(payload, activeItemId ?? undefined);
     }
     setModalVisible(false);
     load();
+  };
+
+  // If a cover was picked/downloaded during an Add session that then
+  // gets cancelled (not saved), that file would otherwise sit around
+  // forever under an id that never became a real entry - this cleans
+  // that up. Editing an existing entry never hits this: editingId is set,
+  // so nothing gets deleted just because the edit was cancelled.
+  const handleCancelForm = () => {
+    if (!editingId && draft.coverImage && activeItemId) {
+      deleteCover('books', activeItemId).catch(() => {});
+    }
+    setModalVisible(false);
   };
 
   const handleCardPress = useCallback(
@@ -801,7 +868,7 @@ export default function BookScreen({ navigation }: any) {
           <ScreenHeader
             title={editingId ? 'Edit Book' : 'Add Book'}
             left={
-              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity onPress={handleCancelForm} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
               </TouchableOpacity>
             }
@@ -824,6 +891,8 @@ export default function BookScreen({ navigation }: any) {
             <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
               * required
             </AppText>
+
+            <CoverPicker uri={draft.coverImage} onPress={handleCoverPress} iconName="book-outline" />
 
             <TouchableOpacity
               onPress={handleScanPress}
@@ -884,6 +953,11 @@ export default function BookScreen({ navigation }: any) {
                   // when it doesn't, the ISBN field just stays whatever
                   // it was, same as if this were entered manually.
                   if (r.isbn) applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
+                  if (r.coverUrl && activeItemId) {
+                    downloadRemoteCover('books', activeItemId, r.coverUrl).then((uri) => {
+                      if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+                    });
+                  }
                 }}
               />
             </View>

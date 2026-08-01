@@ -22,6 +22,7 @@ export interface LookupResult {
   title?: string;
   authors?: string[];
   categories?: string[];
+  coverUrl?: string;
 }
 
 export async function lookupOpenLibrary(digits: string): Promise<LookupResult | null> {
@@ -39,6 +40,9 @@ export async function lookupOpenLibrary(digits: string): Promise<LookupResult | 
     title: info.title as string | undefined,
     authors: Array.isArray(info.authors) ? info.authors.map((a: any) => a.name).filter(Boolean) : undefined,
     categories: Array.isArray(info.subjects) ? info.subjects.map((s: any) => s.name).filter(Boolean) : undefined,
+    // Open Library's own edition record already includes cover URLs
+    // directly - no separate covers-API call needed for this source.
+    coverUrl: info.cover?.medium || info.cover?.large || undefined,
   };
 }
 
@@ -59,7 +63,17 @@ export async function lookupGoogleBooks(digits: string): Promise<LookupResult | 
     console.warn('Media Base: Google Books API error', json.error);
     return null;
   }
-  return json?.items?.[0]?.volumeInfo ?? null;
+  const info = json?.items?.[0]?.volumeInfo;
+  if (!info) return null;
+  return {
+    title: info.title as string | undefined,
+    authors: info.authors as string[] | undefined,
+    categories: info.categories as string[] | undefined,
+    // Google's thumbnail URLs come back as plain http:// even though
+    // https:// works fine - iOS blocks plain HTTP by default (App
+    // Transport Security), so this gets upgraded before it's ever used.
+    coverUrl: info.imageLinks?.thumbnail ? String(info.imageLinks.thumbnail).replace(/^http:/, 'https:') : undefined,
+  };
 }
 
 // Fallback source, only worth calling when the two primary lookups leave
@@ -68,9 +82,10 @@ export async function lookupGoogleBooks(digits: string): Promise<LookupResult | 
 // edition/printing of a work, so it's often populated with genre subjects
 // even when this one specific ISBN's own edition record is sparse.
 export async function lookupOpenLibraryWork(digits: string): Promise<LookupResult | null> {
-  const res = await fetch(`https://openlibrary.org/search.json?isbn=${digits}&fields=title,author_name,subject`, {
-    headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT },
-  });
+  const res = await fetch(
+    `https://openlibrary.org/search.json?isbn=${digits}&fields=title,author_name,subject,cover_i`,
+    { headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT } },
+  );
   if (!res.ok) {
     console.warn('Media Base: Open Library search returned', res.status);
     return null;
@@ -82,6 +97,7 @@ export async function lookupOpenLibraryWork(digits: string): Promise<LookupResul
     title: doc.title as string | undefined,
     authors: Array.isArray(doc.author_name) ? doc.author_name : undefined,
     categories: Array.isArray(doc.subject) ? doc.subject : undefined,
+    coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : undefined,
   };
 }
 
@@ -89,6 +105,7 @@ export interface IsbnLookupResult {
   title?: string;
   author?: string;
   genres: string[];
+  coverUrl?: string;
   // True if the RAW category/subject data (before any allowlist filtering)
   // contains an explicit comics/graphic-novel/manga signal - publishers
   // reliably tag these works with BISAC's own "COMICS & GRAPHIC NOVELS"
@@ -140,6 +157,13 @@ export async function runIsbnLookup(digits: string, genreAllowlist: string[]): P
 
   const title = olInfo?.title || gInfo?.title;
   const author = (olInfo?.authors && olInfo.authors[0]) || (gInfo?.authors && gInfo.authors[0]);
+  // Prefer Google Books' cover when available (usually accurate/clean),
+  // then Open Library's own edition-specific one, then fall back to
+  // directly constructing an Open Library ISBN-covers-API URL as a last
+  // attempt - cheap and harmless to try even with no confirmation it
+  // exists, since downloadRemoteCover treats a 404 the same as "no cover
+  // available" rather than an error.
+  const coverUrl = gInfo?.coverUrl || olInfo?.coverUrl || `https://covers.openlibrary.org/b/isbn/${digits}-L.jpg?default=false`;
   // Genre specifically prefers Google Books: its categories are usually
   // one or two curated BISAC-style entries ("Fiction / Romance"), while
   // Open Library's subject list is long and noisy - normalizeGenres cleans
@@ -159,12 +183,13 @@ export async function runIsbnLookup(digits: string, genreAllowlist: string[]): P
         title: title || workInfo.title,
         author: author || (workInfo.authors && workInfo.authors[0]),
         genres,
+        coverUrl: gInfo?.coverUrl || olInfo?.coverUrl || workInfo.coverUrl || coverUrl,
         isLikelyComic,
       };
     }
   }
 
-  return { title, author, genres, isLikelyComic };
+  return { title, author, genres, coverUrl, isLikelyComic };
 }
 
 // --- Genre allowlist matching ---

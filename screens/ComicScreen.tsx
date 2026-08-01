@@ -34,8 +34,11 @@ import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
+import CoverThumbnail from '../components/CoverThumbnail';
+import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
-import { getComics, addComic, updateComic, deleteComic, deleteComics } from '../lib/storage';
+import { getComics, addComic, updateComic, deleteComic, deleteComics, newId } from '../lib/storage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
 import { searchBooksByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -116,6 +119,7 @@ interface DraftState {
   genresText: string; // comma-separated as typed; parsed into an array on save
   author: string;
   isbn: string;
+  coverImage: string | null;
   read: boolean;
   rating: number;
   review: string;
@@ -126,6 +130,7 @@ const EMPTY_DRAFT: DraftState = {
   genresText: '',
   author: '',
   isbn: '',
+  coverImage: null,
   read: false,
   rating: 0,
   review: '',
@@ -172,6 +177,7 @@ const ComicCard = React.memo(function ComicCard({
             style={styles.cardCheckbox}
           />
         )}
+        <CoverThumbnail uri={comic.coverImage} iconName="book-outline" />
         <View style={styles.flex}>
           <AppText
             variant="header"
@@ -232,6 +238,7 @@ export default function ComicScreen({ navigation }: any) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
@@ -288,6 +295,7 @@ export default function ComicScreen({ navigation }: any) {
 
   const openAdd = () => {
     setEditingId(null);
+    setActiveItemId(newId());
     setDraft(EMPTY_DRAFT);
     setIsbnStatus('idle');
     setModalVisible(true);
@@ -295,11 +303,13 @@ export default function ComicScreen({ navigation }: any) {
 
   const openEdit = (comic: Comic) => {
     setEditingId(comic.id);
+    setActiveItemId(comic.id);
     setDraft({
       title: comic.title,
       genresText: comic.genres.join(', '),
       author: comic.author,
       isbn: comic.isbn ?? '',
+      coverImage: comic.coverImage ?? null,
       read: comic.read,
       rating: comic.rating ?? 0,
       review: comic.review,
@@ -327,6 +337,40 @@ export default function ComicScreen({ navigation }: any) {
         },
       },
     ]);
+  };
+
+  const handleCoverPress = () => {
+    const buttons: AlertButton[] = [
+      { text: 'Take Photo', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await takeCoverPhoto('comics', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+      { text: 'Choose from Library', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await pickCoverFromLibrary('comics', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+    ];
+    if (draft.coverImage) {
+      buttons.push({
+        text: 'Remove Photo',
+        style: 'destructive',
+        onPress: async () => {
+          if (activeItemId) await deleteCover('comics', activeItemId);
+          setDraft((d) => ({ ...d, coverImage: null }));
+        },
+      });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Cover photo', undefined, buttons);
+  };
+
+  const handleCancelForm = () => {
+    if (!editingId && draft.coverImage && activeItemId) {
+      deleteCover('comics', activeItemId).catch(() => {});
+    }
+    setModalVisible(false);
   };
 
   const enterSelectionMode = () => {
@@ -524,6 +568,11 @@ export default function ComicScreen({ navigation }: any) {
         author: result.author || d.author,
         genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
       }));
+      if (result.coverUrl && activeItemId) {
+        downloadRemoteCover('comics', activeItemId, result.coverUrl).then((uri) => {
+          if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+        });
+      }
     } catch (err) {
       console.warn('Media Base: ISBN lookup failed', err);
       Alert.alert('Lookup failed', 'Could not reach the book database - check your connection, or fill in the details by hand.');
@@ -564,6 +613,7 @@ export default function ComicScreen({ navigation }: any) {
       genres,
       author: draft.author.trim(),
       isbn: draft.isbn.trim(),
+      coverImage: draft.coverImage,
       read: draft.read,
       rating: draft.read ? draft.rating || null : null,
       review: draft.read ? draft.review : '',
@@ -572,7 +622,7 @@ export default function ComicScreen({ navigation }: any) {
     if (editingId) {
       await updateComic(editingId, payload);
     } else {
-      await addComic(payload);
+      await addComic(payload, activeItemId ?? undefined);
     }
     setModalVisible(false);
     load();
@@ -740,7 +790,7 @@ export default function ComicScreen({ navigation }: any) {
           <ScreenHeader
             title={editingId ? 'Edit Entry' : 'Add Entry'}
             left={
-              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity onPress={handleCancelForm} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
               </TouchableOpacity>
             }
@@ -763,6 +813,8 @@ export default function ComicScreen({ navigation }: any) {
             <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
               * required
             </AppText>
+
+            <CoverPicker uri={draft.coverImage} onPress={handleCoverPress} iconName="book-outline" />
 
             <TouchableOpacity
               onPress={handleScanPress}
@@ -823,6 +875,11 @@ export default function ComicScreen({ navigation }: any) {
                   // when it doesn't, the ISBN field just stays whatever
                   // it was, same as if this were entered manually.
                   if (r.isbn) applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
+                  if (r.coverUrl && activeItemId) {
+                    downloadRemoteCover('comics', activeItemId, r.coverUrl).then((uri) => {
+                      if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+                    });
+                  }
                 }}
               />
             </View>

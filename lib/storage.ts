@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie } from '../types/models';
+import { deleteCover, deleteAllCovers } from './coverStorage';
 
 const KEYS = {
   settings: 'mediabase:settings',
@@ -13,7 +14,11 @@ const KEYS = {
   dailyPicks: 'mediabase:dailyPicks',
 };
 
-const newId = () => uuidv4();
+// Exported so a screen can pre-generate an id when the Add form opens -
+// needed so a cover photo picked/taken *before* the entry is first saved
+// still has a real, final id to be stored under from the start, rather
+// than needing to move the file once a real id exists.
+export const newId = () => uuidv4();
 
 async function getAll<T>(key: string): Promise<T[]> {
   const raw = await AsyncStorage.getItem(key);
@@ -56,9 +61,9 @@ export async function getBooks(): Promise<Book[]> {
   return raw.map((b) => (Array.isArray(b.genres) ? (b as Book) : { ...b, genres: b.genre ? [b.genre] : [] }));
 }
 
-export async function addBook(input: Omit<Book, 'id' | 'createdAt'>): Promise<Book> {
+export async function addBook(input: Omit<Book, 'id' | 'createdAt'>, id?: string): Promise<Book> {
   const books = await getBooks();
-  const book: Book = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  const book: Book = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
   await saveAll(KEYS.books, [...books, book]);
   return book;
 }
@@ -75,6 +80,7 @@ export async function deleteBook(id: string): Promise<void> {
     KEYS.books,
     books.filter((b) => b.id !== id),
   );
+  await deleteCover('books', id);
 }
 
 export async function deleteBooks(ids: string[]): Promise<void> {
@@ -84,6 +90,7 @@ export async function deleteBooks(ids: string[]): Promise<void> {
     KEYS.books,
     books.filter((b) => !idSet.has(b.id)),
   );
+  await Promise.all(ids.map((id) => deleteCover('books', id)));
 }
 
 // --- Comics/Manga ---
@@ -95,9 +102,9 @@ export async function getComics(): Promise<Comic[]> {
   return raw.map((c) => (Array.isArray(c.genres) ? (c as Comic) : { ...c, genres: c.genre ? [c.genre] : [] }));
 }
 
-export async function addComic(input: Omit<Comic, 'id' | 'createdAt'>): Promise<Comic> {
+export async function addComic(input: Omit<Comic, 'id' | 'createdAt'>, id?: string): Promise<Comic> {
   const comics = await getComics();
-  const comic: Comic = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  const comic: Comic = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
   await saveAll(KEYS.comics, [...comics, comic]);
   return comic;
 }
@@ -114,6 +121,7 @@ export async function deleteComic(id: string): Promise<void> {
     KEYS.comics,
     comics.filter((c) => c.id !== id),
   );
+  await deleteCover('comics', id);
 }
 
 export async function deleteComics(ids: string[]): Promise<void> {
@@ -123,6 +131,7 @@ export async function deleteComics(ids: string[]): Promise<void> {
     KEYS.comics,
     comics.filter((c) => !idSet.has(c.id)),
   );
+  await Promise.all(ids.map((id) => deleteCover('comics', id)));
 }
 
 // --- Movies ---
@@ -131,9 +140,9 @@ export async function getMovies(): Promise<Movie[]> {
   return getAll<Movie>(KEYS.movies);
 }
 
-export async function addMovie(input: Omit<Movie, 'id' | 'createdAt'>): Promise<Movie> {
+export async function addMovie(input: Omit<Movie, 'id' | 'createdAt'>, id?: string): Promise<Movie> {
   const movies = await getMovies();
-  const movie: Movie = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  const movie: Movie = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
   await saveAll(KEYS.movies, [...movies, movie]);
   return movie;
 }
@@ -150,6 +159,7 @@ export async function deleteMovie(id: string): Promise<void> {
     KEYS.movies,
     movies.filter((m) => m.id !== id),
   );
+  await deleteCover('movies', id);
 }
 
 export async function deleteMovies(ids: string[]): Promise<void> {
@@ -159,6 +169,7 @@ export async function deleteMovies(ids: string[]): Promise<void> {
     KEYS.movies,
     movies.filter((m) => !idSet.has(m.id)),
   );
+  await Promise.all(ids.map((id) => deleteCover('movies', id)));
 }
 
 // --- Daily recommendation ("try this today" on Home) ---
@@ -250,4 +261,5 @@ export async function importAllData(jsonString: string): Promise<void> {
 /** All-or-nothing wipe, per the confirmed Settings > Data > Delete Data design. */
 export async function deleteAllData(): Promise<void> {
   await AsyncStorage.multiRemove(Object.values(KEYS));
+  await deleteAllCovers();
 }

@@ -42,6 +42,7 @@ export interface BookTitleSearchResult {
   title: string;
   author?: string;
   genres: string[];
+  coverUrl?: string;
 }
 
 async function searchGoogleBooksByTitle(
@@ -80,6 +81,7 @@ async function searchGoogleBooksByTitle(
       title: info.title as string,
       author: Array.isArray(info.authors) ? info.authors[0] : undefined,
       genres: normalizeGenres(info.categories, genreAllowlist),
+      coverUrl: info.imageLinks?.thumbnail ? String(info.imageLinks.thumbnail).replace(/^http:/, 'https:') : undefined,
     });
   }
   console.warn('Media Base: Google Books title search for', `"${trimmed}"`, '->', items.length, 'raw,', results.length, 'usable');
@@ -95,7 +97,7 @@ async function searchOpenLibraryByTitle(
   maxResults: number,
 ): Promise<BookTitleSearchResult[]> {
   const res = await fetch(
-    `https://openlibrary.org/search.json?title=${encodeURIComponent(trimmed)}&limit=${maxResults}&fields=key,title,author_name,isbn,subject`,
+    `https://openlibrary.org/search.json?title=${encodeURIComponent(trimmed)}&limit=${maxResults}&fields=key,title,author_name,isbn,subject,cover_i`,
     { headers: { 'User-Agent': OPEN_LIBRARY_USER_AGENT } },
   );
   if (!res.ok) {
@@ -115,6 +117,7 @@ async function searchOpenLibraryByTitle(
       title: doc.title as string,
       author: Array.isArray(doc.author_name) ? doc.author_name[0] : undefined,
       genres: normalizeGenres(doc.subject, genreAllowlist),
+      coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg` : undefined,
     });
   }
   console.warn('Media Base: Open Library title search for', `"${trimmed}"`, '->', docs.length, 'raw,', results.length, 'usable');

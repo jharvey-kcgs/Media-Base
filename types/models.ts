@@ -59,6 +59,7 @@ export interface Book {
   genres: string[]; // a book can carry more than one genre tag; index 0 is treated as "primary" for sorting/A-Z grouping
   author: string;
   isbn: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
+  coverImage: string | null; // local file URI (lib/coverStorage.ts) - never a remote URL, see that file for why
   read: boolean;
   rating: number | null; // 1-5, only meaningful once read = true
   review: string; // only meaningful once read = true
@@ -78,6 +79,7 @@ export interface Comic {
   genres: string[];
   author: string; // covers writer/illustrator both - typed as one field, same as Book's Author
   isbn: string;
+  coverImage: string | null; // local file URI (lib/coverStorage.ts) - never a remote URL, see that file for why
   read: boolean;
   rating: number | null;
   review: string;
@@ -97,6 +99,7 @@ export interface Movie {
   title: string;
   genres: string[];
   upc: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
+  coverImage: string | null; // local file URI (lib/coverStorage.ts) - never a remote URL, see that file for why
   watched: boolean;
   rating: number | null;
   review: string;

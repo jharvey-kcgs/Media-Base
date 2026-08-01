@@ -12,10 +12,11 @@ alongside the in-app About/FAQ screens as more categories get built.*
 3. [Running the dev server](#3-running-the-dev-server)
 4. [What's here — project structure](#4-whats-here--project-structure)
 5. [Permissions](#5-permissions)
-6. [Color accessibility](#6-color-accessibility)
-7. [Known setup gotchas](#7-known-setup-gotchas)
-8. [Status](#8-status)
-9. [Roadmap (genuinely open, not yet built)](#9-roadmap-genuinely-open-not-yet-built)
+6. [Cover photos](#6-cover-photos)
+7. [Color accessibility](#7-color-accessibility)
+8. [Known setup gotchas](#8-known-setup-gotchas)
+9. [Status](#9-status)
+10. [Roadmap (genuinely open, not yet built)](#10-roadmap-genuinely-open-not-yet-built)
 
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
@@ -114,6 +115,9 @@ versions here rather than generating them from a live `expo install`.
 | `react-native-get-random-values`, `uuid` | Generates unique IDs for every stored item |
 | `expo-camera` | Camera access + permission status for the optional barcode-scan shortcut and the Permissions settings page |
 | `expo-notifications` | The daily 10am "check today's recommendations" reminder (Settings → Permissions → Daily reminder toggle) |
+| `expo-image-picker` | Cover photos - taking a new one or choosing an existing one from the photo library (`lib/coverStorage.ts`) |
+| `expo-file-system` | Saving cover photos to this app's own private storage, and deleting them again when an entry is deleted |
+| `expo-image-manipulator` | Resizing/compressing every cover photo before it's saved - keeps storage footprint reasonable regardless of source (camera, picked, or auto-fetched) |
 | `isbn3` | Real ISBN validation/hyphenation for the Books ISBN field - bundles the official ISBN-agency range data, since hyphen placement isn't a fixed pattern that could be hand-written |
 | `@expo/vector-icons` | Icons used in headers/menus - Home screen's cog (Settings) and play (refresh), Books' "•••" menu |
 | `expo-font`, `@expo-google-fonts/jetbrains-mono` | The app's JetBrains Mono typeface (Extra Bold for titles/headers, Regular for everything else) |
@@ -213,6 +217,32 @@ lib/
   storage.ts                       Every piece of data logic - one
                                      function per action. Read this file
                                      first to understand the data model.
+                                     addBook/addComic/addMovie accept an
+                                     optional pre-generated id (see
+                                     coverStorage.ts below for why), and
+                                     every delete function - single, bulk,
+                                     and Delete all data - also cleans up
+                                     that item's saved cover photo, so
+                                     nothing orphaned is left behind.
+  coverStorage.ts                   The unified cover-photo storage
+                                     system - one system regardless of
+                                     whether a cover came from the camera,
+                                     the photo library, or was
+                                     auto-fetched from Open Library/
+                                     Google Books/TMDb. Every cover is
+                                     resized/compressed then saved to this
+                                     app's own private, sandboxed storage
+                                     (never the device's Photos app -
+                                     takeCoverPhoto() explicitly disables
+                                     that) at a path derived from the
+                                     item's own id, so once an item has an
+                                     id its cover (if any) can always be
+                                     found without a separate lookup
+                                     table. Not network-tested from this
+                                     sandbox - expo-image-picker's exact
+                                     API shape has changed across SDK
+                                     versions, worth checking first if
+                                     picking/taking a photo throws.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
@@ -232,7 +262,15 @@ lib/
                                      applied twice. Each category still
                                      supplies its own genre allowlist.
                                      NOT used by Movies - see
-                                     upcLookup.ts below.
+                                     upcLookup.ts below. Also captures a
+                                     coverUrl when available (Open
+                                     Library's own edition cover data,
+                                     Google Books' thumbnail, or a
+                                     directly-constructed Open Library
+                                     ISBN-covers-API URL as a last
+                                     resort) - fed straight into
+                                     coverStorage.ts's downloadRemoteCover(),
+                                     no extra lookup call needed.
   config.ts                         Git-ignored (this repo is public) -
                                      holds the real TMDB_READ_ACCESS_TOKEN.
                                      Movies' UPC lookup needs this free
@@ -617,6 +655,25 @@ components/
                                      filter (both narrow the same
                                      underlying list together, not
                                      either/or).
+  CoverThumbnail.tsx                Small, FIXED-SIZE cover for list rows
+                                     - same dimensions whether a real
+                                     cover loaded, is still loading, or
+                                     doesn't exist. That fixed size is
+                                     deliberate, not a style choice - see
+                                     Section 6 (Cover photos) for why it
+                                     matters for scroll performance.
+                                     Resets its own load-failure state on
+                                     every uri change, not just on mount,
+                                     since VirtualizedList recycles row
+                                     components rather than always
+                                     mounting fresh ones.
+  CoverPicker.tsx                   Larger, tappable cover for the
+                                     Add/Edit form - purely presentational
+                                     (shows current state, forwards the
+                                     tap), same split as AlphabetBar: the
+                                     actual Take Photo/Choose from
+                                     Library/Remove Photo action-sheet
+                                     logic lives in each screen, not here.
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book
@@ -1129,7 +1186,120 @@ toggle the setting off and back on manually.
 
 ---
 
-## 6. Color accessibility
+## 6. Cover photos
+
+Every Book/Comic/Manga/Movie can have a cover image - a small thumbnail
+in the list, a larger tappable one in the Add/Edit form. Designed across
+a real back-and-forth before any code was written; worth knowing the
+reasoning, not just the result.
+
+**One storage system regardless of source.** A cover from the camera, a
+cover picked from the photo library, and a cover auto-fetched from Open
+Library/Google Books/TMDb all go through the exact same path in
+`lib/coverStorage.ts`: resized/compressed, then saved to this app's own
+private, sandboxed file storage. This was a deliberate simplification -
+the alternative (storing a remote URL for auto-fetched covers, a local
+file for manual ones) would mean two different code paths, two different
+failure modes, and covers that stop working the moment there's no
+internet connection. One system was simpler to build *and* better.
+
+**Never the device's Photos app.** `takeCoverPhoto()` explicitly passes
+`saveToPhotos: false` to the camera call - a photo taken through this
+app exists only inside Media Base's own private storage, invisible to
+the Photos app, the Files app, and every other app on the device. This
+was a specific, direct requirement, not an assumption: plenty of apps
+default to also saving a copy to the camera roll, but that's a choice
+those apps make, not something the camera API requires.
+
+**Auto-fetch reuses data already being fetched - no new API calls.**
+Open Library's own book records already include cover URLs directly;
+Google Books' search results already include a thumbnail link; TMDb's
+search results already include a poster path. All three lookup
+libraries (`isbnLookup.ts`, `upcLookup.ts`, `titleSearch.ts`) now
+capture this as `coverUrl` on their existing result types, so every
+entry method - scan, ISBN/UPC entry, and title search - gets auto-fetch
+for free, with zero extra network requests. The one place this genuinely
+does cost an extra call is Books/Comics' ISBN-constructed fallback
+(`https://covers.openlibrary.org/b/isbn/{ISBN}-L.jpg?default=false`),
+tried only when neither primary source had its own cover data - cheap
+and harmless to attempt even with no confirmation it exists, since a
+404 there is treated the same as "no cover available" everywhere else in
+this app (the same principle already established for missing genre
+data - not every book/movie has one, and that's not a bug).
+
+**Fixed-size thumbnails, on purpose.** `components/CoverThumbnail.tsx`
+is always the exact same dimensions in the list, whether a real cover
+loaded, is still loading, or doesn't exist at all. This app went through
+several real rounds of scroll-performance bugs earlier (see
+`lib/useAlphabetScroll.ts`) that all traced back to row height not being
+perfectly uniform - a thumbnail whose size changed based on load state
+would have reintroduced exactly that problem. A load failure is also
+tracked with its own `useEffect` reset keyed to the `uri` prop
+specifically, since `VirtualizedList` recycles row components for
+different items as you scroll rather than always mounting fresh ones -
+without that reset, a failure recorded for one item could incorrectly
+persist onto a completely different item recycled into the same row.
+
+**A pre-generated id solves "what if you add a photo before hitting
+Save."** Every item's cover lives at a path derived from its own id -
+but an item doesn't get a real id until it's actually saved. Rather than
+storing a photo somewhere temporary and moving it once a real id exists,
+each screen now pre-generates a real id (`newId()` from `lib/storage.ts`,
+now exported) the moment the Add form opens, and uses that same id
+consistently for cover operations *and* as the id actually passed to
+`addBook`/`addComic`/`addMovie` on save. One id, from the start, no file
+ever needs to move. If that Add session gets cancelled instead of saved,
+and a photo was picked/taken during it, that orphaned file gets cleaned
+up immediately (`handleCancelForm` in each screen) rather than sitting
+around forever under an id that never became a real entry.
+
+**Deletion cleans up after itself, everywhere.** Deleting a single item,
+bulk-deleting a selection, and Settings → Data → Delete all data all now
+remove the associated cover photo(s) too (`lib/storage.ts`), not just
+the text record. No orphaned files left behind at any deletion path.
+
+**Placeholder, not a blank box.** No cover yet shows a simple icon
+(`book-outline` for Books/Comics, `film-outline` for Movies) rather than
+an empty gray rectangle - same treatment in both the list thumbnail and
+the larger Edit-form version, which also adds "Add cover photo" text so
+the affordance is obvious.
+
+**Where the manual option lives.** Tapping the cover itself (in the
+Add/Edit form) opens "Take Photo / Choose from Library / Remove Photo" -
+not a separate button elsewhere in the form. This was an explicit choice
+between two reasonable options (the other being a dedicated button near
+the read/watched switch) - tapping the image directly is the more
+standard pattern (Goodreads, Letterboxd, etc.), and was the one that got
+built.
+
+**One real, deliberate limitation as of this writing: Export/Import
+doesn't include cover photos yet.** `exportAllData()`/`importAllData()`
+still only handle the text/JSON data - a cover photo is a real file, not
+something that fits cleanly into that same text-based backup format the
+way it currently works. This was discussed directly and the decision was
+made to prioritize the core cover-photo system first (dependencies,
+storage, list/edit UI, auto-fetch, cleanup) and treat "Export/Import
+becomes a real backup file that includes photos too" as its own
+follow-up - a genuinely bigger change (the share-sheet-based text export
+would need to become an actual file-based backup) that depends on this
+storage system existing first anyway. **Right now, exporting your data
+and reimporting it will restore every book/comic/movie correctly, but
+without their cover photos** - worth knowing before relying on Export as
+a full backup.
+
+**Permissions**: picking a photo from the library needs its own OS
+permission, separate from Camera (already in this app for barcode
+scanning) - not yet its own visible toggle on the Permissions settings
+screen as of this writing (expo-image-picker requests it lazily,
+on-demand, the same moment "Choose from Library" is actually tapped, so
+the underlying feature works regardless) - a dedicated Photo Library
+row on that screen, plus refreshing all three permission toggles on
+every app-foreground return rather than only on first load, is a
+confirmed but not-yet-built follow-up.
+
+---
+
+## 7. Color accessibility
 
 The app supports a user-selected accent color (12 options, including
 White and Black) across both Light and Dark mode, which means the same
@@ -1161,7 +1331,7 @@ Light/Dark on a real device the way Home Base's equivalent system was.
 
 ---
 
-## 7. Known setup gotchas
+## 8. Known setup gotchas
 
 Carried over from Home Base/League Base's setup experience, since this
 project uses the identical Node/Expo stack — nothing below has needed
@@ -1210,7 +1380,7 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 
 ---
 
-## 8. Status
+## 9. Status
 
 - **Bundle identifier**: set (`com.JHarvey.MediaBase`, both iOS and
   Android, in `app.json`).
@@ -1222,7 +1392,7 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 - **Header consistency & contrast**: every screen uses
   `components/ScreenHeader.tsx` (centered title, consistent size, safe-area
   fix for the Modal issue) and `accentReadable` for foreground color -
-  see [Section 6](#6-color-accessibility).
+  see [Section 7](#7-color-accessibility).
 - **Data safety**: export/import/delete-all all implemented in Settings
   → Data. Import/delete-all confirmed working on-device, including a
   fixed bug where restored/reset settings (theme, dark mode, text size)
@@ -1257,7 +1427,7 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 
 ---
 
-## 9. Roadmap (genuinely open, not yet built)
+## 10. Roadmap (genuinely open, not yet built)
 
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a

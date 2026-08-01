@@ -35,8 +35,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
+import CoverThumbnail from '../components/CoverThumbnail';
+import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
-import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies } from '../lib/storage';
+import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies, newId } from '../lib/storage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
 import { runUpcMovieLookup, looksLikeIsbn, TMDB_GENRE_NAMES } from '../lib/upcLookup';
 import { searchMoviesByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -98,6 +101,7 @@ interface DraftState {
   title: string;
   genresText: string;
   upc: string;
+  coverImage: string | null;
   watched: boolean;
   rating: number;
   review: string;
@@ -107,6 +111,7 @@ const EMPTY_DRAFT: DraftState = {
   title: '',
   genresText: '',
   upc: '',
+  coverImage: null,
   watched: false,
   rating: 0,
   review: '',
@@ -148,6 +153,7 @@ const MovieCard = React.memo(function MovieCard({
             style={styles.cardCheckbox}
           />
         )}
+        <CoverThumbnail uri={movie.coverImage} iconName="film-outline" />
         <View style={styles.flex}>
           <AppText
             variant="header"
@@ -208,6 +214,7 @@ export default function MovieScreen({ navigation }: any) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [upcStatus, setUpcStatus] = useState<'idle' | 'valid' | 'invalid' | 'isbn'>('idle');
@@ -254,6 +261,7 @@ export default function MovieScreen({ navigation }: any) {
 
   const openAdd = () => {
     setEditingId(null);
+    setActiveItemId(newId());
     setDraft(EMPTY_DRAFT);
     setUpcStatus('idle');
     setModalVisible(true);
@@ -261,10 +269,12 @@ export default function MovieScreen({ navigation }: any) {
 
   const openEdit = (movie: Movie) => {
     setEditingId(movie.id);
+    setActiveItemId(movie.id);
     setDraft({
       title: movie.title,
       genresText: movie.genres.join(', '),
       upc: movie.upc ?? '',
+      coverImage: movie.coverImage ?? null,
       watched: movie.watched,
       rating: movie.rating ?? 0,
       review: movie.review,
@@ -290,6 +300,40 @@ export default function MovieScreen({ navigation }: any) {
         },
       },
     ]);
+  };
+
+  const handleCoverPress = () => {
+    const buttons: AlertButton[] = [
+      { text: 'Take Photo', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await takeCoverPhoto('movies', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+      { text: 'Choose from Library', onPress: async () => {
+        if (!activeItemId) return;
+        const uri = await pickCoverFromLibrary('movies', activeItemId);
+        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+      } },
+    ];
+    if (draft.coverImage) {
+      buttons.push({
+        text: 'Remove Photo',
+        style: 'destructive',
+        onPress: async () => {
+          if (activeItemId) await deleteCover('movies', activeItemId);
+          setDraft((d) => ({ ...d, coverImage: null }));
+        },
+      });
+    }
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert('Cover photo', undefined, buttons);
+  };
+
+  const handleCancelForm = () => {
+    if (!editingId && draft.coverImage && activeItemId) {
+      deleteCover('movies', activeItemId).catch(() => {});
+    }
+    setModalVisible(false);
   };
 
   const enterSelectionMode = () => {
@@ -478,6 +522,11 @@ export default function MovieScreen({ navigation }: any) {
         title: result.title || d.title,
         genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
       }));
+      if (result.coverUrl && activeItemId) {
+        downloadRemoteCover('movies', activeItemId, result.coverUrl).then((uri) => {
+          if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+        });
+      }
     } catch (err) {
       console.warn('Media Base: UPC lookup failed', err);
       Alert.alert('Lookup failed', 'Could not reach the lookup services - check your connection, or fill in the details by hand.');
@@ -509,6 +558,7 @@ export default function MovieScreen({ navigation }: any) {
       title: draft.title.trim(),
       genres,
       upc: draft.upc.trim(),
+      coverImage: draft.coverImage,
       watched: draft.watched,
       rating: draft.watched ? draft.rating || null : null,
       review: draft.watched ? draft.review : '',
@@ -517,7 +567,7 @@ export default function MovieScreen({ navigation }: any) {
     if (editingId) {
       await updateMovie(editingId, payload);
     } else {
-      await addMovie(payload);
+      await addMovie(payload, activeItemId ?? undefined);
     }
     setModalVisible(false);
     load();
@@ -685,7 +735,7 @@ export default function MovieScreen({ navigation }: any) {
           <ScreenHeader
             title={editingId ? 'Edit Entry' : 'Add Entry'}
             left={
-              <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <TouchableOpacity onPress={handleCancelForm} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>Cancel</AppText>
               </TouchableOpacity>
             }
@@ -709,6 +759,8 @@ export default function MovieScreen({ navigation }: any) {
               * required
             </AppText>
 
+            <CoverPicker uri={draft.coverImage} onPress={handleCoverPress} iconName="film-outline" />
+
             <View style={[styles.field, { zIndex: 20 }]}>
               <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
                 Title * (type to search and auto-fill)
@@ -731,6 +783,11 @@ export default function MovieScreen({ navigation }: any) {
                     title: r.title || d.title,
                     genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
                   }));
+                  if (r.coverUrl && activeItemId) {
+                    downloadRemoteCover('movies', activeItemId, r.coverUrl).then((uri) => {
+                      if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+                    });
+                  }
                 }}
               />
             </View>
