@@ -9,7 +9,7 @@
 //    so the title gets cleaned up before the next step.
 // 2. Cleaned title -> real movie metadata (title, genres, release year),
 //    via TMDb's (The Movie Database) search endpoint - this DOES need a
-//    free API key, see lib/config.ts.
+//    free TMDb Read Access Token, see lib/config.ts.
 //
 // NOTE: not network-testable from the sandbox this was written in - the
 // title-cleaning regex in particular is a first pass based on common
@@ -19,7 +19,7 @@
 // few real UPCs (logged via console.warn on every lookup) is the first
 // thing to check before assuming TMDb's search itself is at fault.
 
-import { TMDB_API_KEY } from './config';
+import { TMDB_READ_ACCESS_TOKEN } from './config';
 
 // TMDb's own official movie genre list, verified directly against their
 // live API response (id -> name) rather than guessed. Exported as
@@ -109,15 +109,15 @@ function cleanMovieTitle(raw: string): string {
 // searchTmdbMovie below (the UPC pipeline's own single-best-match need)
 // is now a thin wrapper around this.
 export async function tmdbSearchMovies(query: string, maxResults: number): Promise<UpcMovieLookupResult[]> {
-  if (!TMDB_API_KEY) {
+  if (!TMDB_READ_ACCESS_TOKEN) {
     console.warn(
-      'Media Base: TMDB_API_KEY is not set in lib/config.ts - get a free key from themoviedb.org to enable Movies auto-fill.',
+      'Media Base: TMDB_READ_ACCESS_TOKEN is not set in lib/config.ts - get a free one from themoviedb.org to enable Movies auto-fill.',
     );
     return [];
   }
-  const res = await fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
-  );
+  const res = await fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${TMDB_READ_ACCESS_TOKEN}`, accept: 'application/json' },
+  });
   if (!res.ok) {
     console.warn('Media Base: TMDb returned', res.status);
     return [];

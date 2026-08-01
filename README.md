@@ -233,16 +233,37 @@ lib/
                                      supplies its own genre allowlist.
                                      NOT used by Movies - see
                                      upcLookup.ts below.
-  config.ts                         Holds TMDB_API_KEY - Movies' UPC
-                                     lookup needs a free key from
-                                     themoviedb.org pasted in here, since
+  config.ts                         Git-ignored (this repo is public) -
+                                     holds the real TMDB_READ_ACCESS_TOKEN.
+                                     Movies' UPC lookup needs this free
+                                     credential from themoviedb.org, since
                                      unlike Open Library/Google Books
                                      there's no keyless source for real
-                                     movie metadata. Empty by default;
-                                     upcLookup.ts logs a clear console
-                                     warning (not a silent failure) if a
-                                     lookup is attempted before this is
-                                     filled in.
+                                     movie metadata. Specifically the
+                                     "API Read Access Token" (v4 auth, a
+                                     long JWT-style string, used via a
+                                     `Authorization: Bearer` header) -
+                                     not the shorter "API Key" (v3 auth,
+                                     used via `?api_key=`) shown on the
+                                     same TMDb settings page. Switched to
+                                     the v4 token after the v3 key
+                                     returned a real, confirmed 401
+                                     (verified independent of this app,
+                                     via a plain browser request) even
+                                     once TMDb's account page showed it
+                                     as registered - TMDb's own community
+                                     has documented cases where the Read
+                                     Access Token validates successfully
+                                     before the API Key does, during the
+                                     same account-side propagation
+                                     window. upcLookup.ts logs a clear
+                                     console warning (not a silent
+                                     failure) if a lookup is attempted
+                                     before this is filled in.
+  config.example.ts                 The tracked template - what actually
+                                     stays in the public repo. Copy this
+                                     to config.ts and paste your own
+                                     token in for a fresh clone.
   upcLookup.ts                      Movies' entry-assist pipeline, in two
                                      steps: UPC -> a rough retail product
                                      title via UPCitemdb's free, keyless
@@ -602,7 +623,7 @@ reuse:
   *not* share `lib/isbnLookup.ts` - movies aren't catalogued with ISBNs,
   so the entry-assist pipeline is a genuinely different two-step shape
   (`lib/upcLookup.ts`: UPC → rough retail title via UPCitemdb → real
-  movie metadata via TMDb), and TMDb needs a free API key
+  movie metadata via TMDb), and TMDb needs a free Read Access Token
   (`lib/config.ts`) that the ISBN path never did. MovieScreen also drops
   the author/director field entirely (not part of the requested spec)
   and its genre filter shows TMDb's full fixed 19-genre list directly
