@@ -240,17 +240,74 @@ lib/
                                      matching needed here at all - TMDb's
                                      genre_ids already map to this exact
                                      clean list with nothing to filter
-                                     out. Not network-testable from this
-                                     sandbox; the title-cleaning regex
+                                     out. **Confirmed working on-device**
+                                     for the UPCitemdb half specifically -
+                                     two real UPCs both correctly resolved
+                                     to their raw retail titles (the TMDb
+                                     half still needs a key added to be
+                                     tested). The title-cleaning regex
                                      (stripping "[Blu-ray]", "(DVD)", etc.
                                      from retail titles before searching
-                                     TMDb) is a first pass based on common
-                                     disc-packaging conventions, not
-                                     verified against real UPCitemdb
-                                     responses - every successful lookup
+                                     TMDb) is still a first pass based on
+                                     common disc-packaging conventions,
+                                     not fully verified beyond those two
+                                     examples - every successful lookup
                                      logs the raw title via console.warn
                                      specifically to make that easy to
-                                     check/tune later.
+                                     check/tune further. Also exports
+                                     `looksLikeIsbn()` - a real, hard rule
+                                     (not a guess): ISBNs are structurally
+                                     just EAN-13 barcodes in the reserved
+                                     978/979 prefix range. Some movie sets
+                                     bundle a book/booklet and print BOTH
+                                     that item's own UPC and the bundled
+                                     book's ISBN on the case - scanning or
+                                     typing the ISBN by mistake would look
+                                     up the bundled book instead of the
+                                     movie. `MovieScreen.tsx` checks for
+                                     this on both the scan path and manual
+                                     entry and explains what happened
+                                     rather than silently returning the
+                                     wrong item. Exported from
+                                     `lib/upcLookup.ts` (not kept
+                                     Movies-specific) since any future
+                                     UPC-based category - Vinyl, Board
+                                     Games - could hit the same ambiguity.
+  titleSearch.ts                     The third entry method (alongside
+                                     scan and number-entry): type a
+                                     title, get real candidates back, tap
+                                     one to fill in every field it has.
+                                     For the cases scan/number-entry
+                                     can't cover - no working camera, a
+                                     damaged/unreadable barcode, a
+                                     thrifted book with a sticker over
+                                     part of it. Books/Comics search
+                                     Google Books by title (reuses
+                                     normalizeGenres() from
+                                     isbnLookup.ts, so results go through
+                                     the same genre-allowlist matching);
+                                     results without a real ISBN are
+                                     filtered out entirely, since the
+                                     whole point is filling that field in
+                                     too. Movies reuses upcLookup.ts's
+                                     tmdbSearchMovies() directly (the
+                                     same TMDb search its UPC pipeline
+                                     already calls) - but Movies results
+                                     never carry a UPC at all: a UPC
+                                     identifies a specific physical
+                                     disc/release, not "the movie" as a
+                                     concept, so unlike Books/Comics'
+                                     ISBN there's no single correct
+                                     number to backfill from a title
+                                     match. Deliberate difference, not a
+                                     gap. Paired with
+                                     `components/TitleSearchInput.tsx` -
+                                     the shared debounced-search +
+                                     dropdown UI, generic over the result
+                                     type so each screen plugs in its own
+                                     search function/result shape rather
+                                     than three separate copies of the
+                                     debounce/dropdown logic itself.
   useAlphabetScroll.ts              The A-Z index jump hook, also
                                      extracted out of BookScreen.tsx -
                                      carries forward three rounds of real
@@ -435,6 +492,27 @@ components/
                                      at larger text sizes could otherwise
                                      visually run into each other with no
                                      gap, since the title paints on top.
+  TitleSearchInput.tsx              The shared "type a title, get real
+                                     candidates back, tap one to fill in
+                                     everything" dropdown - the third
+                                     entry method, paired with
+                                     lib/titleSearch.ts. Generic over the
+                                     result type (`<T>`) so Books/Comics/
+                                     Movies each plug in their own search
+                                     function and result shape without a
+                                     separate copy of the debounce +
+                                     dropdown UI. Renders as a drop-in
+                                     replacement for a plain TextInput -
+                                     the results dropdown is absolutely
+                                     positioned below it, so the field
+                                     using it needs `zIndex` bumped above
+                                     whatever form fields come after it
+                                     (see how BookScreen/ComicScreen/
+                                     MovieScreen's Title field wraps
+                                     itself in `{ zIndex: 20 }`), or
+                                     later fields would paint over the
+                                     dropdown instead of the other way
+                                     around.
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book
@@ -467,15 +545,33 @@ reuse:
   and its genre filter shows TMDb's full fixed 19-genre list directly
   rather than only genres currently in use - a deliberate difference
   from Books/Comics' dynamic list, not an oversight.
+- **Every category screen offers three entry methods, in a deliberately
+  different order per category**: scan, number-entry (ISBN/UPC), and
+  title search (`lib/titleSearch.ts` + `components/TitleSearchInput.tsx`
+  - type a title, get real candidates back, tap one to fill in every
+  field it has). Books/Comics lead with scan since it's genuinely
+  reliable there (ISBN uniquely identifies a specific edition); Movies
+  leads with title search instead, with scan/UPC entry demoted to a
+  secondary "Have the disc?" section below it - UPC lookup there is a
+  weaker chain (UPC → messy retail title → TMDb search, vs. ISBN going
+  straight to a real record), so the more reliable path is the default.
+  One real structural difference to know before copying this into a
+  future UPC-based category (Vinyl, Board Games): Movies' title search
+  never backfills UPC, only title + genre - a UPC identifies a specific
+  physical disc/release, not "the movie" as a concept, so there's no
+  single correct number to derive from a title match the way there is
+  for Books/Comics' ISBN.
 
 A future category screen should follow this same split: reuse
 `lib/useAlphabetScroll.ts` unconditionally (any category with an A-Z
 index benefits from its four rounds of bug fixes), reuse
 `lib/isbnLookup.ts` only if the category actually has ISBNs (Books,
 Comics/Manga - not Movies, TV Shows, Vinyl, Board Games, which all need
-their own lookup shape per the Roadmap doc), and only duplicate what's
-genuinely category-specific (the form fields, the row component, the
-allowlist or genre source).
+their own lookup shape per the Roadmap doc), reuse
+`components/TitleSearchInput.tsx` for the title-search entry method
+regardless of category (only the search function/result shape passed
+into it differs), and only duplicate what's genuinely category-specific
+(the form fields, the row component, the allowlist or genre source).
 - **The row component (`BookCard`) is defined at module scope and wrapped
   in `React.memo`** - not as a plain function inside the screen's body.
   This is what actually fixes React Native's "VirtualizedList: You have a

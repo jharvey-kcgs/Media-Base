@@ -37,6 +37,8 @@ import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook, deleteBooks } from '../lib/storage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
+import { searchBooksByTitle } from '../lib/titleSearch';
+import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
 import { Book, BookSortField } from '../types/models';
 
@@ -847,14 +849,26 @@ export default function BookScreen({ navigation }: any) {
               )}
             </View>
 
-            <View style={styles.field}>
+            <View style={[styles.field, { zIndex: 20 }]}>
               <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Title *
+                Title * (type to search and auto-fill)
               </AppText>
-              <TextInput
+              <TitleSearchInput
                 value={draft.title}
                 onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                search={(query) => searchBooksByTitle(query, GENRE_ALLOWLIST)}
+                getKey={(r) => r.isbn}
+                getLabel={(r) => r.title}
+                getSubtitle={(r) => r.author}
+                onSelect={(r) => {
+                  setDraft((d) => ({
+                    ...d,
+                    title: r.title,
+                    author: r.author || d.author,
+                    genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
+                  }));
+                  applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
+                }}
               />
             </View>
 

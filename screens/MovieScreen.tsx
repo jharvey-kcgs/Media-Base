@@ -36,7 +36,9 @@ import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies } from '../lib/storage';
-import { runUpcMovieLookup, TMDB_GENRE_NAMES } from '../lib/upcLookup';
+import { runUpcMovieLookup, looksLikeIsbn, TMDB_GENRE_NAMES } from '../lib/upcLookup';
+import { searchMoviesByTitle } from '../lib/titleSearch';
+import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
 import { Movie, MovieSortField } from '../types/models';
 
@@ -206,7 +208,7 @@ export default function MovieScreen({ navigation }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
-  const [upcStatus, setUpcStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [upcStatus, setUpcStatus] = useState<'idle' | 'valid' | 'invalid' | 'isbn'>('idle');
   const [scannerVisible, setScannerVisible] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const scanLockRef = useRef(false);
@@ -262,7 +264,7 @@ export default function MovieScreen({ navigation }: any) {
     });
     const digits = (movie.upc ?? '').replace(/\D/g, '');
     if (digits.length === 12 || digits.length === 13) {
-      setUpcStatus(digits.length === 12 ? (isValidUpcA(digits) ? 'valid' : 'invalid') : 'valid');
+      setUpcStatus(looksLikeIsbn(digits) ? 'isbn' : digits.length === 12 ? (isValidUpcA(digits) ? 'valid' : 'invalid') : 'valid');
     } else {
       setUpcStatus('idle');
     }
@@ -386,6 +388,10 @@ export default function MovieScreen({ navigation }: any) {
       return false;
     }
     setDraft((d) => ({ ...d, upc: digits }));
+    if (looksLikeIsbn(digits)) {
+      setUpcStatus('isbn');
+      return false;
+    }
     if (digits.length === 13) {
       // EAN-13 - common for some imported/international discs. No
       // check-digit validation implemented for this format (diminishing
@@ -414,6 +420,13 @@ export default function MovieScreen({ navigation }: any) {
     if (digits.length !== 12 && digits.length !== 13) return;
     scanLockRef.current = true;
     setScannerVisible(false);
+    if (looksLikeIsbn(digits)) {
+      Alert.alert(
+        "That's an ISBN, not this movie's UPC",
+        "13-digit codes starting 978/979 are book ISBNs. Some movie sets bundle a book or booklet and print both barcodes on the case - this one would look up that bundled book, not the movie. Look for the other barcode (usually a plain 12-digit UPC) and scan that instead.",
+      );
+      return;
+    }
     const isValid = applyUpcDigits(digits);
     if (isValid) {
       runUpcLookup(digits);
@@ -428,6 +441,7 @@ export default function MovieScreen({ navigation }: any) {
   const handleUpcBlur = () => {
     const digits = draft.upc.replace(/\D/g, '');
     if (digits.length !== 12 && digits.length !== 13) return;
+    if (looksLikeIsbn(digits)) return; // inline status already explains this - see applyUpcDigits
     runUpcLookup(digits);
   };
 
@@ -682,16 +696,57 @@ export default function MovieScreen({ navigation }: any) {
               * required
             </AppText>
 
+            <View style={[styles.field, { zIndex: 20 }]}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                Title * (type to search and auto-fill)
+              </AppText>
+              <TitleSearchInput
+                value={draft.title}
+                onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
+                search={(query) => searchMoviesByTitle(query)}
+                getKey={(r) => (r.tmdbId != null ? String(r.tmdbId) : `${r.title}-${r.releaseYear}`)}
+                getLabel={(r) => r.title ?? 'Untitled'}
+                getSubtitle={(r) => r.releaseYear}
+                onSelect={(r) => {
+                  // No UPC to fill from a title match - a UPC identifies
+                  // a specific physical disc/release, not "the movie" as
+                  // a concept, so there's no single correct number to
+                  // backfill here the way there is for Books/Comics'
+                  // ISBN. draft.upc is left untouched.
+                  setDraft((d) => ({
+                    ...d,
+                    title: r.title || d.title,
+                    genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
+                  }));
+                }}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                Genre(s) * (comma-separated, e.g. Action, Comedy)
+              </AppText>
+              <TextInput
+                value={draft.genresText}
+                onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
+                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              />
+            </View>
+
+            <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 8 }]}>
+              Have the disc? (optional - can also fill in the fields above)
+            </AppText>
+
             <TouchableOpacity
               onPress={handleScanPress}
               style={[styles.scanButton, { borderColor: theme.colors.accentReadable }]}
             >
-              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
+              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan its barcode</AppText>
             </TouchableOpacity>
 
             <View style={styles.field}>
               <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                UPC (optional - fills in the fields below automatically)
+                UPC
               </AppText>
               <TextInput
                 value={draft.upc}
@@ -712,6 +767,11 @@ export default function MovieScreen({ navigation }: any) {
                   ⚠ That check digit doesn't look right - double-check the numbers
                 </AppText>
               )}
+              {upcStatus === 'isbn' && (
+                <AppText style={{ color: theme.colors.danger, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
+                  ⚠ That's an ISBN (a bundled book, if this set has one) - look for the disc's own UPC instead
+                </AppText>
+              )}
               {lookingUp && (
                 <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
                   Looking up...
@@ -719,27 +779,6 @@ export default function MovieScreen({ navigation }: any) {
               )}
             </View>
 
-            <View style={styles.field}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Title *
-              </AppText>
-              <TextInput
-                value={draft.title}
-                onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Genre(s) * (comma-separated, e.g. Action, Comedy)
-              </AppText>
-              <TextInput
-                value={draft.genresText}
-                onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              />
-            </View>
 
             <View style={[styles.row, { marginTop: 8 }]}>
               <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>

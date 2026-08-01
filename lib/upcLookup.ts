@@ -52,9 +52,22 @@ const TMDB_GENRE_MAP: Record<number, string> = {
 export const TMDB_GENRE_NAMES = Object.values(TMDB_GENRE_MAP);
 
 export interface UpcMovieLookupResult {
+  tmdbId?: number;
   title?: string;
   genres: string[];
   releaseYear?: string;
+}
+
+// An ISBN is structurally just an EAN-13 barcode in the reserved
+// "Bookland" 978/979 prefix range - always true, not a guess. Useful for
+// any UPC-based category (this one, and potentially Vinyl/Board Games
+// later) where physical packaging can carry a SECOND, separate ISBN
+// barcode for bundled print material (a book, art book, or booklet
+// packaged with the disc/game) alongside the item's own UPC. Scanning
+// that second barcode by mistake would look up the bundled book instead
+// of the actual item.
+export function looksLikeIsbn(digits: string): boolean {
+  return digits.length === 13 && (digits.startsWith('978') || digits.startsWith('979'));
 }
 
 async function lookupUpcItem(upc: string): Promise<string | null> {
@@ -90,31 +103,43 @@ function cleanMovieTitle(raw: string): string {
     .trim();
 }
 
-async function searchTmdbMovie(title: string): Promise<UpcMovieLookupResult | null> {
+// Shared low-level TMDb search - returns up to maxResults candidates.
+// Exported so lib/titleSearch.ts (Movies' "search by title" feature) can
+// reuse the exact same fetch/parse logic rather than a second copy;
+// searchTmdbMovie below (the UPC pipeline's own single-best-match need)
+// is now a thin wrapper around this.
+export async function tmdbSearchMovies(query: string, maxResults: number): Promise<UpcMovieLookupResult[]> {
   if (!TMDB_API_KEY) {
     console.warn(
       'Media Base: TMDB_API_KEY is not set in lib/config.ts - get a free key from themoviedb.org to enable Movies auto-fill.',
     );
-    return null;
+    return [];
   }
   const res = await fetch(
-    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`,
+    `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`,
   );
   if (!res.ok) {
     console.warn('Media Base: TMDb returned', res.status);
-    return null;
+    return [];
   }
   const json = await res.json();
-  const match = json?.results?.[0];
-  if (!match) return null;
-  const genres = Array.isArray(match.genre_ids)
-    ? match.genre_ids.map((id: number) => TMDB_GENRE_MAP[id]).filter(Boolean)
-    : [];
-  return {
-    title: match.title as string | undefined,
-    genres,
-    releaseYear: match.release_date ? String(match.release_date).slice(0, 4) : undefined,
-  };
+  const results = Array.isArray(json?.results) ? json.results.slice(0, maxResults) : [];
+  return results.map((match: any) => {
+    const genres = Array.isArray(match.genre_ids)
+      ? match.genre_ids.map((id: number) => TMDB_GENRE_MAP[id]).filter(Boolean)
+      : [];
+    return {
+      tmdbId: typeof match.id === 'number' ? match.id : undefined,
+      title: match.title as string | undefined,
+      genres,
+      releaseYear: match.release_date ? String(match.release_date).slice(0, 4) : undefined,
+    };
+  });
+}
+
+async function searchTmdbMovie(title: string): Promise<UpcMovieLookupResult | null> {
+  const [top] = await tmdbSearchMovies(title, 1);
+  return top ?? null;
 }
 
 export async function runUpcMovieLookup(upc: string): Promise<UpcMovieLookupResult | null> {

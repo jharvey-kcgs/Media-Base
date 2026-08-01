@@ -55,6 +55,8 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 
 Every entry screen has a manual-entry path as the default; scanning/link-pasting is always an optional shortcut, never required. The camera icon only requests OS camera permission when tapped (lazy, not on screen load), matching Home Base's lazy notification-permission pattern. Regardless of entry method, all required fields for that category must be filled before saving.
 
+**Added after Books/Comics/Movies were built:** a third entry method, "type a title, get real candidates back, tap one to fill in every field it has" (`lib/titleSearch.ts` + `components/TitleSearchInput.tsx`, shared across categories). For the cases scan/number-entry can't cover - no working camera, a damaged/unreadable barcode, a thrifted book with a sticker over part of it. Each category screen orders its three methods (scan / number-entry / title search) by how reliable each actually is for that category - Books/Comics lead with scan since ISBN uniquely identifies an edition; Movies leads with title search instead, with scan/UPC demoted to a secondary section, since UPC lookup there is a weaker chain (UPC → messy retail title → TMDb search). Worth applying the same "which method should lead" judgment call to each future category rather than defaulting to scan-first everywhere.
+
 ## Confirmed add-on: "Listen on Spotify" / "Where to Watch"
 Not part of the core entry flow, layered on top once basic entries exist for each category:
 - **Music** — each entry gets a "Listen on Spotify" link. Spotify's Web API supports catalog search via an app-level developer key (Client Credentials — no user login), so even manually-typed title/artist can resolve to a link.
