@@ -285,22 +285,42 @@ lib/
                                      Google Books by title (reuses
                                      normalizeGenres() from
                                      isbnLookup.ts, so results go through
-                                     the same genre-allowlist matching);
-                                     results without a real ISBN are
-                                     filtered out entirely, since the
-                                     whole point is filling that field in
-                                     too. Movies reuses upcLookup.ts's
-                                     tmdbSearchMovies() directly (the
-                                     same TMDb search its UPC pipeline
-                                     already calls) - but Movies results
-                                     never carry a UPC at all: a UPC
-                                     identifies a specific physical
-                                     disc/release, not "the movie" as a
-                                     concept, so unlike Books/Comics'
-                                     ISBN there's no single correct
-                                     number to backfill from a title
-                                     match. Deliberate difference, not a
-                                     gap. Paired with
+                                     the same genre-allowlist matching).
+                                     **Real bug, found and fixed**: the
+                                     first version required every result
+                                     to have an ISBN before showing it
+                                     ("the whole point is filling that
+                                     field in too") - but Google Books'
+                                     title-search results frequently omit
+                                     that field entirely, even for
+                                     extremely well-known titles, which
+                                     was silently discarding every single
+                                     result and caused a genuine 100%
+                                     failure rate on real searches
+                                     (confirmed on Harry Potter, The
+                                     Hunger Games, and others). ISBN is
+                                     now optional on a result - ISBN_13
+                                     falls back to ISBN_10 falls back to
+                                     `''`, and screens only fill the ISBN
+                                     field when one's actually present,
+                                     same as manual entry otherwise.
+                                     Every search also logs a raw-vs-
+                                     usable result count via
+                                     console.warn, to make "why no
+                                     matches" easy to diagnose going
+                                     forward without re-deriving this
+                                     from scratch. Movies reuses
+                                     upcLookup.ts's tmdbSearchMovies()
+                                     directly (the same TMDb search its
+                                     UPC pipeline already calls) - but
+                                     Movies results never carry a UPC at
+                                     all: a UPC identifies a specific
+                                     physical disc/release, not "the
+                                     movie" as a concept, so unlike
+                                     Books/Comics' ISBN there's no single
+                                     correct number to backfill from a
+                                     title match. Deliberate difference,
+                                     not a gap. Paired with
                                      `components/TitleSearchInput.tsx` -
                                      the shared debounced-search +
                                      dropdown UI, generic over the result

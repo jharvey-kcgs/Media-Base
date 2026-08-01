@@ -857,9 +857,9 @@ export default function BookScreen({ navigation }: any) {
                 value={draft.title}
                 onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
                 search={(query) => searchBooksByTitle(query, GENRE_ALLOWLIST)}
-                getKey={(r) => r.isbn}
+                getKey={(r) => r.key}
                 getLabel={(r) => r.title}
-                getSubtitle={(r) => r.author}
+                getSubtitle={(r) => [r.author, r.isbn ? null : 'no ISBN on file'].filter(Boolean).join(' · ') || undefined}
                 onSelect={(r) => {
                   setDraft((d) => ({
                     ...d,
@@ -867,7 +867,10 @@ export default function BookScreen({ navigation }: any) {
                     author: r.author || d.author,
                     genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
                   }));
-                  applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
+                  // Not every Google Books record has an ISBN on file -
+                  // when it doesn't, the ISBN field just stays whatever
+                  // it was, same as if this were entered manually.
+                  if (r.isbn) applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
                 }}
               />
             </View>
