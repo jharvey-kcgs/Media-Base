@@ -597,6 +597,26 @@ components/
                                      later fields would paint over the
                                      dropdown instead of the other way
                                      around.
+  SearchBar.tsx                     Simple inline search filter for
+                                     narrowing an already-loaded list by
+                                     title (+ author on Books/Comics,
+                                     which have that field) - entirely
+                                     local/offline, no network calls at
+                                     all. Not to be confused with
+                                     TitleSearchInput.tsx above, which
+                                     searches external catalogs to help
+                                     fill in a NEW entry; this one only
+                                     ever filters what's already in your
+                                     library. Added once Books/Comics
+                                     crossed 50-80 entries and the genre
+                                     filter alone wasn't enough to
+                                     quickly find one specific item by
+                                     name. Sits directly below the
+                                     "Sorted by X" row on every category
+                                     screen, combined with the genre
+                                     filter (both narrow the same
+                                     underlying list together, not
+                                     either/or).
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book

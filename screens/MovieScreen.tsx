@@ -34,6 +34,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
+import SearchBar from '../components/SearchBar';
 import { useTheme } from '../lib/theme';
 import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies } from '../lib/storage';
 import { runUpcMovieLookup, looksLikeIsbn, TMDB_GENRE_NAMES } from '../lib/upcLookup';
@@ -202,6 +203,7 @@ export default function MovieScreen({ navigation }: any) {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [sortField, setSortField] = useState<MovieSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
@@ -223,11 +225,16 @@ export default function MovieScreen({ navigation }: any) {
     }, [load]),
   );
 
-  const filteredMovies = useMemo(
-    () =>
-      genreFilter ? movies.filter((m) => m.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : movies,
-    [movies, genreFilter],
-  );
+  const filteredMovies = useMemo(() => {
+    let result = genreFilter
+      ? movies.filter((m) => m.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase()))
+      : movies;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((m) => m.title.toLowerCase().includes(q));
+    }
+    return result;
+  }, [movies, genreFilter, searchQuery]);
 
   const sorted = useMemo(() => sortMovies(filteredMovies, sortField), [filteredMovies, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
@@ -556,7 +563,11 @@ export default function MovieScreen({ navigation }: any) {
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
-      {genreFilter ? `No movies tagged "${genreFilter}" yet.` : 'No movies yet. Tap ••• to add your first one.'}
+      {searchQuery.trim()
+        ? `No movies match "${searchQuery.trim()}".`
+        : genreFilter
+          ? `No movies tagged "${genreFilter}" yet.`
+          : 'No movies yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -607,6 +618,8 @@ export default function MovieScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search your movies..." />
 
       <View style={styles.flex} onLayout={onListLayout}>
         {isAlpha ? (

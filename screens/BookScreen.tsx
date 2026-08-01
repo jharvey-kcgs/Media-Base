@@ -34,6 +34,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
+import SearchBar from '../components/SearchBar';
 import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook, deleteBooks } from '../lib/storage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
@@ -250,6 +251,7 @@ export default function BookScreen({ navigation }: any) {
   const [books, setBooks] = useState<Book[]>([]);
   const [sortField, setSortField] = useState<BookSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
@@ -278,11 +280,16 @@ export default function BookScreen({ navigation }: any) {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [books]);
 
-  const filteredBooks = useMemo(
-    () =>
-      genreFilter ? books.filter((b) => b.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : books,
-    [books, genreFilter],
-  );
+  const filteredBooks = useMemo(() => {
+    let result = genreFilter
+      ? books.filter((b) => b.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase()))
+      : books;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
+    }
+    return result;
+  }, [books, genreFilter, searchQuery]);
 
   const sorted = useMemo(() => sortBooks(filteredBooks, sortField), [filteredBooks, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
@@ -663,7 +670,11 @@ export default function BookScreen({ navigation }: any) {
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
-      {genreFilter ? `No books tagged "${genreFilter}" yet.` : 'No books yet. Tap ••• to add your first one.'}
+      {searchQuery.trim()
+        ? `No books match "${searchQuery.trim()}".`
+        : genreFilter
+          ? `No books tagged "${genreFilter}" yet.`
+          : 'No books yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -714,6 +725,8 @@ export default function BookScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search your books..." />
 
       <View style={styles.flex} onLayout={onListLayout}>
         {isAlpha ? (

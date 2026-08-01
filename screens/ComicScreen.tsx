@@ -33,6 +33,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import ISBN from 'isbn3';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
+import SearchBar from '../components/SearchBar';
 import { useTheme } from '../lib/theme';
 import { getComics, addComic, updateComic, deleteComic, deleteComics } from '../lib/storage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
@@ -226,6 +227,7 @@ export default function ComicScreen({ navigation }: any) {
   const [comics, setComics] = useState<Comic[]>([]);
   const [sortField, setSortField] = useState<ComicSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [modalVisible, setModalVisible] = useState(false);
@@ -254,11 +256,16 @@ export default function ComicScreen({ navigation }: any) {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [comics]);
 
-  const filteredComics = useMemo(
-    () =>
-      genreFilter ? comics.filter((c) => c.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase())) : comics,
-    [comics, genreFilter],
-  );
+  const filteredComics = useMemo(() => {
+    let result = genreFilter
+      ? comics.filter((c) => c.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase()))
+      : comics;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter((c) => c.title.toLowerCase().includes(q) || c.author.toLowerCase().includes(q));
+    }
+    return result;
+  }, [comics, genreFilter, searchQuery]);
 
   const sorted = useMemo(() => sortComics(filteredComics, sortField), [filteredComics, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
@@ -611,7 +618,11 @@ export default function ComicScreen({ navigation }: any) {
 
   const emptyState = (
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
-      {genreFilter ? `No entries tagged "${genreFilter}" yet.` : 'No comics or manga yet. Tap ••• to add your first one.'}
+      {searchQuery.trim()
+        ? `No comics or manga match "${searchQuery.trim()}".`
+        : genreFilter
+          ? `No entries tagged "${genreFilter}" yet.`
+          : 'No comics or manga yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -662,6 +673,8 @@ export default function ComicScreen({ navigation }: any) {
           </TouchableOpacity>
         )}
       </View>
+
+      <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Search your comics/manga..." />
 
       <View style={styles.flex} onLayout={onListLayout}>
         {isAlpha ? (
