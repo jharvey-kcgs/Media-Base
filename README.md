@@ -48,14 +48,21 @@ or transmits about you.
   their own
 
 **Where this stands right now:** Onboarding, Home, all of Settings, and
-two categories - Books and Comics/Manga - are working end-to-end (add,
-edit, sort/filter, rate, review, delete, real barcode scanning). Every
-other category widget shows "Coming soon" until its own screen is built,
-following the confirmed build order in
-[Media-Base-Roadmap.md](./Media-Base-Roadmap.md). ISBN lookup and the
-A-Z index are shared between Books and Comics/Manga via `lib/isbnLookup.ts`
-and `lib/useAlphabetScroll.ts` rather than duplicated - see the Category
-screen pattern section for what to reuse vs. rebuild per category.
+three categories - Books, Comics/Manga, and Movies - are working
+end-to-end (add, edit, sort/filter, rate, review, delete, real barcode
+scanning). Every other category widget shows "Coming soon" until its own
+screen is built - Movies was built out of the original planned order in
+[Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
+so the remaining order there is Puzzles → Music → TV Shows → Anime →
+Vinyl → Board Games. The A-Z index is shared across all three
+implemented categories via `lib/useAlphabetScroll.ts`; ISBN lookup
+(`lib/isbnLookup.ts`) is shared between Books/Comics specifically, since
+Movies' UPC-based lookup (`lib/upcLookup.ts`) is a genuinely different
+shape - see the Category screen pattern section for what to reuse vs.
+rebuild per category. **Movies needs a one-time setup step Books/Comics
+never did**: a free TMDb API key in `lib/config.ts`, or its UPC/barcode
+auto-fill won't return anything (manual entry always works regardless) -
+see Section 5 below.
 
 ---
 
@@ -150,6 +157,19 @@ screens/
                                      with its own genre allowlist that
                                      adds manga demographic labels
                                      (Shonen/Shoujo/Seinen/Josei)
+  MovieScreen.tsx                  Movies (widget 3 - working), built
+                                     out of the original planned order -
+                                     shares lib/useAlphabetScroll.ts but
+                                     NOT lib/isbnLookup.ts, since Movies'
+                                     UPC-based lookup (lib/upcLookup.ts)
+                                     is a genuinely different two-step
+                                     shape. No author/director field -
+                                     not part of the requested spec.
+                                     Genre filter shows TMDb's full fixed
+                                     19-genre list directly rather than
+                                     only genres currently in use, unlike
+                                     Books/Comics - a deliberate
+                                     difference, not an oversight.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
@@ -191,6 +211,46 @@ lib/
                                      second copy needing every future fix
                                      applied twice. Each category still
                                      supplies its own genre allowlist.
+                                     NOT used by Movies - see
+                                     upcLookup.ts below.
+  config.ts                         Holds TMDB_API_KEY - Movies' UPC
+                                     lookup needs a free key from
+                                     themoviedb.org pasted in here, since
+                                     unlike Open Library/Google Books
+                                     there's no keyless source for real
+                                     movie metadata. Empty by default;
+                                     upcLookup.ts logs a clear console
+                                     warning (not a silent failure) if a
+                                     lookup is attempted before this is
+                                     filled in.
+  upcLookup.ts                      Movies' entry-assist pipeline, in two
+                                     steps: UPC -> a rough retail product
+                                     title via UPCitemdb's free, keyless
+                                     trial endpoint (100/day), then that
+                                     cleaned-up title -> real movie
+                                     metadata (title, genres, release
+                                     year) via TMDb's search endpoint
+                                     (needs the key above). Also exports
+                                     TMDB_GENRE_NAMES - TMDb's own fixed,
+                                     official 19-genre list, verified
+                                     directly against their live API
+                                     response rather than guessed. Unlike
+                                     Books/Comics' normalizeGenres(),
+                                     there's no free-text allowlist
+                                     matching needed here at all - TMDb's
+                                     genre_ids already map to this exact
+                                     clean list with nothing to filter
+                                     out. Not network-testable from this
+                                     sandbox; the title-cleaning regex
+                                     (stripping "[Blu-ray]", "(DVD)", etc.
+                                     from retail titles before searching
+                                     TMDb) is a first pass based on common
+                                     disc-packaging conventions, not
+                                     verified against real UPCitemdb
+                                     responses - every successful lookup
+                                     logs the raw title via console.warn
+                                     specifically to make that easy to
+                                     check/tune later.
   useAlphabetScroll.ts              The A-Z index jump hook, also
                                      extracted out of BookScreen.tsx -
                                      carries forward three rounds of real
@@ -389,15 +449,33 @@ assets/
 ### Category screen pattern (applies to every future category, not just Books)
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
-building the remaining categories (Movies, TV Shows, etc.) - and
-`screens/ComicScreen.tsx` is a real example of that copy already done,
-built on the same two extracted shared modules
-(`lib/isbnLookup.ts`, `lib/useAlphabetScroll.ts`) rather than a second
-copy of that logic, with only the genre allowlist and user-facing wording
-actually differing between the two. A future category screen should
-follow that same split: reuse the shared modules for ISBN lookup and the
-A-Z index, and only duplicate what's genuinely category-specific (the
-form fields, the row component, the allowlist).
+building the remaining categories (TV Shows, Puzzles, etc.) -
+`screens/ComicScreen.tsx` and `screens/MovieScreen.tsx` are two real
+examples of that copy already done, showing two different degrees of
+reuse:
+- **Comics/Manga** is the closest copy - same shape entirely (multi-genre,
+  ISBN lookup/scan, a read switch), built on the same two shared modules
+  (`lib/isbnLookup.ts`, `lib/useAlphabetScroll.ts`), with only the genre
+  allowlist and wording actually differing.
+- **Movies** shares `lib/useAlphabetScroll.ts` but deliberately does
+  *not* share `lib/isbnLookup.ts` - movies aren't catalogued with ISBNs,
+  so the entry-assist pipeline is a genuinely different two-step shape
+  (`lib/upcLookup.ts`: UPC → rough retail title via UPCitemdb → real
+  movie metadata via TMDb), and TMDb needs a free API key
+  (`lib/config.ts`) that the ISBN path never did. MovieScreen also drops
+  the author/director field entirely (not part of the requested spec)
+  and its genre filter shows TMDb's full fixed 19-genre list directly
+  rather than only genres currently in use - a deliberate difference
+  from Books/Comics' dynamic list, not an oversight.
+
+A future category screen should follow this same split: reuse
+`lib/useAlphabetScroll.ts` unconditionally (any category with an A-Z
+index benefits from its four rounds of bug fixes), reuse
+`lib/isbnLookup.ts` only if the category actually has ISBNs (Books,
+Comics/Manga - not Movies, TV Shows, Vinyl, Board Games, which all need
+their own lookup shape per the Roadmap doc), and only duplicate what's
+genuinely category-specific (the form fields, the row component, the
+allowlist or genre source).
 - **The row component (`BookCard`) is defined at module scope and wrapped
   in `React.memo`** - not as a plain function inside the screen's body.
   This is what actually fixes React Native's "VirtualizedList: You have a
@@ -931,18 +1009,23 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
   fixed bug where restored/reset settings (theme, dark mode, text size)
   didn't visibly take effect until refreshSettings() was added to both.
 - **Permissions**: camera status + Phone Settings link implemented.
-  Real barcode scanning is wired up for both Books and Comics/Manga
-  (EAN-13, Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`)
-  - see the Category screen pattern section above. Other categories that
-  called for scanning (Movies, Vinyl, Board Games) still need their own
-  barcode-type/lookup wiring since their codes and data sources differ
-  from ISBN.
+  Real barcode scanning is wired up for Books/Comics/Manga (EAN-13,
+  Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) and now
+  Movies too (UPC-A/UPC-E/EAN-13, via the genuinely different
+  `lib/upcLookup.ts` two-step pipeline - needs a free TMDb API key in
+  `lib/config.ts` to actually return results, unlike the ISBN path)
+  - see the Category screen pattern section above. Vinyl and Board Games
+  still need their own barcode-type/lookup wiring since their data
+  sources differ again.
 - **Notifications**: daily 10am reminder confirmed working on-device,
   including the badge (fixed - the scheduled notification wasn't
   setting one at all).
 - **Home screen**: generalized to load widget data (count + daily pick)
-  for any implemented category rather than a Books-only special case,
-  now that Comics/Manga is a second one.
+  for any implemented category rather than a Books-only special case -
+  the "done" field's name differs per category (Books/Comics: `read`,
+  Movies: `watched`), so this takes an `isDone` accessor function rather
+  than assuming a field name, unlike the first version of this
+  generalization.
 - **TypeScript**: can't be run directly from this sandbox (no network
   access to install dependencies), but real errors have been caught via
   VS Code's own checking and fixed as they came up - an `Alert.alert`
@@ -960,11 +1043,12 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Puzzles → Music → Movies → TV Shows → Anime → Vinyl → Board Games, in
-  that order (Books and Comics/Manga are both done)
-- Real barcode scanning for Movies, Vinyl, Board Games (Books and
-  Comics/Manga are done, sharing `lib/isbnLookup.ts` - see the Category
-  screen pattern section above for the reference implementation to adapt)
+- Puzzles → Music → TV Shows → Anime → Vinyl → Board Games, in that
+  order (Books, Comics/Manga, and Movies are all done - Movies built out
+  of the original planned sequence per explicit request)
+- Real barcode scanning for Vinyl and Board Games (Books/Comics share
+  `lib/isbnLookup.ts`; Movies has its own `lib/upcLookup.ts` - see the
+  Category screen pattern section above for what each one reuses)
 - "Listen on Spotify" (Music) and "Where to Watch" popup (TV Shows,
   Anime)
 - Share sheet wiring (native OS share, per item)

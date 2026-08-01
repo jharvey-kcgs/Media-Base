@@ -86,6 +86,25 @@ export interface Comic {
 
 export type ComicSortField = 'title' | 'genre' | 'author' | 'read';
 
+// No author/director field - not part of the requested spec, kept
+// deliberately minimal. UPC instead of ISBN (movies aren't catalogued
+// with ISBNs), "watched" instead of "read". Genre here comes from
+// TMDb's own fixed, official genre list (lib/upcLookup.ts) rather than
+// an allowlist-matched free-text one, since that source is already
+// clean structured data - no noisy subject headings to filter out.
+export interface Movie {
+  id: string;
+  title: string;
+  genres: string[];
+  upc: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
+  watched: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type MovieSortField = 'title' | 'genre' | 'watched';
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home

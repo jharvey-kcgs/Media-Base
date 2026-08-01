@@ -3,12 +3,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie } from '../types/models';
 
 const KEYS = {
   settings: 'mediabase:settings',
   books: 'mediabase:books',
   comics: 'mediabase:comics',
+  movies: 'mediabase:movies',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -121,6 +122,42 @@ export async function deleteComics(ids: string[]): Promise<void> {
   await saveAll(
     KEYS.comics,
     comics.filter((c) => !idSet.has(c.id)),
+  );
+}
+
+// --- Movies ---
+
+export async function getMovies(): Promise<Movie[]> {
+  return getAll<Movie>(KEYS.movies);
+}
+
+export async function addMovie(input: Omit<Movie, 'id' | 'createdAt'>): Promise<Movie> {
+  const movies = await getMovies();
+  const movie: Movie = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.movies, [...movies, movie]);
+  return movie;
+}
+
+export async function updateMovie(id: string, updates: Partial<Movie>): Promise<void> {
+  const movies = await getMovies();
+  const next = movies.map((m) => (m.id === id ? { ...m, ...updates } : m));
+  await saveAll(KEYS.movies, next);
+}
+
+export async function deleteMovie(id: string): Promise<void> {
+  const movies = await getMovies();
+  await saveAll(
+    KEYS.movies,
+    movies.filter((m) => m.id !== id),
+  );
+}
+
+export async function deleteMovies(ids: string[]): Promise<void> {
+  const movies = await getMovies();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.movies,
+    movies.filter((m) => !idSet.has(m.id)),
   );
 }
 

@@ -45,7 +45,7 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 |---|---|---|---|
 | Books | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Open Library / Google Books API — reliable |
 | Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Same as Books — comics/manga have ISBNs, reliable |
-| Movies | Enter or scan (UPC barcode) | Title, genre, runtime, watched switch | UPC lookup → title match against OMDb/TMDb — decent, not perfect |
+| Movies | Enter or scan (UPC barcode) | Title, genre, watched switch | UPC → rough title (UPCitemdb, free/keyless) → real title+genre (TMDb, free API key required) |
 | TV Shows | Enter only (no scan) | Title, genre, seasons/episodes, watched switch | N/A — manual entry; see "where to watch" below |
 | Anime | Enter only (no scan) | Title, genre, episodes, watched switch | N/A — manual entry; see "where to watch" below |
 | Vinyl/Records | Enter or scan (UPC barcode) | Title, genre, artist, listened switch | Discogs API — has strong UPC-to-release lookup, best barcode match of the physical-media categories |
@@ -66,7 +66,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - **Share** button opens the native OS share sheet (Mail, Messages, Snapchat, Copy Link, whatever's installed) — no custom per-platform integration needed.
 
 ## Filters per category screen
-- Movies: Title / Genre / Runtime / Watched
+- Movies: Title / Genre / Watched
 - TV Shows: Title / Genre / Seasons / Watched
 - Anime: Title / Genre / Episodes / Watched
 - Books: Title / Genre / Author / Read
@@ -79,11 +79,12 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 ## Build order
 1. **Books** — most reliable lookup, simplest way to prove the entry → confirm → rate → recommend pattern end to end ✅ done
 2. **Comics/Manga** (same ISBN pattern, near-zero extra lookup work) ✅ done — built on shared lib/isbnLookup.ts and lib/useAlphabetScroll.ts rather than a second copy, with its own genre allowlist that adds manga demographic labels (Shonen/Shoujo/Seinen/Josei) alongside standard genres
-3. Puzzles (manual-only, good simple second target)
-4. Music (link-paste + developer API keys)
-5. Movies → TV Shows → Anime (same UPC/title-search family)
-6. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
+3. **Movies** ✅ done, built out of the original planned order per explicit request - genuinely different lookup shape than Books/Comics (no free keyless source for movie metadata the way Open Library was for books), see lib/upcLookup.ts. Needs a free TMDb API key added to lib/config.ts before UPC/barcode auto-fill will work; manual entry works regardless.
+4. Puzzles (manual-only, good simple next target)
+5. Music (link-paste + developer API keys)
+6. TV Shows → Anime (same UPC/title-search family as Movies, can likely reuse a lot of lib/upcLookup.ts's shape)
+7. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
 
 ## Open items not yet decided
-- Exact API/developer accounts to register (Google Books, OMDb/TMDb, Discogs, Spotify developer keys) — can be done incrementally per widget as you build it, not all upfront
+- Exact API/developer accounts to register (OMDb/TMDb, Discogs, Spotify developer keys) — **TMDb is now actually needed**: Movies' UPC lookup (lib/upcLookup.ts) won't auto-fill anything until a free key from themoviedb.org is added to lib/config.ts. The rest can still be done incrementally per widget as you build it.
 - Whether TV Shows/Anime need a distinct "in progress" state beyond the binary watched switch (e.g. partway through a season) — flagged for later, not blocking v1 build

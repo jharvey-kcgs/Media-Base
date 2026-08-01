@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -16,6 +16,7 @@ import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   books: 'Book',
   comics: 'Comic',
+  movies: 'Movie',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
@@ -23,13 +24,13 @@ const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
 type RootStackParamList = {
   Book: undefined;
   Comic: undefined;
+  Movie: undefined;
   Settings: undefined;
 };
 
 interface TrackedItem {
   id: string;
   title: string;
-  read: boolean;
 }
 
 interface WidgetData {
@@ -39,8 +40,8 @@ interface WidgetData {
   unitPlural: string;
 }
 
-function pickRandomUnread<T extends TrackedItem>(items: T[]): T | null {
-  const unread = items.filter((i) => !i.read);
+function pickRandomUnread<T extends TrackedItem>(items: T[], isDone: (item: T) => boolean): T | null {
+  const unread = items.filter((i) => !isDone(i));
   if (unread.length === 0) return null;
   return unread[Math.floor(Math.random() * unread.length)];
 }
@@ -49,11 +50,13 @@ function pickRandomUnread<T extends TrackedItem>(items: T[]): T | null {
 // this" suggestion, which stays fixed for the whole calendar day (even
 // across manual refreshes/app reopens) unless the day changes or the
 // previous pick got marked done/deleted since it was chosen. Generic over
-// any category whose items look like { id, title, read } - which is every
-// implemented category so far (Books, Comics/Manga).
+// any category whose items look like { id, title } - isDone is passed in
+// separately since the "done" field's actual name differs per category
+// (Books/Comics: read, Movies: watched).
 async function loadWidgetData<T extends TrackedItem>(
   category: string,
   items: T[],
+  isDone: (item: T) => boolean,
   unitSingular: string,
   unitPlural: string,
   today: string,
@@ -61,11 +64,11 @@ async function loadWidgetData<T extends TrackedItem>(
   const stored = await getDailyPick(category);
   let pick: T | null = null;
   if (stored && stored.date === today) {
-    const stillValid = items.find((i) => i.id === stored.itemId && !i.read);
+    const stillValid = items.find((i) => i.id === stored.itemId && !isDone(i));
     if (stillValid) pick = stillValid;
   }
   if (!pick) {
-    pick = pickRandomUnread(items);
+    pick = pickRandomUnread(items, isDone);
     if (pick) await saveDailyPick(category, pick.id);
   }
   return { count: items.length, suggestion: pick?.title ?? null, unitSingular, unitPlural };
@@ -77,12 +80,13 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const today = toLocalDateString(new Date());
-    const [books, comics] = await Promise.all([getBooks(), getComics()]);
-    const [booksData, comicsData] = await Promise.all([
-      loadWidgetData('books', books, 'book', 'books', today),
-      loadWidgetData('comics', comics, 'entry', 'entries', today),
+    const [books, comics, movies] = await Promise.all([getBooks(), getComics(), getMovies()]);
+    const [booksData, comicsData, moviesData] = await Promise.all([
+      loadWidgetData('books', books, (b) => b.read, 'book', 'books', today),
+      loadWidgetData('comics', comics, (c) => c.read, 'entry', 'entries', today),
+      loadWidgetData('movies', movies, (m) => m.watched, 'movie', 'movies', today),
     ]);
-    setWidgetData({ books: booksData, comics: comicsData });
+    setWidgetData({ books: booksData, comics: comicsData, movies: moviesData });
   }, []);
 
   useFocusEffect(
