@@ -19,7 +19,16 @@
 // photo throws or behaves unexpectedly, that's the first surface worth
 // checking against whatever version actually installs.
 
-import * as FileSystem from 'expo-file-system';
+// expo-file-system's promise-based API used throughout this file
+// (getInfoAsync, makeDirectoryAsync, downloadAsync, copyAsync,
+// deleteAsync) was deprecated in the SDK 54 version actually installed,
+// in favor of new File/Directory classes - confirmed via a real "Method
+// getInfoAsync is deprecated" thrown error during on-device testing, not
+// just a console warning. Importing from the /legacy subpath instead of
+// the bare package keeps the exact same API working, since Expo
+// deliberately preserved it there for this migration rather than only
+// offering the new class-based API.
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 

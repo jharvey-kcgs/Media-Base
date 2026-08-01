@@ -238,11 +238,32 @@ lib/
                                      item's own id, so once an item has an
                                      id its cover (if any) can always be
                                      found without a separate lookup
-                                     table. Not network-tested from this
-                                     sandbox - expo-image-picker's exact
-                                     API shape has changed across SDK
-                                     versions, worth checking first if
-                                     picking/taking a photo throws.
+                                     table. Confirmed real, on-device:
+                                     the exact risk flagged before testing
+                                     ("expo-file-system's exact API shape
+                                     has changed across SDK versions") -
+                                     the promise-based API this file uses
+                                     throughout (getInfoAsync,
+                                     makeDirectoryAsync, downloadAsync,
+                                     copyAsync, deleteAsync) was
+                                     deprecated in the SDK 54 version
+                                     actually installed, and it wasn't
+                                     just a console warning - it actually
+                                     threw, breaking every cover download.
+                                     Fixed by importing from
+                                     `expo-file-system/legacy` instead of
+                                     the bare package - Expo deliberately
+                                     kept the exact old API stable there
+                                     specifically for this migration, so
+                                     this was a one-line import fix, not a
+                                     rewrite. expo-image-picker/
+                                     expo-image-manipulator's own APIs
+                                     haven't been exercised yet (the
+                                     failure happened earlier in the
+                                     pipeline, before either ever ran) -
+                                     still worth treating with the same
+                                     caution if a future error traces to
+                                     either of those specifically.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
@@ -674,6 +695,15 @@ components/
                                      actual Take Photo/Choose from
                                      Library/Remove Photo action-sheet
                                      logic lives in each screen, not here.
+                                     The "Add cover photo" placeholder
+                                     text has an explicit `textAlign:
+                                     'center'` - `alignItems: 'center'`
+                                     on the parent only centers a wrapped
+                                     multi-line text block as a whole, not
+                                     each individual line within it, which
+                                     is what was actually causing a real
+                                     reported "not centered" look once
+                                     that text wrapped to two lines.
 
 types/models.ts                   Every TypeScript type and shared
                                     constant - the category list, Book

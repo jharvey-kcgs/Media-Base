@@ -37,7 +37,9 @@ export default function CoverPicker({ uri, onPress, iconName = 'book-outline' }:
       {showPlaceholder ? (
         <>
           <Ionicons name={iconName} size={36} color={theme.colors.textMuted} />
-          <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginTop: 6 }}>
+          <AppText
+            style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginTop: 6, textAlign: 'center' }}
+          >
             Add cover photo
           </AppText>
         </>
@@ -56,6 +58,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
     overflow: 'hidden',
     alignSelf: 'center',
     marginBottom: 20,
