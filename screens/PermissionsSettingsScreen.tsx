@@ -35,16 +35,40 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
   const [notifStatus, setNotifStatus] = useState<Notifications.PermissionStatus | null>(null);
 
   const refreshAllPermissions = useCallback(async () => {
-    const [cam, photo, notif] = await Promise.all([
-      getCameraPermissionsAsync(),
-      ImagePicker.getMediaLibraryPermissionsAsync(),
-      Notifications.getPermissionsAsync(),
-    ]);
-    setCameraGranted(cam.granted);
-    setCameraCanAskAgain(cam.canAskAgain);
-    setPhotoGranted(photo.granted);
-    setPhotoCanAskAgain(photo.canAskAgain);
-    setNotifStatus(notif.status);
+    // Handled independently, not via Promise.all - that combined form
+    // fails atomically on the FIRST rejection, meaning if any one of
+    // these three throws, none of the three ever update and nothing
+    // ever logs, which is exactly what got reported (toggles stuck at
+    // their false defaults, zero console output at all). Checking each
+    // one separately means a problem with one can't silently block the
+    // other two, and whichever one is actually failing now says so
+    // explicitly with its real error, instead of the whole thing just
+    // going quiet.
+    const cam = await getCameraPermissionsAsync().catch((err) => {
+      console.warn('Media Base: getCameraPermissionsAsync threw', err);
+      return null;
+    });
+    const photo = await ImagePicker.getMediaLibraryPermissionsAsync().catch((err) => {
+      console.warn('Media Base: getMediaLibraryPermissionsAsync threw', err);
+      return null;
+    });
+    const notif = await Notifications.getPermissionsAsync().catch((err) => {
+      console.warn('Media Base: Notifications.getPermissionsAsync threw', err);
+      return null;
+    });
+    if (cam) {
+      console.warn('Media Base: camera permission ->', JSON.stringify(cam));
+      setCameraGranted(cam.granted);
+      setCameraCanAskAgain(cam.canAskAgain);
+    }
+    if (photo) {
+      console.warn('Media Base: photo permission ->', JSON.stringify(photo));
+      setPhotoGranted(photo.granted);
+      setPhotoCanAskAgain(photo.canAskAgain);
+    }
+    if (notif) {
+      setNotifStatus(notif.status);
+    }
   }, []);
 
   useFocusEffect(
@@ -73,9 +97,14 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         );
         return;
       }
-      const result = await requestCameraPermissionsAsync();
-      setCameraGranted(result.granted);
-      setCameraCanAskAgain(result.canAskAgain);
+      const result = await requestCameraPermissionsAsync().catch((err) => {
+        console.warn('Media Base: requestCameraPermissionsAsync threw', err);
+        return null;
+      });
+      if (result) {
+        setCameraGranted(result.granted);
+        setCameraCanAskAgain(result.canAskAgain);
+      }
     } else {
       Alert.alert(
         'Turn off camera access',
@@ -101,9 +130,14 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         );
         return;
       }
-      const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      setPhotoGranted(result.granted);
-      setPhotoCanAskAgain(result.canAskAgain);
+      const result = await ImagePicker.requestMediaLibraryPermissionsAsync().catch((err) => {
+        console.warn('Media Base: requestMediaLibraryPermissionsAsync threw', err);
+        return null;
+      });
+      if (result) {
+        setPhotoGranted(result.granted);
+        setPhotoCanAskAgain(result.canAskAgain);
+      }
     } else {
       Alert.alert(
         'Turn off Photo Library access',
