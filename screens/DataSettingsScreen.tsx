@@ -68,6 +68,11 @@ export default function DataSettingsScreen({ navigation }: any) {
 
   const handleDelete = () => {
     // Confirmed design: all-or-nothing wipe only, with a two-step confirmation.
+    // The "fully close and reopen" note is a precaution requested directly,
+    // not a workaround for anything specifically broken - every screen
+    // already reloads its own data on focus, so this shouldn't be strictly
+    // necessary, but it's a reasonable safety net for a fully irreversible
+    // action regardless.
     Alert.alert(
       'Delete all data?',
       'This permanently removes every item you have tracked, including cover photos. This cannot be undone.',
@@ -77,16 +82,20 @@ export default function DataSettingsScreen({ navigation }: any) {
           text: 'Delete everything',
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Are you sure?', 'Last chance - this cannot be undone.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete', style: 'destructive', onPress: async () => {
-                  await deleteAllData();
-                  // Same reason as the import fix above - deleteAllData
-                  // wipes settings on disk too, but the running app needs
-                  // to be told to reload them back to defaults.
-                  await refreshSettings();
-                } },
-            ]);
+            Alert.alert(
+              'Are you sure?',
+              'Last chance - this cannot be undone. Fully close and reopen the app afterward.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: async () => {
+                    await deleteAllData();
+                    // Same reason as the import fix above - deleteAllData
+                    // wipes settings on disk too, but the running app needs
+                    // to be told to reload them back to defaults.
+                    await refreshSettings();
+                  } },
+              ],
+            );
           },
         },
       ],

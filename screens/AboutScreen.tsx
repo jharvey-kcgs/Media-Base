@@ -13,8 +13,16 @@ const SECTIONS: { title: string; body: string }[] = [
     body: "Lets you pick which media categories show up as widgets on your Home screen. Turning a category off hides its widget but keeps everything you've already added, in case you turn it back on.",
   },
   {
-    title: 'Category screens',
-    body: "Each category screen (Books, Comics/Manga, Movies) lists what you've added, with a cover photo next to each item, a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. Adding an entry supports typing everything by hand, scanning a barcode, entering the ISBN/UPC directly, or searching by title and picking the right result - whichever you use, cover photos fill in automatically where one's available, and you get a chance to review and edit every field before saving. The same title can't be added twice. Tap an item's cover in Add/Edit to take a new photo, choose one from your library, or remove it - your own photo is never added to your device's Photos app, it stays inside Media Base only. The ••• menu (top right) has Add entry / Filter by... / Filter by genre... / Delete entries - Delete switches the screen into a selection mode so you can remove one or many entries at once. Every category is stored completely separately, so nothing added under one can ever end up in another. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
+    title: 'Finding & adding entries',
+    body: "Each category screen (Books, Comics/Manga, Movies) lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. Adding an entry supports typing everything by hand, scanning a barcode, entering the ISBN/UPC directly, or searching by title and picking the right result - whichever you use, you get a chance to review and edit every field before saving, and the same title can't be added twice.",
+  },
+  {
+    title: 'Cover photos',
+    body: "Cover photos fill in automatically wherever one's available, whichever way you add an entry. Tap an item's cover in Add/Edit to take a new photo, choose one from your library, or remove it - your own photo is never added to your device's Photos app, it stays inside Media Base only.",
+  },
+  {
+    title: 'Managing your list',
+    body: "The ••• menu (top right of each category screen) has Add entry / Filter by... / Filter by genre... / Delete entries - Delete switches the screen into a selection mode so you can remove one or many entries at once. Every category is stored completely separately, so nothing added under one can ever end up in another. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
   },
   {
     title: 'Data',
