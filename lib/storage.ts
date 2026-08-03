@@ -3,8 +3,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie } from '../types/models';
-import { deleteCover, deleteAllCovers } from './coverStorage';
+import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
   settings: 'mediabase:settings',
@@ -220,12 +221,27 @@ export async function saveDailyPick(category: string, itemId: string): Promise<v
 
 export interface BackupPayload {
   app: 'media-base';
-  version: 1;
+  version: 2;
   exportedAt: string;
   data: Record<string, string>;
+  // Cover photos, base64-encoded, keyed by "category/id" - the whole
+  // reason this moved from pasteable text to a real file. Version 1
+  // backups predate this entirely and simply won't have one -
+  // importAllData() below handles that as "nothing to restore", not an
+  // error, so an old backup still restores everything it actually has.
+  covers: Record<string, string>;
 }
 
-/** Serializes every stored key into one JSON string, for backup/transfer. */
+const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
+  { category: 'books', key: KEYS.books },
+  { category: 'comics', key: KEYS.comics },
+  { category: 'movies', key: KEYS.movies },
+];
+
+/** Builds a full backup - every stored key's data, plus every item's
+ * actual cover photo read and embedded as base64 - and writes it to one
+ * JSON file in temporary storage, ready to hand to the OS share sheet
+ * (Settings > Data > Save Backup File). Returns the file's local URI. */
 export async function exportAllData(): Promise<string> {
   const allKeys = Object.values(KEYS);
   const pairs = await AsyncStorage.multiGet(allKeys);
@@ -233,29 +249,79 @@ export async function exportAllData(): Promise<string> {
   for (const [key, value] of pairs) {
     if (value !== null) data[key] = value;
   }
+
+  const covers: Record<string, string> = {};
+  for (const { category, key } of COVER_CATEGORY_KEYS) {
+    const raw = data[key];
+    if (!raw) continue;
+    let items: { id: string; coverImage?: string | null }[] = [];
+    try {
+      items = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    for (const item of items) {
+      if (!item.coverImage) continue;
+      const base64 = await FileSystem.readAsStringAsync(item.coverImage, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).catch((err) => {
+        console.warn('Media Base: failed to read cover for backup', item.id, err);
+        return null;
+      });
+      if (base64) covers[`${category}/${item.id}`] = base64;
+    }
+  }
+
   const payload: BackupPayload = {
     app: 'media-base',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     data,
+    covers,
   };
-  return JSON.stringify(payload, null, 2);
+
+  const fileName = `media-base-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+  await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(payload));
+  return fileUri;
 }
 
-/** Restores data from a backup produced by exportAllData(). Throws if unrecognizable. */
-export async function importAllData(jsonString: string): Promise<void> {
+/** Restores data from a backup file (produced by exportAllData(), or an
+ * older pasted-text export - version is checked, not assumed) at
+ * fileUri. Throws if the file isn't a recognizable Media Base backup. */
+export async function importAllData(fileUri: string): Promise<void> {
+  const raw = await FileSystem.readAsStringAsync(fileUri).catch(() => null);
+  if (raw === null) {
+    throw new Error("Couldn't read that file.");
+  }
   let parsed: any;
   try {
-    parsed = JSON.parse(jsonString);
+    parsed = JSON.parse(raw);
   } catch {
-    throw new Error("That doesn't look like valid backup text.");
+    throw new Error("That doesn't look like a valid backup file.");
   }
   if (!parsed || parsed.app !== 'media-base' || typeof parsed.data !== 'object') {
     throw new Error("That doesn't look like a Media Base backup.");
   }
+
   const validKeys = new Set(Object.values(KEYS));
   const entries = Object.entries(parsed.data).filter(([key]) => validKeys.has(key));
   await AsyncStorage.multiSet(entries as [string, string][]);
+
+  // Version 1 backups (the old pasted-text format) predate cover photos
+  // entirely - parsed.covers is simply undefined for those, which is
+  // fine, not an error; everything else still restores correctly.
+  const covers: Record<string, string> = parsed.covers ?? {};
+  for (const [coverKey, base64] of Object.entries(covers)) {
+    const [category, id] = coverKey.split('/');
+    if (!category || !id) continue;
+    await ensureCoverDirExists(category);
+    await FileSystem.writeAsStringAsync(getCoverUri(category, id), base64 as string, {
+      encoding: FileSystem.EncodingType.Base64,
+    }).catch((err) => {
+      console.warn('Media Base: failed to restore cover', coverKey, err);
+    });
+  }
 }
 
 /** All-or-nothing wipe, per the confirmed Settings > Data > Delete Data design. */

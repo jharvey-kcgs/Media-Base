@@ -58,6 +58,14 @@ export function getCoverUri(category: string, id: string): string {
   return coverPath(category, id);
 }
 
+/** Ensures a category's cover directory exists - exported specifically
+ * for lib/storage.ts's importAllData(), which needs to write cover files
+ * directly (restoring a backup on a fresh install, where no cover has
+ * ever been saved yet, so the directory itself may not exist). */
+export async function ensureCoverDirExists(category: string): Promise<void> {
+  await ensureDirExists(categoryDir(category));
+}
+
 // Resizes down to a sensible width and compresses before writing to the
 // permanent per-item path - a photo straight from a phone camera can be
 // several megabytes, and a cover thumbnail doesn't need anywhere near

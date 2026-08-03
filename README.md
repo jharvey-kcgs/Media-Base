@@ -118,6 +118,8 @@ versions here rather than generating them from a live `expo install`.
 | `expo-image-picker` | Cover photos - taking a new one or choosing an existing one from the photo library (`lib/coverStorage.ts`) |
 | `expo-file-system` | Saving cover photos to this app's own private storage, and deleting them again when an entry is deleted |
 | `expo-image-manipulator` | Resizing/compressing every cover photo before it's saved - keeps storage footprint reasonable regardless of source (camera, picked, or auto-fetched) |
+| `expo-sharing` | "Save Backup File" (Settings → Data) - hands the built backup file to the OS share sheet |
+| `expo-document-picker` | "Choose Backup File" (Settings → Data) - picking a real backup file to restore, instead of pasting text |
 | `isbn3` | Real ISBN validation/hyphenation for the Books ISBN field - bundles the official ISBN-agency range data, since hyphen placement isn't a fixed pattern that could be hand-written |
 | `@expo/vector-icons` | Icons used in headers/menus - Home screen's cog (Settings) and play (refresh), Books' "•••" menu |
 | `expo-font`, `@expo-google-fonts/jetbrains-mono` | The app's JetBrains Mono typeface (Extra Bold for titles/headers, Regular for everything else) |
@@ -180,15 +182,22 @@ screens/
   SettingsScreen.tsx               Settings nav list
   ProfileSettingsScreen.tsx        Toggle which categories show on Home
   ThemeSettingsScreen.tsx          Theme color, Light/Dark, text size
-  DataSettingsScreen.tsx           Export / import / delete-all - both
-                                     import and delete-all call
-                                     refreshSettings() from ThemeContext
-                                     afterward, since restoring/wiping
-                                     settings on disk doesn't by itself
-                                     update the app's already-loaded,
-                                     in-memory copy (theme color, Light/
-                                     Dark mode, text size, enabled Home
-                                     categories all live there)
+  DataSettingsScreen.tsx           Save Backup File / Choose Backup
+                                     File / delete-all - Export/Import
+                                     moved from pasteable text to a real
+                                     file (see Section 6, Cover photos,
+                                     for the full reasoning: one JSON
+                                     file with cover photos embedded as
+                                     base64, not a .zip that would need
+                                     unzipping first). Both import and
+                                     delete-all call refreshSettings()
+                                     from ThemeContext afterward, since
+                                     restoring/wiping settings on disk
+                                     doesn't by itself update the app's
+                                     already-loaded, in-memory copy
+                                     (theme color, Light/Dark mode, text
+                                     size, enabled Home categories all
+                                     live there)
   PermissionsSettingsScreen.tsx    Camera access status + Phone Settings link
   AboutScreen.tsx                  What each setting/screen does. Also
                                      has the Credits section required by
@@ -1302,20 +1311,28 @@ the read/watched switch) - tapping the image directly is the more
 standard pattern (Goodreads, Letterboxd, etc.), and was the one that got
 built.
 
-**One real, deliberate limitation as of this writing: Export/Import
-doesn't include cover photos yet.** `exportAllData()`/`importAllData()`
-still only handle the text/JSON data - a cover photo is a real file, not
-something that fits cleanly into that same text-based backup format the
-way it currently works. This was discussed directly and the decision was
-made to prioritize the core cover-photo system first (dependencies,
-storage, list/edit UI, auto-fetch, cleanup) and treat "Export/Import
-becomes a real backup file that includes photos too" as its own
-follow-up - a genuinely bigger change (the share-sheet-based text export
-would need to become an actual file-based backup) that depends on this
-storage system existing first anyway. **Right now, exporting your data
-and reimporting it will restore every book/comic/movie correctly, but
-without their cover photos** - worth knowing before relying on Export as
-a full backup.
+**Export/Import is now a real backup file, including cover photos -
+the deferred follow-up mentioned above, now built.** One JSON file with
+every AsyncStorage key's data *and* every item's cover photo embedded
+inside it as base64, produced by `exportAllData()` and restored by
+`importAllData(fileUri)` in `lib/storage.ts`. Deliberately not a `.zip`
+- that would mean the person has to unzip it themselves before
+restoring, which is exactly the extra friction a single self-contained
+file avoids. The accepted tradeoff: base64 inflates file size by
+roughly a third over the raw photos, not a problem for a local save or
+AirDrop, worth knowing if it ever needs to go through an email
+attachment limit on a very large library. `screens/DataSettingsScreen.tsx`
+replaced the old paste-text UI with "Save Backup File" (writes the
+backup to temporary storage, then hands it to the OS share sheet via
+`expo-sharing` - Files, AirDrop, Mail, whatever the person picks) and
+"Choose Backup File" (`expo-document-picker`, picking a real file
+instead of pasting text). `BackupPayload` bumped to `version: 2` with
+the new `covers` field; `importAllData()` checks for that field rather
+than assuming it, so an old version-1 (pasted-text, no photos) backup
+still restores everything it actually has rather than failing outright.
+Neither new dependency needs `app.json` plugin configuration - neither
+requires a custom Info.plist permission string, unlike Camera/Photo
+Library/Notifications.
 
 **Permissions**: picking a photo from the library needs its own OS
 permission, separate from Camera (already in this app for barcode
@@ -1424,9 +1441,13 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
   fix for the Modal issue) and `accentReadable` for foreground color -
   see [Section 7](#7-color-accessibility).
 - **Data safety**: export/import/delete-all all implemented in Settings
-  → Data. Import/delete-all confirmed working on-device, including a
-  fixed bug where restored/reset settings (theme, dark mode, text size)
-  didn't visibly take effect until refreshSettings() was added to both.
+  → Data. Import/delete-all confirmed working on-device for the original
+  text-based format, including a fixed bug where restored/reset settings
+  (theme, dark mode, text size) didn't visibly take effect until
+  refreshSettings() was added to both. Export/Import rebuilt since as a
+  real backup file including cover photos (`expo-sharing` +
+  `expo-document-picker`, see Section 6) - not yet device-tested in that
+  new form specifically.
 - **Permissions**: camera status + Phone Settings link implemented.
   Real barcode scanning is wired up for Books/Comics/Manga (EAN-13,
   Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) and now

@@ -1,37 +1,58 @@
 // screens/DataSettingsScreen.tsx
+//
+// Export/Import moved from pasteable text to a real backup file - a
+// single JSON file with every cover photo embedded inside it as base64,
+// not a .zip (a zip would mean the person has to unzip it themselves
+// before restoring, which is exactly the extra friction this was meant
+// to avoid). Base64 inflates file size by roughly a third over the raw
+// photos, which is the accepted tradeoff for keeping this to one file
+// with no unpacking step - not a problem for a local save or AirDrop,
+// worth knowing if it ever needs to go through an email attachment
+// limit on a very large library.
 
-import React, { useState } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  Share,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
-} from 'react-native';
+import React from 'react';
+import { View, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AppText, { FONT_FAMILY } from '../components/AppText';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
+import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 import { exportAllData, importAllData, deleteAllData } from '../lib/storage';
 
 export default function DataSettingsScreen({ navigation }: any) {
   const { theme, refreshSettings } = useTheme();
-  const [importText, setImportText] = useState('');
 
   const handleExport = async () => {
-    const json = await exportAllData();
-    await Share.share({ message: json });
+    try {
+      const fileUri = await exportAllData();
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing not available', 'Your device cannot share files right now.');
+        return;
+      }
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: 'Save Media Base backup',
+      });
+    } catch (err: any) {
+      console.warn('Media Base: export failed', err);
+      Alert.alert('Export failed', err.message ?? 'Something went wrong building the backup file.');
+    }
   };
 
   const handleImport = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/json', 'public.json', 'public.plain-text'],
+      copyToCacheDirectory: true,
+    }).catch((err: any) => {
+      console.warn('Media Base: document picker threw', err);
+      return null;
+    });
+    if (!result || result.canceled || !result.assets?.[0]?.uri) return;
+
     try {
-      await importAllData(importText);
+      await importAllData(result.assets[0].uri);
       // importAllData writes the restored settings to disk correctly, but
       // the running app's ThemeProvider still holds whatever settings it
       // loaded at launch in memory - without this, the imported theme
@@ -40,7 +61,6 @@ export default function DataSettingsScreen({ navigation }: any) {
       // until the app was fully restarted.
       await refreshSettings();
       Alert.alert('Import complete', 'Your data has been restored.');
-      setImportText('');
     } catch (err: any) {
       Alert.alert('Import failed', err.message ?? 'Something went wrong.');
     }
@@ -50,7 +70,7 @@ export default function DataSettingsScreen({ navigation }: any) {
     // Confirmed design: all-or-nothing wipe only, with a two-step confirmation.
     Alert.alert(
       'Delete all data?',
-      'This permanently removes every item you have tracked. This cannot be undone.',
+      'This permanently removes every item you have tracked, including cover photos. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -77,62 +97,35 @@ export default function DataSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader title="Data" onBack={() => navigation.goBack()} backLabel="Settings" />
 
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets
+      <ScrollView contentContainerStyle={styles.content}>
+        <TouchableOpacity
+          onPress={handleExport}
+          style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View>
-              <TouchableOpacity
-                onPress={handleExport}
-                style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-              >
-                <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Export data</AppText>
-              </TouchableOpacity>
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Save Backup File</AppText>
+        </TouchableOpacity>
+        <AppText style={[styles.hint, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }]}>
+          One file with everything - your entries and their cover photos. Save it to Files, AirDrop it, or attach it
+          to an email.
+        </AppText>
 
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
-                Paste a Media Base backup below to import it
-              </AppText>
-              <TextInput
-                value={importText}
-                onChangeText={setImportText}
-                multiline
-                placeholder="Paste backup JSON here"
-                placeholderTextColor={theme.colors.textMuted}
-                style={[
-                  styles.input,
-                  {
-                    color: theme.colors.text,
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surface,
-                    fontFamily: FONT_FAMILY.body,
-                  },
-                ]}
-              />
-              <TouchableOpacity
-                onPress={handleImport}
-                disabled={!importText.trim()}
-                style={[
-                  styles.button,
-                  { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, opacity: importText.trim() ? 1 : 0.5 },
-                ]}
-              >
-                <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Import data</AppText>
-              </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleImport}
+          style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, marginTop: 24 }]}
+        >
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Choose Backup File</AppText>
+        </TouchableOpacity>
+        <AppText style={[styles.hint, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }]}>
+          Restores a Media Base backup file - overwrites anything currently in the app with what's in that file.
+        </AppText>
 
-              <TouchableOpacity
-                onPress={handleDelete}
-                style={[styles.button, styles.dangerButton, { borderColor: theme.colors.danger }]}
-              >
-                <AppText style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</AppText>
-              </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <TouchableOpacity
+          onPress={handleDelete}
+          style={[styles.button, styles.dangerButton, { borderColor: theme.colors.danger }]}
+        >
+          <AppText style={{ color: theme.colors.danger, fontSize: 16 * theme.fontScale }}>Delete all data</AppText>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -140,8 +133,7 @@ export default function DataSettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: 20, paddingTop: 8 },
-  label: { marginTop: 20, marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, minHeight: 100, textAlignVertical: 'top' },
-  button: { borderWidth: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  dangerButton: { marginTop: 32, backgroundColor: 'transparent' },
+  hint: { marginTop: 8, marginHorizontal: 4 },
+  button: { borderWidth: 1, borderRadius: 8, paddingVertical: 14, alignItems: 'center' },
+  dangerButton: { marginTop: 40, backgroundColor: 'transparent' },
 });
