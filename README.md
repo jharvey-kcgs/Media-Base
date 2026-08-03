@@ -74,14 +74,18 @@ exactly what's needed and where to get it), or its UPC/barcode and
 title-search auto-fill won't return anything (manual entry always works
 regardless).
 
-**TV Shows is in progress** - the data layer (`types/models.ts`'s
-`TVShow`, full CRUD in `lib/storage.ts` including backup/cover wiring,
-and `lib/tvLookup.ts`'s TMDb TV search) is built, and the Home widget is
-now wired up and reachable (count + daily-pick suggestion, same as every
-other category), but `screens/TVScreen.tsx` itself is still just a
-shell - header, back button, and the ••• menu structure, with no list
-rendering, search, A-Z index, or Add/Edit form yet. Tapping into it
-today shows a placeholder, not a working screen.
+**TV Shows is functionally complete except Where to Watch** - list,
+search, genre filter, A-Z index, hold-to-select, and full Add/Edit
+(title search, cover photos with the cancel-safe staging fix built in
+from day one this time) are all working, same as Books/Comics/Movies.
+The one piece not built yet is the "Where to Watch" button itself
+(`lib/tvLookup.ts`'s `tmdbWatchUrl()` already exists and every entry
+added through title search already stores its `tmdbId`, so that step
+doesn't need to backfill anything once it's built). TV Shows is
+structurally simpler than Movies in one real way: no camera/scanner at
+all, since it has no barcode/number entry of any kind - title search is
+the *only* entry-assist method, so it leads the form directly rather
+than being demoted below a scan option.
 
 ---
 
@@ -215,6 +219,24 @@ screens/
                                      only genres currently in use, unlike
                                      Books/Comics - a deliberate
                                      difference, not an oversight.
+  TVScreen.tsx                      TV Shows (widget 4 - working, except
+                                     the Where to Watch button - see
+                                     lib/tvLookup.ts). Structurally
+                                     simpler than every other category
+                                     screen: no camera/scanner at all, no
+                                     number-entry field, no author field -
+                                     title search (lib/titleSearch.ts's
+                                     searchTVShowsByTitle()) is the only
+                                     entry-assist method that exists for
+                                     this category, so it leads the
+                                     Add/Edit form directly rather than
+                                     being demoted below a scan option
+                                     the way Movies' UPC entry is. Genre
+                                     filter shows TMDb's own fixed TV
+                                     genre list (lib/tvLookup.ts's
+                                     TMDB_TV_GENRE_NAMES) - a genuinely
+                                     different 16-genre set from Movies',
+                                     not the same list reused.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
