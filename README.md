@@ -855,6 +855,22 @@ into it differs), and only duplicate what's genuinely category-specific
   since it isn't alphabetical either. The star count is already visible
   on every row regardless of sort (`Read · 4★`), so no card changes were
   needed to make this sort useful to look at.
+- **Tap an author's name to filter to just their books (Books/Comics
+  only - Movies has no author field)**: deliberately *not* a new
+  `•••` menu item, per explicit request to avoid growing that menu
+  further - the author name in each card is its own nested
+  `TouchableOpacity`, disabled during selection mode so a tap there
+  just toggles selection like everywhere else on the card. Mirrors
+  genre's existing filter chip exactly (shown next to "Sorted by X",
+  clears with a tap), and the two filters clear each other rather than
+  combining - tapping an author clears any active genre filter, and
+  picking an actual genre from "Filter by genre..." clears any active
+  author filter - so a stray tap from one origin can't leave you in a
+  confusing combined-filter state you didn't intend. The author/genre
+  text line, previously one combined string, is now a `View` row with
+  the author as its own tappable segment (styled in the accent color to
+  look tappable) followed by a genre `AppText` that starts with the
+  separator only when an author is actually present.
 - **Real barcode scanning (Books specifically)**: "📷 Scan barcode
   instead" switches the Add/Edit Book modal's content over to a
   full-screen `expo-camera` `CameraView` restricted to `ean13` codes -

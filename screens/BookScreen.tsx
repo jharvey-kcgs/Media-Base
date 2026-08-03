@@ -178,12 +178,14 @@ const BookCard = React.memo(function BookCard({
   selected,
   selectionMode,
   onPress,
+  onAuthorPress,
   onLayout,
 }: {
   book: Book;
   selected: boolean;
   selectionMode: boolean;
   onPress: (book: Book) => void;
+  onAuthorPress: (author: string) => void;
   onLayout?: (e: any) => void;
 }) {
   const { theme } = useTheme();
@@ -216,14 +218,31 @@ const BookCard = React.memo(function BookCard({
           >
             {book.title}
           </AppText>
-          <AppText
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}
-          >
-            {book.author} · {book.genres.slice(0, 2).join(', ')}
-            {book.genres.length > 2 ? ` +${book.genres.length - 2}` : ''}
-          </AppText>
+          <View style={styles.authorGenreRow}>
+            {book.author ? (
+              <TouchableOpacity
+                disabled={selectionMode}
+                onPress={() => onAuthorPress(book.author)}
+                hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
+              >
+                <AppText
+                  numberOfLines={1}
+                  style={{ color: selectionMode ? theme.colors.textSecondary : theme.colors.accentReadable, fontSize: 13 * theme.fontScale }}
+                >
+                  {book.author}
+                </AppText>
+              </TouchableOpacity>
+            ) : null}
+            <AppText
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, flexShrink: 1 }}
+            >
+              {book.author ? ' · ' : ''}
+              {book.genres.slice(0, 2).join(', ')}
+              {book.genres.length > 2 ? ` +${book.genres.length - 2}` : ''}
+            </AppText>
+          </View>
           <AppText
             numberOfLines={1}
             style={{ color: book.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}
@@ -262,6 +281,7 @@ export default function BookScreen({ navigation }: any) {
   const [books, setBooks] = useState<Book[]>([]);
   const [sortField, setSortField] = useState<BookSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -300,12 +320,15 @@ export default function BookScreen({ navigation }: any) {
     let result = genreFilter
       ? books.filter((b) => b.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase()))
       : books;
+    if (authorFilter) {
+      result = result.filter((b) => b.author.toLowerCase() === authorFilter.toLowerCase());
+    }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       result = result.filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
     }
     return result;
-  }, [books, genreFilter, searchQuery]);
+  }, [books, genreFilter, authorFilter, searchQuery]);
 
   const sorted = useMemo(() => sortBooks(filteredBooks, sortField), [filteredBooks, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
@@ -459,7 +482,13 @@ export default function BookScreen({ navigation }: any) {
     }
     const buttons: AlertButton[] = [
       { text: 'All genres', onPress: () => setGenreFilter(null) },
-      ...allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })),
+      ...allGenres.map((g) => ({
+        text: g,
+        onPress: () => {
+          setAuthorFilter(null);
+          setGenreFilter(g);
+        },
+      })),
       { text: 'Cancel', style: 'cancel' },
     ];
     Alert.alert('Filter by genre', 'A book shows up if it has this genre among its tags.', buttons);
@@ -704,6 +733,17 @@ export default function BookScreen({ navigation }: any) {
     [selectionMode],
   );
 
+  // Narrows the list to one author, same as tapping a genre chip does for
+  // genre - not a new menu item, deliberately, per explicit request to
+  // avoid growing the ••• menu further. Clears the existing genre filter:
+  // combining "this genre" with "this author" from two different taps
+  // would be confusing to land on unintentionally, so a fresh author tap
+  // starts a clean, single-author view instead.
+  const handleAuthorPress = useCallback((author: string) => {
+    setGenreFilter(null);
+    setAuthorFilter(author);
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: Book }) => (
       <BookCard
@@ -711,10 +751,11 @@ export default function BookScreen({ navigation }: any) {
         selected={selectedIds.has(item.id)}
         selectionMode={selectionMode}
         onPress={handleCardPress}
+        onAuthorPress={handleAuthorPress}
         onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
       />
     ),
-    [selectedIds, selectionMode, handleCardPress, recordRowHeight],
+    [selectedIds, selectionMode, handleCardPress, handleAuthorPress, recordRowHeight],
   );
 
   // Stable for the same reason renderItem is: SectionList keeps the current
@@ -744,9 +785,11 @@ export default function BookScreen({ navigation }: any) {
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
       {searchQuery.trim()
         ? `No books match "${searchQuery.trim()}".`
-        : genreFilter
-          ? `No books tagged "${genreFilter}" yet.`
-          : 'No books yet. Tap ••• to add your first one.'}
+        : authorFilter
+          ? `No books by "${authorFilter}" yet.`
+          : genreFilter
+            ? `No books tagged "${genreFilter}" yet.`
+            : 'No books yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -793,6 +836,13 @@ export default function BookScreen({ navigation }: any) {
           <TouchableOpacity onPress={() => setGenreFilter(null)}>
             <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale, marginLeft: 8 }}>
               · Genre: {genreFilter} ✕
+            </AppText>
+          </TouchableOpacity>
+        )}
+        {authorFilter && (
+          <TouchableOpacity onPress={() => setAuthorFilter(null)}>
+            <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale, marginLeft: 8 }}>
+              · Author: {authorFilter} ✕
             </AppText>
           </TouchableOpacity>
         )}
@@ -1055,6 +1105,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
   cardSelected: { borderWidth: 2 },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  authorGenreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   cardCheckbox: { marginRight: 10, marginTop: 2 },
   azBar: {
     position: 'absolute',

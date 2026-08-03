@@ -153,12 +153,14 @@ const ComicCard = React.memo(function ComicCard({
   selected,
   selectionMode,
   onPress,
+  onAuthorPress,
   onLayout,
 }: {
   comic: Comic;
   selected: boolean;
   selectionMode: boolean;
   onPress: (comic: Comic) => void;
+  onAuthorPress: (author: string) => void;
   onLayout?: (e: any) => void;
 }) {
   const { theme } = useTheme();
@@ -191,14 +193,31 @@ const ComicCard = React.memo(function ComicCard({
           >
             {comic.title}
           </AppText>
-          <AppText
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 2 }}
-          >
-            {comic.author} · {comic.genres.slice(0, 2).join(', ')}
-            {comic.genres.length > 2 ? ` +${comic.genres.length - 2}` : ''}
-          </AppText>
+          <View style={styles.authorGenreRow}>
+            {comic.author ? (
+              <TouchableOpacity
+                disabled={selectionMode}
+                onPress={() => onAuthorPress(comic.author)}
+                hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
+              >
+                <AppText
+                  numberOfLines={1}
+                  style={{ color: selectionMode ? theme.colors.textSecondary : theme.colors.accentReadable, fontSize: 13 * theme.fontScale }}
+                >
+                  {comic.author}
+                </AppText>
+              </TouchableOpacity>
+            ) : null}
+            <AppText
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, flexShrink: 1 }}
+            >
+              {comic.author ? ' · ' : ''}
+              {comic.genres.slice(0, 2).join(', ')}
+              {comic.genres.length > 2 ? ` +${comic.genres.length - 2}` : ''}
+            </AppText>
+          </View>
           <AppText
             numberOfLines={1}
             style={{ color: comic.read ? theme.colors.success : theme.colors.textMuted, fontSize: 13 * theme.fontScale, marginTop: 4 }}
@@ -237,6 +256,7 @@ export default function ComicScreen({ navigation }: any) {
   const [comics, setComics] = useState<Comic[]>([]);
   const [sortField, setSortField] = useState<ComicSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -271,12 +291,15 @@ export default function ComicScreen({ navigation }: any) {
     let result = genreFilter
       ? comics.filter((c) => c.genres.some((g) => g.toLowerCase() === genreFilter.toLowerCase()))
       : comics;
+    if (authorFilter) {
+      result = result.filter((c) => c.author.toLowerCase() === authorFilter.toLowerCase());
+    }
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       result = result.filter((c) => c.title.toLowerCase().includes(q) || c.author.toLowerCase().includes(q));
     }
     return result;
-  }, [comics, genreFilter, searchQuery]);
+  }, [comics, genreFilter, authorFilter, searchQuery]);
 
   const sorted = useMemo(() => sortComics(filteredComics, sortField), [filteredComics, sortField]);
   const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
@@ -432,7 +455,13 @@ export default function ComicScreen({ navigation }: any) {
     }
     const buttons: AlertButton[] = [
       { text: 'All genres', onPress: () => setGenreFilter(null) },
-      ...allGenres.map((g) => ({ text: g, onPress: () => setGenreFilter(g) })),
+      ...allGenres.map((g) => ({
+        text: g,
+        onPress: () => {
+          setAuthorFilter(null);
+          setGenreFilter(g);
+        },
+      })),
       { text: 'Cancel', style: 'cancel' },
     ];
     Alert.alert('Filter by genre', 'An entry shows up if it has this genre among its tags.', buttons);
@@ -643,6 +672,11 @@ export default function ComicScreen({ navigation }: any) {
     [selectionMode],
   );
 
+  const handleAuthorPress = useCallback((author: string) => {
+    setGenreFilter(null);
+    setAuthorFilter(author);
+  }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: Comic }) => (
       <ComicCard
@@ -650,10 +684,11 @@ export default function ComicScreen({ navigation }: any) {
         selected={selectedIds.has(item.id)}
         selectionMode={selectionMode}
         onPress={handleCardPress}
+        onAuthorPress={handleAuthorPress}
         onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
       />
     ),
-    [selectedIds, selectionMode, handleCardPress, recordRowHeight],
+    [selectedIds, selectionMode, handleCardPress, handleAuthorPress, recordRowHeight],
   );
 
   const renderSectionHeader = useCallback(
@@ -674,9 +709,11 @@ export default function ComicScreen({ navigation }: any) {
     <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale, padding: 20 }}>
       {searchQuery.trim()
         ? `No comics or manga match "${searchQuery.trim()}".`
-        : genreFilter
-          ? `No entries tagged "${genreFilter}" yet.`
-          : 'No comics or manga yet. Tap ••• to add your first one.'}
+        : authorFilter
+          ? `No entries by "${authorFilter}" yet.`
+          : genreFilter
+            ? `No entries tagged "${genreFilter}" yet.`
+            : 'No comics or manga yet. Tap ••• to add your first one.'}
     </AppText>
   );
 
@@ -723,6 +760,13 @@ export default function ComicScreen({ navigation }: any) {
           <TouchableOpacity onPress={() => setGenreFilter(null)}>
             <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale, marginLeft: 8 }}>
               · Genre: {genreFilter} ✕
+            </AppText>
+          </TouchableOpacity>
+        )}
+        {authorFilter && (
+          <TouchableOpacity onPress={() => setAuthorFilter(null)}>
+            <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale, marginLeft: 8 }}>
+              · Author: {authorFilter} ✕
             </AppText>
           </TouchableOpacity>
         )}
@@ -976,6 +1020,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
   cardSelected: { borderWidth: 2 },
   cardRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  authorGenreRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   cardCheckbox: { marginRight: 10, marginTop: 2 },
   azBar: {
     position: 'absolute',
