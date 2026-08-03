@@ -14,7 +14,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Finding & adding entries',
-    body: "Each category screen (Books, Comics/Manga, Movies) lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. Adding an entry supports typing everything by hand, scanning a barcode, entering the ISBN/UPC directly, or searching by title and picking the right result - whichever you use, you get a chance to review and edit every field before saving, and the same title can't be added twice.",
+    body: "Each category screen (Books, Comics/Manga, Movies) lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. On Books and Comics/Manga, tapping an author's name (shown in the accent color) narrows the list to just their books - tap the ✕ next to \"Sorted by...\" to clear it. Adding an entry supports typing everything by hand, scanning a barcode, entering the ISBN/UPC directly, or searching by title and picking the right result - whichever you use, you get a chance to review and edit every field before saving, and the same title can't be added twice.",
   },
   {
     title: 'Cover photos',

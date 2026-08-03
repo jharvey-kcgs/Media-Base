@@ -29,6 +29,10 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes - press and hold any entry to switch into a selection mode with that entry already checked, tap any others you want to remove, then Delete.',
   },
   {
+    q: 'Can I see everything by one author?',
+    a: "Yes - on Books and Comics/Manga, tap an author's name on any entry (shown in the accent color) to narrow the list to just their books. Tap the ✕ next to \"Sorted by...\" to clear it.",
+  },
+  {
     q: 'Can a Comic/Manga end up under Books, or a Book under Comics/Manga?',
     a: "No - they're stored completely separately, so nothing added under one screen can ever show up in the other. If you scan or enter an ISBN that's clearly classified as the wrong type, the app won't auto-fill it and tells you which screen to use instead.",
   },
