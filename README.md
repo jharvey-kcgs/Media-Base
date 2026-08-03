@@ -74,18 +74,17 @@ exactly what's needed and where to get it), or its UPC/barcode and
 title-search auto-fill won't return anything (manual entry always works
 regardless).
 
-**TV Shows is functionally complete except Where to Watch** - list,
-search, genre filter, A-Z index, hold-to-select, and full Add/Edit
-(title search, cover photos with the cancel-safe staging fix built in
-from day one this time) are all working, same as Books/Comics/Movies.
-The one piece not built yet is the "Where to Watch" button itself
-(`lib/tvLookup.ts`'s `tmdbWatchUrl()` already exists and every entry
-added through title search already stores its `tmdbId`, so that step
-doesn't need to backfill anything once it's built). TV Shows is
-structurally simpler than Movies in one real way: no camera/scanner at
-all, since it has no barcode/number entry of any kind - title search is
-the *only* entry-assist method, so it leads the form directly rather
-than being demoted below a scan option.
+**TV Shows is fully working** - list, search, genre filter, A-Z index,
+hold-to-select, full Add/Edit (title search, cover photos with the
+cancel-safe staging fix built in from day one this time), and "Where to
+Watch" are all working, same as Books/Comics/Movies. Structurally
+simpler than Movies in one real way: no camera/scanner at all, since it
+has no barcode/number entry of any kind - title search is the *only*
+entry-assist method, so it leads the form directly rather than being
+demoted below a scan option. "Where to Watch" only shows on an entry
+added through title search (needs a stored `tmdbId` to link to anything
+- see `lib/tvLookup.ts`'s `tmdbWatchUrl()`) - not shown at all for an
+entry typed in by hand, a graceful hide rather than a disabled button.
 
 ---
 
@@ -219,11 +218,10 @@ screens/
                                      only genres currently in use, unlike
                                      Books/Comics - a deliberate
                                      difference, not an oversight.
-  TVScreen.tsx                      TV Shows (widget 4 - working, except
-                                     the Where to Watch button - see
-                                     lib/tvLookup.ts). Structurally
-                                     simpler than every other category
-                                     screen: no camera/scanner at all, no
+  TVScreen.tsx                      TV Shows (widget 4 - fully working).
+                                     Structurally simpler than every
+                                     other category screen: no
+                                     camera/scanner at all, no
                                      number-entry field, no author field -
                                      title search (lib/titleSearch.ts's
                                      searchTVShowsByTitle()) is the only
@@ -236,7 +234,23 @@ screens/
                                      genre list (lib/tvLookup.ts's
                                      TMDB_TV_GENRE_NAMES) - a genuinely
                                      different 16-genre set from Movies',
-                                     not the same list reused.
+                                     not the same list reused. "Where to
+                                     Watch" (lib/tvLookup.ts's
+                                     tmdbWatchUrl(), opened via
+                                     Linking.openURL) sits between Genre
+                                     and the Watched toggle deliberately -
+                                     splits the form into identity info
+                                     (Cover/Title/Genre), a quick external
+                                     action, then personal tracking
+                                     (Watched/Rating/Review), and stays
+                                     reachable without scrolling past
+                                     Rating/Review, which can grow tall
+                                     once Watched is on. Only rendered
+                                     when the entry has a stored tmdbId
+                                     (came from title search) - a
+                                     graceful hide, not a disabled
+                                     button, for anything typed in by
+                                     hand instead.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 

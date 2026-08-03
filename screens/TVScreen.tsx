@@ -26,6 +26,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -48,7 +49,7 @@ import {
   commitPendingCover,
   discardPendingCover,
 } from '../lib/coverStorage';
-import { TMDB_TV_GENRE_NAMES } from '../lib/tvLookup';
+import { TMDB_TV_GENRE_NAMES, tmdbWatchUrl } from '../lib/tvLookup';
 import { searchTVShowsByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
@@ -400,6 +401,20 @@ export default function TVScreen({ navigation }: any) {
     ]);
   };
 
+  // Opens TMDb's own watch page for this show - see lib/tvLookup.ts's
+  // tmdbWatchUrl() for why this links out rather than building a custom
+  // in-app provider list (the JustWatch attribution requirement that
+  // data carries). Only ever called when draft.tmdbId is set, since the
+  // button itself doesn't render otherwise - nothing to link to for an
+  // entry typed in by hand rather than found through title search.
+  const handleWhereToWatch = () => {
+    if (!draft.tmdbId) return;
+    Linking.openURL(tmdbWatchUrl(draft.tmdbId)).catch((err) => {
+      console.warn('Media Base: failed to open Where to Watch URL', err);
+      Alert.alert("Couldn't open that", 'Something went wrong opening the watch page - please try again.');
+    });
+  };
+
   const handleSave = async () => {
     const genres = draft.genresText
       .split(',')
@@ -661,6 +676,17 @@ export default function TVScreen({ navigation }: any) {
                 />
               </View>
 
+              {draft.tmdbId && (
+                <TouchableOpacity
+                  onPress={handleWhereToWatch}
+                  style={[styles.watchButton, { borderColor: theme.colors.accentReadable }]}
+                >
+                  <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>
+                    📺 Where to Watch
+                  </AppText>
+                </TouchableOpacity>
+              )}
+
               <View style={[styles.row, { marginTop: 8 }]}>
                 <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>
                   {REQUIRED_SWITCH_LABEL}
@@ -742,5 +768,6 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   starRow: { flexDirection: 'row', gap: 8 },
+  watchButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 14 },
   deleteButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 28 },
 });
