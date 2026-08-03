@@ -10,7 +10,7 @@ import { useTheme } from '../lib/theme';
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Do I have to scan a barcode to add something?',
-    a: 'No - scanning is always optional. Every entry form lets you type everything in by hand instead.',
+    a: "No - scanning is always optional on Books and Comics/Manga, and every entry form lets you type everything in by hand instead. Movies and TV Shows don't have a scan option at all - title search is the fast path there instead.",
   },
   {
     q: "Why isn't a category showing on my Home screen?",
@@ -38,7 +38,11 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Why didn't I get a cover photo when I added something?",
-    a: "Not every book, comic, or movie has a cover photo indexed anywhere online - same as genre, some entries just don't have one available, which isn't a bug. Tap the cover in Add/Edit to take a photo or choose one from your library instead.",
+    a: "Not every book, comic, movie, or TV show has a cover photo indexed anywhere online - same as genre, some entries just don't have one available, which isn't a bug. Tap the cover in Add/Edit to take a photo or choose one from your library instead.",
+  },
+  {
+    q: 'How do I find out where to watch a movie or show?',
+    a: 'On Movies and TV Shows, entries added through title search get a "Where to Watch" button in the Edit screen - tap it for current streaming, rental, and purchase options. An entry typed in entirely by hand won\'t have this button, since it needs to know exactly which title you mean.',
   },
   {
     q: 'Does my photo get saved anywhere else on my phone?',

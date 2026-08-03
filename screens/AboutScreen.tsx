@@ -14,11 +14,15 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Finding & adding entries',
-    body: "Each category screen (Books, Comics/Manga, Movies) lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. On Books and Comics/Manga, tapping an author's name (shown in the accent color) narrows the list to just their books - tap the ✕ next to \"Sorted by...\" to clear it. Adding an entry supports typing everything by hand, scanning a barcode, entering the ISBN/UPC directly, or searching by title and picking the right result - whichever you use, you get a chance to review and edit every field before saving, and the same title can't be added twice.",
+    body: "Each category screen (Books, Comics/Manga, Movies, TV Shows) lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. On Books and Comics/Manga, tapping an author's name (shown in the accent color) narrows the list to just their books - tap the ✕ next to \"Sorted by...\" to clear it. Books and Comics/Manga support typing everything by hand, scanning a barcode, entering the ISBN directly, or searching by title and picking the right result. Movies and TV Shows are title-search only - no scanning or number entry for either, since real testing showed a barcode-based lookup for movies was unreliable in practice, and title search was already the more reliable path. Whichever method you use, you get a chance to review and edit every field before saving, and the same title can't be added twice.",
   },
   {
     title: 'Cover photos',
     body: "Cover photos fill in automatically wherever one's available, whichever way you add an entry. Tap an item's cover in Add/Edit to take a new photo, choose one from your library, or remove it - your own photo is never added to your device's Photos app, it stays inside Media Base only.",
+  },
+  {
+    title: 'Where to Watch',
+    body: "On Movies and TV Shows, entries added through title search get a \"Where to Watch\" button in Edit - tap it to open a page showing which streaming services currently carry that title, plus rental/purchase pricing where available. This only shows up for entries found through title search, since it needs to know exactly which movie or show you mean - an entry typed in entirely by hand won't have this button.",
   },
   {
     title: 'Managing your list',
@@ -30,7 +34,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Permissions',
-    body: "Shows whether Camera and Photo Library access are currently granted, always kept in sync with your actual Phone Settings, and links straight there to change either. Camera is only used for the optional scan shortcut; Photo Library is only used when you choose \"Choose from Library\" for a cover photo - taking a new photo with the camera doesn't need it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
+    body: "Shows whether Camera and Photo Library access are currently granted, always kept in sync with your actual Phone Settings, and links straight there to change either. Camera is only used for the optional scan shortcut on Books and Comics/Manga - Movies and TV Shows don't use it at all. Photo Library is only used when you choose \"Choose from Library\" for a cover photo - taking a new photo with the camera doesn't need it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
   },
   {
     title: 'Credits',

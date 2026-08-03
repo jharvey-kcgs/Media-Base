@@ -63,28 +63,33 @@ explicit request, so the remaining order there is Puzzles → Music → TV
 Shows → Anime → Vinyl → Board Games. `lib/useAlphabetScroll.ts` (A-Z
 index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
 `components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
-search, local search, and cover photos) are shared across all three
-implemented categories; `lib/isbnLookup.ts` is shared between Books/
-Comics specifically, since Movies' UPC-based lookup
-(`lib/upcLookup.ts`) is a genuinely different shape - see the Category
-screen pattern section for what to reuse vs. rebuild per category.
-**Movies needs a one-time setup step Books/Comics never did**: a free
-TMDb credential in `lib/config.ts` (see that file's own comments for
-exactly what's needed and where to get it), or its UPC/barcode and
+search, local search, and cover photos) are shared across all four
+implemented categories; `lib/isbnLookup.ts` is Books/Comics-specific,
+since both use ISBN lookup directly - Movies and TV Shows are both
+TMDb-backed instead (`lib/movieLookup.ts`, `lib/tvLookup.ts`), and
+title-search-only, having no ISBN/barcode concept at all - see the
+Category screen pattern section for what to reuse vs. rebuild per
+category.
+**Movies and TV Shows need a one-time setup step Books/Comics never
+did**: a free TMDb credential in `lib/config.ts` (see that file's own
+comments for exactly what's needed and where to get it), or their
 title-search auto-fill won't return anything (manual entry always works
 regardless).
 
-**TV Shows is fully working** - list, search, genre filter, A-Z index,
-hold-to-select, full Add/Edit (title search, cover photos with the
-cancel-safe staging fix built in from day one this time), and "Where to
-Watch" are all working, same as Books/Comics/Movies. Structurally
-simpler than Movies in one real way: no camera/scanner at all, since it
-has no barcode/number entry of any kind - title search is the *only*
-entry-assist method, so it leads the form directly rather than being
-demoted below a scan option. "Where to Watch" only shows on an entry
-added through title search (needs a stored `tmdbId` to link to anything
-- see `lib/tvLookup.ts`'s `tmdbWatchUrl()`) - not shown at all for an
-entry typed in by hand, a graceful hide rather than a disabled button.
+**All four implemented categories are fully working** - Books,
+Comics/Manga, Movies, and TV Shows all have working list/search/genre
+filter/A-Z index/hold-to-select and full Add/Edit. Movies and TV Shows
+are structural twins: both TMDb-backed, both title-search-only (no
+camera/scanner, no barcode/number entry of any kind - confirmed design,
+not a gap), both with a "Where to Watch" button that opens TMDb's own
+watch page. That button only shows on an entry added through title
+search (needs a stored `tmdbId` to link to anything) - not shown at all
+for an entry typed in by hand, a graceful hide rather than a disabled
+button. Movies didn't start this way - it originally had UPC/barcode
+scanning like Books/Comics, removed later after real testing confirmed
+that multi-hop lookup chain was unreliable in practice, with Title
+Search already being the reliable path being used - see
+`lib/movieLookup.ts`'s header comment for the full story.
 
 ---
 
@@ -205,31 +210,48 @@ screens/
                                      with its own genre allowlist that
                                      adds manga demographic labels
                                      (Shonen/Shoujo/Seinen/Josei)
-  MovieScreen.tsx                  Movies (widget 3 - working), built
-                                     out of the original planned order -
-                                     shares lib/useAlphabetScroll.ts but
-                                     NOT lib/isbnLookup.ts, since Movies'
-                                     UPC-based lookup (lib/upcLookup.ts)
-                                     is a genuinely different two-step
-                                     shape. No author/director field -
-                                     not part of the requested spec.
-                                     Genre filter shows TMDb's full fixed
-                                     19-genre list directly rather than
-                                     only genres currently in use, unlike
-                                     Books/Comics - a deliberate
-                                     difference, not an oversight.
+  MovieScreen.tsx                  Movies (widget 3 - fully working).
+                                     Originally built with UPC/barcode
+                                     scanning like Books/Comics
+                                     (lib/upcLookup.ts, a genuinely
+                                     different two-step shape from
+                                     lib/isbnLookup.ts) - removed later,
+                                     after real testing confirmed that
+                                     multi-hop lookup chain was unreliable
+                                     in practice, with Title Search
+                                     already being the reliable path being
+                                     used. Rebuilt to match TVScreen.tsx's
+                                     structure exactly: no camera/scanner
+                                     at all, no number-entry field, title
+                                     search (lib/titleSearch.ts's
+                                     searchMoviesByTitle(), via
+                                     lib/movieLookup.ts) is the only
+                                     entry-assist method. No author/
+                                     director field either - not part of
+                                     the requested spec. Genre filter
+                                     shows TMDb's full fixed 19-genre list
+                                     directly rather than only genres
+                                     currently in use, unlike Books/Comics
+                                     - a deliberate difference, not an
+                                     oversight. "Where to Watch"
+                                     (lib/movieLookup.ts's
+                                     tmdbMovieWatchUrl()) sits between
+                                     Genre and the Watched toggle, same
+                                     placement and reasoning as
+                                     TVScreen.tsx below - only shows on an
+                                     entry with a stored tmdbId (came from
+                                     title search), a graceful hide rather
+                                     than a disabled button for anything
+                                     typed in by hand.
   TVScreen.tsx                      TV Shows (widget 4 - fully working).
-                                     Structurally simpler than every
-                                     other category screen: no
-                                     camera/scanner at all, no
-                                     number-entry field, no author field -
-                                     title search (lib/titleSearch.ts's
+                                     Structurally simple in the same way
+                                     Movies later became: no camera/
+                                     scanner at all, no number-entry
+                                     field, no author field - title search
+                                     (lib/titleSearch.ts's
                                      searchTVShowsByTitle()) is the only
                                      entry-assist method that exists for
-                                     this category, so it leads the
-                                     Add/Edit form directly rather than
-                                     being demoted below a scan option
-                                     the way Movies' UPC entry is. Genre
+                                     this category. Genre
                                      filter shows TMDb's own fixed TV
                                      genre list (lib/tvLookup.ts's
                                      TMDB_TV_GENRE_NAMES) - a genuinely
@@ -406,8 +428,9 @@ lib/
                                      second copy needing every future fix
                                      applied twice. Each category still
                                      supplies its own genre allowlist.
-                                     NOT used by Movies - see
-                                     upcLookup.ts below. Also captures a
+                                     NOT used by Movies or TV Shows - see
+                                     movieLookup.ts/tvLookup.ts below. Also
+                                     captures a
                                      coverUrl when available (Open
                                      Library's own edition cover data,
                                      Google Books' thumbnail, or a
@@ -418,11 +441,12 @@ lib/
                                      no extra lookup call needed.
   config.ts                         Git-ignored (this repo is public) -
                                      holds the real TMDB_READ_ACCESS_TOKEN.
-                                     Movies' UPC lookup needs this free
+                                     Movies' and TV Shows' title-search
+                                     auto-fill both need this free
                                      credential from themoviedb.org, since
                                      unlike Open Library/Google Books
                                      there's no keyless source for real
-                                     movie metadata. Specifically the
+                                     movie/TV metadata. Specifically the
                                      "API Read Access Token" (v4 auth, a
                                      long JWT-style string, used via a
                                      `Authorization: Bearer` header) -
@@ -439,7 +463,8 @@ lib/
                                      Access Token validates successfully
                                      before the API Key does, during the
                                      same account-side propagation
-                                     window. upcLookup.ts logs a clear
+                                     window. movieLookup.ts/tvLookup.ts
+                                     both log a clear
                                      console warning (not a silent
                                      failure) if a lookup is attempted
                                      before this is filled in.
@@ -447,58 +472,47 @@ lib/
                                      stays in the public repo. Copy this
                                      to config.ts and paste your own
                                      token in for a fresh clone.
-  upcLookup.ts                      Movies' entry-assist pipeline, in two
-                                     steps: UPC -> a rough retail product
-                                     title via UPCitemdb's free, keyless
-                                     trial endpoint (100/day), then that
-                                     cleaned-up title -> real movie
-                                     metadata (title, genres, release
-                                     year) via TMDb's search endpoint
-                                     (needs the key above). Also exports
-                                     TMDB_GENRE_NAMES - TMDb's own fixed,
-                                     official 19-genre list, verified
-                                     directly against their live API
-                                     response rather than guessed. Unlike
-                                     Books/Comics' normalizeGenres(),
-                                     there's no free-text allowlist
-                                     matching needed here at all - TMDb's
-                                     genre_ids already map to this exact
-                                     clean list with nothing to filter
-                                     out. **Confirmed working on-device**
-                                     for the UPCitemdb half specifically -
-                                     two real UPCs both correctly resolved
-                                     to their raw retail titles (the TMDb
-                                     half still needs a key added to be
-                                     tested). The title-cleaning regex
-                                     (stripping "[Blu-ray]", "(DVD)", etc.
-                                     from retail titles before searching
-                                     TMDb) is still a first pass based on
-                                     common disc-packaging conventions,
-                                     not fully verified beyond those two
-                                     examples - every successful lookup
-                                     logs the raw title via console.warn
-                                     specifically to make that easy to
-                                     check/tune further. Also exports
-                                     `looksLikeIsbn()` - a real, hard rule
-                                     (not a guess): ISBNs are structurally
-                                     just EAN-13 barcodes in the reserved
-                                     978/979 prefix range. Some movie sets
-                                     bundle a book/booklet and print BOTH
-                                     that item's own UPC and the bundled
-                                     book's ISBN on the case - scanning or
-                                     typing the ISBN by mistake would look
-                                     up the bundled book instead of the
-                                     movie. `MovieScreen.tsx` checks for
-                                     this on both the scan path and manual
-                                     entry and explains what happened
-                                     rather than silently returning the
-                                     wrong item. Exported from
-                                     `lib/upcLookup.ts` (not kept
-                                     Movies-specific) since any future
-                                     UPC-based category - Vinyl, Board
-                                     Games - could hit the same ambiguity.
+  movieLookup.ts                    Movies' TMDb integration - renamed
+                                     from upcLookup.ts after Movies
+                                     dropped barcode/UPC scanning
+                                     entirely. Real testing confirmed the
+                                     old UPC pipeline (UPC -> a rough
+                                     retail title via UPCitemdb -> a
+                                     title-cleaning regex -> a TMDb
+                                     search) was unreliable in practice -
+                                     always the structurally weaker path
+                                     here, since it was three hops deep
+                                     versus Books/Comics' direct ISBN
+                                     lookup or TV Shows' direct title
+                                     search. Title Search was already the
+                                     reliable path being used, so it's
+                                     now the only entry-assist method,
+                                     matching TV Shows exactly. Kept what
+                                     was still needed - TMDB_GENRE_NAMES
+                                     (TMDb's own fixed, official 19-genre
+                                     list, verified directly against
+                                     their live API response),
+                                     tmdbSearchMovies() (reused by
+                                     lib/titleSearch.ts's
+                                     searchMoviesByTitle()), and
+                                     looksLikeIsbn() (not Movies-specific
+                                     logic, kept for any future UPC-based
+                                     category - Vinyl, Board Games - that
+                                     could hit the same bundled-print-
+                                     material ambiguity). Removed the
+                                     UPCitemdb lookup and title-cleaning
+                                     regex as genuinely dead code rather
+                                     than leaving them unused. Added
+                                     tmdbMovieWatchUrl(), mirroring
+                                     lib/tvLookup.ts's tmdbWatchUrl()
+                                     exactly, for the new "Where to
+                                     Watch" button - links to TMDb's own
+                                     watch page rather than a custom
+                                     in-app provider list, same
+                                     JustWatch-attribution reasoning as
+                                     TV Shows below.
   tvLookup.ts                       TV Shows' TMDb integration - a
-                                     separate file from upcLookup.ts
+                                     separate file from movieLookup.ts
                                      despite both using TMDb, since TV has
                                      its own official genre taxonomy
                                      (confirmed via TMDb's live API - no
@@ -511,8 +525,15 @@ lib/
                                      of `release_date`). No number-entry
                                      pipeline at all - confirmed design,
                                      title search is TV Shows' only
-                                     assisted entry method, so this file
-                                     is simpler than upcLookup.ts: just
+                                     assisted entry method, and Movies
+                                     later became the same way once its
+                                     own barcode/UPC entry was removed -
+                                     the two are structural twins in this
+                                     specific respect now, though this
+                                     file stayed separate regardless,
+                                     since the genre/field-name
+                                     differences above are real and
+                                     unrelated to that later change. Just
                                      tmdbSearchTVShows() (reused directly
                                      by lib/titleSearch.ts's
                                      searchTVShowsByTitle(), same split as
@@ -591,23 +612,22 @@ lib/
                                      resilience pattern isbnLookup.ts
                                      already uses for ISBN lookup, now
                                      applied here too. Movies reuses
-                                     upcLookup.ts's tmdbSearchMovies()
-                                     directly (the same TMDb search its
-                                     UPC pipeline already calls) - but
-                                     Movies results never carry a UPC at
-                                     all: a UPC identifies a specific
-                                     physical disc/release, not "the
-                                     movie" as a concept, so unlike
-                                     Books/Comics' ISBN there's no single
-                                     correct number to backfill from a
-                                     title match. Deliberate difference,
-                                     not a gap. Paired with
+                                     movieLookup.ts's tmdbSearchMovies()
+                                     directly, its only entry-assist
+                                     method now that barcode/UPC scanning
+                                     has been removed (confirmed
+                                     unreliable via real testing). TV
+                                     Shows reuses tvLookup.ts's
+                                     tmdbSearchTVShows() the same way -
+                                     neither category's results carry a
+                                     UPC or barcode field at all anymore.
+                                     Paired with
                                      `components/TitleSearchInput.tsx` -
                                      the shared debounced-search +
                                      dropdown UI, generic over the result
                                      type so each screen plugs in its own
                                      search function/result shape rather
-                                     than three separate copies of the
+                                     than four separate copies of the
                                      debounce/dropdown logic itself.
   useAlphabetScroll.ts              The A-Z index jump hook, also
                                      extracted out of BookScreen.tsx -
@@ -876,40 +896,44 @@ assets/
 ### Category screen pattern (applies to every future category, not just Books)
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
-building the remaining categories (TV Shows, Puzzles, etc.) -
-`screens/ComicScreen.tsx` and `screens/MovieScreen.tsx` are two real
-examples of that copy already done, showing two different degrees of
-reuse:
+building the remaining categories (Puzzles, etc.) -
+`screens/ComicScreen.tsx`, `screens/MovieScreen.tsx`, and
+`screens/TVScreen.tsx` are three real examples of that copy already
+done, showing genuinely different degrees of reuse:
 - **Comics/Manga** is the closest copy - same shape entirely (multi-genre,
   ISBN lookup/scan, a read switch), built on the same two shared modules
   (`lib/isbnLookup.ts`, `lib/useAlphabetScroll.ts`), with only the genre
   allowlist and wording actually differing.
-- **Movies** shares `lib/useAlphabetScroll.ts` but deliberately does
-  *not* share `lib/isbnLookup.ts` - movies aren't catalogued with ISBNs,
-  so the entry-assist pipeline is a genuinely different two-step shape
-  (`lib/upcLookup.ts`: UPC → rough retail title via UPCitemdb → real
-  movie metadata via TMDb), and TMDb needs a free Read Access Token
-  (`lib/config.ts`) that the ISBN path never did. MovieScreen also drops
-  the author/director field entirely (not part of the requested spec)
-  and its genre filter shows TMDb's full fixed 19-genre list directly
-  rather than only genres currently in use - a deliberate difference
-  from Books/Comics' dynamic list, not an oversight.
-- **Every category screen offers three entry methods, in a deliberately
-  different order per category**: scan, number-entry (ISBN/UPC), and
-  title search (`lib/titleSearch.ts` + `components/TitleSearchInput.tsx`
-  - type a title, get real candidates back, tap one to fill in every
-  field it has). Books/Comics lead with scan since it's genuinely
-  reliable there (ISBN uniquely identifies a specific edition); Movies
-  leads with title search instead, with scan/UPC entry demoted to a
-  secondary "Have the disc?" section below it - UPC lookup there is a
-  weaker chain (UPC → messy retail title → TMDb search, vs. ISBN going
-  straight to a real record), so the more reliable path is the default.
-  One real structural difference to know before copying this into a
-  future UPC-based category (Vinyl, Board Games): Movies' title search
-  never backfills UPC, only title + genre - a UPC identifies a specific
-  physical disc/release, not "the movie" as a concept, so there's no
-  single correct number to derive from a title match the way there is
-  for Books/Comics' ISBN.
+- **Movies and TV Shows** share `lib/useAlphabetScroll.ts` but don't
+  share `lib/isbnLookup.ts` at all - both are TMDb-backed
+  (`lib/movieLookup.ts`, `lib/tvLookup.ts`) rather than ISBN-catalogued,
+  and TMDb needs a free Read Access Token (`lib/config.ts`) that the
+  ISBN path never did. Neither has an author/director field (not part of
+  the requested spec for either), and both genre filters show TMDb's own
+  full fixed genre list directly rather than only genres currently in
+  use - a deliberate difference from Books/Comics' dynamic list, not an
+  oversight. **Neither has a scan or number-entry method at all** - title
+  search is the only entry-assist method for both, confirmed design for
+  TV Shows from the start, and true for Movies too after its original
+  UPC/barcode scanning was removed once real testing showed that
+  multi-hop lookup chain (UPC → messy retail title via UPCitemdb → TMDb
+  search) was unreliable in practice, with Title Search already being
+  the reliable path being used. Movies and TV Shows are structural twins
+  now in every way that matters here - same entry-assist shape, same
+  "Where to Watch" button (`tmdbMovieWatchUrl()` / `tmdbWatchUrl()`,
+  same placement between Genre and the Watched toggle, same graceful-hide
+  behavior when an entry has no stored `tmdbId`) - genuinely different
+  only in their genre taxonomies and a couple of TMDb field names
+  (`name`/`first_air_date` vs `title`/`release_date`).
+- **Books/Comics still offer three entry methods** - scan, number-entry
+  (ISBN), and title search (`lib/titleSearch.ts` +
+  `components/TitleSearchInput.tsx` - type a title, get real candidates
+  back, tap one to fill in every field it has) - leading with scan since
+  it's genuinely reliable there (ISBN uniquely identifies a specific
+  edition). **Movies and TV Shows only ever offer title search** - not a
+  reduced/fallback version of the three-method pattern, a deliberate,
+  confirmed-correct design for a category with no reliable
+  number-lookup path to begin with.
 
 A future category screen should follow this same split: reuse
 `lib/useAlphabetScroll.ts` unconditionally (any category with an A-Z
@@ -1433,11 +1457,12 @@ those apps make, not something the camera API requires.
 **Auto-fetch reuses data already being fetched - no new API calls.**
 Open Library's own book records already include cover URLs directly;
 Google Books' search results already include a thumbnail link; TMDb's
-search results already include a poster path. All three lookup
-libraries (`isbnLookup.ts`, `upcLookup.ts`, `titleSearch.ts`) now
-capture this as `coverUrl` on their existing result types, so every
-entry method - scan, ISBN/UPC entry, and title search - gets auto-fetch
-for free, with zero extra network requests. The one place this genuinely
+search results already include a poster path. All four lookup
+libraries (`isbnLookup.ts`, `movieLookup.ts`, `tvLookup.ts`,
+`titleSearch.ts`) capture this as `coverUrl` on their existing result
+types, so every entry method - scan/ISBN entry on Books/Comics, title
+search everywhere - gets auto-fetch for free, with zero extra network
+requests. The one place this genuinely
 does cost an extra call is Books/Comics' ISBN-constructed fallback
 (`https://covers.openlibrary.org/b/isbn/{ISBN}-L.jpg?default=false`),
 tried only when neither primary source had its own cover data - cheap
@@ -1629,12 +1654,12 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
   `expo-document-picker`, see Section 6) - not yet device-tested in that
   new form specifically.
 - **Permissions**: camera status + Phone Settings link implemented.
-  Real barcode scanning is wired up for Books/Comics/Manga (EAN-13,
-  Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) and now
-  Movies too (UPC-A/UPC-E/EAN-13, via the genuinely different
-  `lib/upcLookup.ts` two-step pipeline - needs a free TMDb API key in
-  `lib/config.ts` to actually return results, unlike the ISBN path)
-  - see the Category screen pattern section above. Vinyl and Board Games
+  Real barcode scanning is wired up for Books/Comics/Manga only (EAN-13,
+  Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) - see
+  the Category screen pattern section above. Movies originally had its
+  own UPC/barcode scanning too, removed after real testing confirmed it
+  was unreliable; TV Shows never had it at all (confirmed design from
+  the start). Both are title-search only now. Vinyl and Board Games
   still need their own barcode-type/lookup wiring since their data
   sources differ again.
 - **Notifications**: daily 10am reminder confirmed working on-device,
@@ -1663,12 +1688,15 @@ a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Puzzles → Music → TV Shows → Anime → Vinyl → Board Games, in that
-  order (Books, Comics/Manga, and Movies are all done - Movies built out
-  of the original planned sequence per explicit request)
+- Puzzles → Music → Anime → Vinyl → Board Games, in that order (Books,
+  Comics/Manga, Movies, and TV Shows are all done - Movies and TV Shows
+  both built out of the original planned sequence per explicit request)
 - Real barcode scanning for Vinyl and Board Games (Books/Comics share
-  `lib/isbnLookup.ts`; Movies has its own `lib/upcLookup.ts` - see the
-  Category screen pattern section above for what each one reuses)
-- "Listen on Spotify" (Music) and "Where to Watch" popup (TV Shows,
-  Anime)
+  `lib/isbnLookup.ts` for this - Movies originally had its own
+  `lib/upcLookup.ts` too, removed after real testing confirmed it was
+  unreliable; Movies and TV Shows are both title-search only now - see
+  the Category screen pattern section above for what each category
+  actually reuses)
+- "Listen on Spotify" (Music) and a "Where to Watch"-style popup for
+  Anime, matching what Movies/TV Shows already have
 - Share sheet wiring (native OS share, per item)

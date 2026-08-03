@@ -45,8 +45,8 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 |---|---|---|---|
 | Books | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Open Library / Google Books API — reliable |
 | Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Same as Books — comics/manga have ISBNs, reliable |
-| Movies | Enter or scan (UPC barcode) | Title, genre, watched switch | UPC → rough title (UPCitemdb, free/keyless) → real title+genre (TMDb, free API key required) |
-| TV Shows | Enter only (no scan) | Title, genre, seasons/episodes, watched switch | N/A — manual entry; see "where to watch" below |
+| Movies | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - originally planned with UPC scanning too, removed after real testing confirmed it was unreliable |
+| TV Shows | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - confirmed design from the start, no scan/number-entry ever planned |
 | Anime | Enter only (no scan) | Title, genre, episodes, watched switch | N/A — manual entry; see "where to watch" below |
 | Vinyl/Records | Enter or scan (UPC barcode) | Title, genre, artist, listened switch | Discogs API — has strong UPC-to-release lookup, best barcode match of the physical-media categories |
 | Music (digital) | Enter or paste Spotify/Apple/YouTube link | Genre, artist, title, listened switch | Public catalog API (developer key, not user OAuth) — genre often missing at song level, so expect manual edits here often; see "where to listen" below |
@@ -55,12 +55,12 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 
 Every entry screen has a manual-entry path as the default; scanning/link-pasting is always an optional shortcut, never required. The camera icon only requests OS camera permission when tapped (lazy, not on screen load), matching Home Base's lazy notification-permission pattern. Regardless of entry method, all required fields for that category must be filled before saving.
 
-**Added after Books/Comics/Movies were built:** a third entry method, "type a title, get real candidates back, tap one to fill in every field it has" (`lib/titleSearch.ts` + `components/TitleSearchInput.tsx`, shared across categories). For the cases scan/number-entry can't cover - no working camera, a damaged/unreadable barcode, a thrifted book with a sticker over part of it. Each category screen orders its three methods (scan / number-entry / title search) by how reliable each actually is for that category - Books/Comics lead with scan since ISBN uniquely identifies an edition; Movies leads with title search instead, with scan/UPC demoted to a secondary section, since UPC lookup there is a weaker chain (UPC → messy retail title → TMDb search). Worth applying the same "which method should lead" judgment call to each future category rather than defaulting to scan-first everywhere.
+**Added after Books/Comics/Movies were built:** a third entry method, "type a title, get real candidates back, tap one to fill in every field it has" (`lib/titleSearch.ts` + `components/TitleSearchInput.tsx`, shared across categories). For the cases scan/number-entry can't cover - no working camera, a damaged/unreadable barcode, a thrifted book with a sticker over part of it. Books/Comics lead with scan since ISBN uniquely identifies an edition, keeping all three methods. Movies originally demoted scan/UPC below title search the same way, then dropped it entirely once real testing confirmed that UPC lookup chain (UPC → messy retail title → TMDb search) was unreliable in practice - title search is now Movies' only entry-assist method, same as TV Shows was from the start. Worth applying the same "which method should lead, or whether one should exist at all" judgment call to each future category rather than defaulting to scan-first everywhere.
 
-## Confirmed add-on: "Listen on Spotify" / "Where to Watch"
+## "Listen on Spotify" / "Where to Watch"
 Not part of the core entry flow, layered on top once basic entries exist for each category:
-- **Music** — each entry gets a "Listen on Spotify" link. Spotify's Web API supports catalog search via an app-level developer key (Client Credentials — no user login), so even manually-typed title/artist can resolve to a link.
-- **TV Shows & Anime** — each entry gets a "Where to Watch" button that opens a popup listing the streaming apps/links carrying that title, sourced from TMDb's free `watch/providers` endpoint (region-aware). Most mainstream-popular anime is also catalogued in TMDb as a TV show, so this can likely share one lookup path for both categories. Caveat: regional data, and niche/older titles may be missing or come back empty.
+- **Music** — each entry gets a "Listen on Spotify" link. Spotify's Web API supports catalog search via an app-level developer key (Client Credentials — no user login), so even manually-typed title/artist can resolve to a link. Not built yet.
+- **Movies & TV Shows** ✅ done — each entry added through title search gets a "Where to Watch" button. Built simpler than originally planned here: rather than a custom in-app popup listing providers (which would need ongoing JustWatch attribution everywhere it's shown, not just once in Credits), the button opens TMDb's own watch page directly (`tmdbMovieWatchUrl()` / `tmdbWatchUrl()`) - that page already has correct JustWatch branding built in, so nothing needed to be built or maintained for it. Region-aware but not yet configurable (defaults to US). Only shows on an entry with a stored `tmdbId` (came from title search) - a graceful hide, not a disabled button, for anything typed in by hand. Anime wasn't built yet, but should be able to reuse this exact approach once it exists, per the note below.
 
 ## Recommendation & rating logic
 - Switch = **No** (not read/watched/listened/played) → that category's widget shows one random not-done item as "try this today," refreshed daily, one per widget (not one global pick).
@@ -68,11 +68,11 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - **Share** button opens the native OS share sheet (Mail, Messages, Snapchat, Copy Link, whatever's installed) — no custom per-platform integration needed.
 
 ## Filters per category screen
-- Movies: Title / Genre / Watched
-- TV Shows: Title / Genre / Seasons / Watched
+- Movies: Title / Genre / Watched / Rating
+- TV Shows: Title / Genre / Watched / Rating
 - Anime: Title / Genre / Episodes / Watched
-- Books: Title / Genre / Author / Read
-- Comics/Manga: Title / Genre / Author / Read
+- Books: Title / Genre / Author / Read / Rating
+- Comics/Manga: Title / Genre / Author / Read / Rating
 - Puzzles: Piece Count / Genre / Manufacturer / Completed
 - Music: Title / Genre / Artist / Listened
 - Vinyl/Records: Title / Genre / Artist / Listened
@@ -81,12 +81,13 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 ## Build order
 1. **Books** — most reliable lookup, simplest way to prove the entry → confirm → rate → recommend pattern end to end ✅ done
 2. **Comics/Manga** (same ISBN pattern, near-zero extra lookup work) ✅ done — built on shared lib/isbnLookup.ts and lib/useAlphabetScroll.ts rather than a second copy, with its own genre allowlist that adds manga demographic labels (Shonen/Shoujo/Seinen/Josei) alongside standard genres
-3. **Movies** ✅ done, built out of the original planned order per explicit request - genuinely different lookup shape than Books/Comics (no free keyless source for movie metadata the way Open Library was for books), see lib/upcLookup.ts. Needs a free TMDb API key added to lib/config.ts before UPC/barcode auto-fill will work; manual entry works regardless.
-4. Puzzles (manual-only, good simple next target)
-5. Music (link-paste + developer API keys)
-6. TV Shows → Anime (same UPC/title-search family as Movies, can likely reuse a lot of lib/upcLookup.ts's shape)
-7. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
+3. **Movies** ✅ done, built out of the original planned order per explicit request - originally had its own UPC/barcode scanning too (lib/upcLookup.ts), removed later after real testing confirmed that lookup chain was unreliable in practice. Now title-search only, via lib/movieLookup.ts. Needs a free TMDb credential added to lib/config.ts before title-search auto-fill will work; manual entry works regardless.
+4. **TV Shows** ✅ done, also built out of the original planned order per explicit request - title-search only from the start (lib/tvLookup.ts, its own genre taxonomy genuinely different from Movies'). Structural twin of Movies now that Movies dropped its own scan/UPC entry - both share the same "Where to Watch" approach (see above).
+5. Puzzles (manual-only, good simple next target)
+6. Music (link-paste + developer API keys)
+7. Anime (same TMDb/title-search family as Movies/TV Shows - likely the fastest of the remaining categories to build, given how close its shape is to what's already proven)
+8. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
 
 ## Open items not yet decided
-- Exact API/developer accounts to register (OMDb/TMDb, Discogs, Spotify developer keys) — **TMDb is now actually needed**: Movies' UPC lookup (lib/upcLookup.ts) won't auto-fill anything until a free key from themoviedb.org is added to lib/config.ts. The rest can still be done incrementally per widget as you build it.
-- Whether TV Shows/Anime need a distinct "in progress" state beyond the binary watched switch (e.g. partway through a season) — flagged for later, not blocking v1 build
+- Exact API/developer accounts to register (OMDb/TMDb, Discogs, Spotify developer keys) — Movies and TV Shows both already need a free TMDb credential in lib/config.ts for their title-search auto-fill to work. The rest can still be done incrementally per widget as you build it.
+- Whether TV Shows/Anime need a distinct "in progress" state beyond the binary watched switch (e.g. partway through a season) — flagged for later, not blocking v1 build. TV Shows shipped with the same simple Watched toggle as Movies rather than resolving this question.
