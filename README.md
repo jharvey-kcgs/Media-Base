@@ -161,7 +161,21 @@ App.tsx                          Navigation entry point, SafeAreaProvider,
 
 screens/
   HomeScreen.tsx                  The dashboard - one widget per selected
-                                    category, daily per-widget suggestion
+                                    category, daily per-widget suggestion,
+                                    now with that suggestion's cover photo
+                                    (reuses components/CoverThumbnail.tsx,
+                                    same fixed-size/placeholder behavior
+                                    as every category screen's list rows).
+                                    Widget text ("77 Books Tracked",
+                                    "Try Today: ...") is deliberately
+                                    Title Case here specifically, per
+                                    explicit request - the same unit
+                                    words (book/books, entry/entries,
+                                    movie/movies) are passed in lowercase
+                                    since they're reused elsewhere in
+                                    lowercase contexts, and only
+                                    capitalized at this specific display
+                                    point via a small capitalize() helper.
   OnboardingScreen.tsx             First-launch category picker
 
   BookScreen.tsx                   Books (widget 1 - working)

@@ -1,12 +1,13 @@
 // screens/HomeScreen.tsx
 
 import React, { useCallback, useState } from 'react';
-import { TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
+import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
 import { getBooks, getComics, getMovies, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
@@ -31,13 +32,25 @@ type RootStackParamList = {
 interface TrackedItem {
   id: string;
   title: string;
+  coverImage?: string | null;
 }
 
 interface WidgetData {
   count: number;
   suggestion: string | null;
+  suggestionCoverImage: string | null;
   unitSingular: string;
   unitPlural: string;
+}
+
+// "77 Books Tracked" / "47 Entries Tracked" / "Try Today: ..." - Title
+// Case throughout this widget specifically, per explicit request. The
+// unit words themselves (book/books, entry/entries, movie/movies) are
+// passed in lowercase since they're reused elsewhere in lowercase
+// contexts (error messages, etc.) - only capitalized right here at the
+// point of display.
+function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 function pickRandomUnread<T extends TrackedItem>(items: T[], isDone: (item: T) => boolean): T | null {
@@ -50,9 +63,9 @@ function pickRandomUnread<T extends TrackedItem>(items: T[], isDone: (item: T) =
 // this" suggestion, which stays fixed for the whole calendar day (even
 // across manual refreshes/app reopens) unless the day changes or the
 // previous pick got marked done/deleted since it was chosen. Generic over
-// any category whose items look like { id, title } - isDone is passed in
-// separately since the "done" field's actual name differs per category
-// (Books/Comics: read, Movies: watched).
+// any category whose items look like { id, title, coverImage } - isDone is
+// passed in separately since the "done" field's actual name differs per
+// category (Books/Comics: read, Movies: watched).
 async function loadWidgetData<T extends TrackedItem>(
   category: string,
   items: T[],
@@ -71,7 +84,13 @@ async function loadWidgetData<T extends TrackedItem>(
     pick = pickRandomUnread(items, isDone);
     if (pick) await saveDailyPick(category, pick.id);
   }
-  return { count: items.length, suggestion: pick?.title ?? null, unitSingular, unitPlural };
+  return {
+    count: items.length,
+    suggestion: pick?.title ?? null,
+    suggestionCoverImage: pick?.coverImage ?? null,
+    unitSingular,
+    unitPlural,
+  };
 }
 
 export default function HomeScreen({ navigation }: any) {
@@ -136,12 +155,20 @@ export default function HomeScreen({ navigation }: any) {
               {data ? (
                 <>
                   <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, marginTop: 2 }}>
-                    {data.count} {data.count === 1 ? data.unitSingular : data.unitPlural} tracked
+                    {data.count} {capitalize(data.count === 1 ? data.unitSingular : data.unitPlural)} Tracked
                   </AppText>
                   {data.suggestion && (
-                    <AppText style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, marginTop: 6 }}>
-                      Try today: {data.suggestion}
-                    </AppText>
+                    <View style={styles.suggestionRow}>
+                      <CoverThumbnail
+                        uri={data.suggestionCoverImage}
+                        iconName={cat === 'movies' ? 'film-outline' : 'book-outline'}
+                      />
+                      <AppText
+                        style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, flexShrink: 1 }}
+                      >
+                        Try Today: {data.suggestion}
+                      </AppText>
+                    </View>
                   )}
                 </>
               ) : (
@@ -165,5 +192,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
 });
