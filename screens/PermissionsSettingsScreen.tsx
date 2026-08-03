@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { getCameraPermissionsAsync, requestCameraPermissionsAsync } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import AppText from '../components/AppText';
@@ -28,38 +28,45 @@ import { scheduleDailyRecommendationNotification, cancelDailyRecommendationNotif
 // instant you're back.
 export default function PermissionsSettingsScreen({ navigation }: any) {
   const { theme, settings, refreshSettings } = useTheme();
-  const [cameraGranted, setCameraGranted] = useState(false);
-  const [cameraCanAskAgain, setCameraCanAskAgain] = useState(true);
+  // Camera comes straight from the hook - no separate state to keep in
+  // sync, unlike the standalone getCameraPermissionsAsync/
+  // requestCameraPermissionsAsync functions this used to call, which
+  // TypeScript confirmed don't actually exist as exports of the
+  // installed expo-camera version at all (a real bug, not a stale-read
+  // issue - calling a function that doesn't exist throws immediately,
+  // before it can ever reach a log line or update any state, which is
+  // why nothing was appearing anywhere). Same hook BookScreen.tsx/
+  // ComicScreen.tsx/MovieScreen.tsx already use successfully for their
+  // own scan-button permission check.
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [photoGranted, setPhotoGranted] = useState(false);
   const [photoCanAskAgain, setPhotoCanAskAgain] = useState(true);
   const [notifStatus, setNotifStatus] = useState<Notifications.PermissionStatus | null>(null);
 
   const refreshAllPermissions = useCallback(async () => {
-    // Handled independently, not via Promise.all - that combined form
-    // fails atomically on the FIRST rejection, meaning if any one of
-    // these three throws, none of the three ever update and nothing
-    // ever logs, which is exactly what got reported (toggles stuck at
-    // their false defaults, zero console output at all). Checking each
-    // one separately means a problem with one can't silently block the
-    // other two, and whichever one is actually failing now says so
-    // explicitly with its real error, instead of the whole thing just
-    // going quiet.
-    const cam = await getCameraPermissionsAsync().catch((err) => {
-      console.warn('Media Base: getCameraPermissionsAsync threw', err);
+    // Handled independently, not combined - a problem with one check
+    // can't silently block the other two this way, and each one's real
+    // error (if any) is now visible on its own rather than the whole
+    // thing just going quiet. requestCameraPermission() is safe to call
+    // here even though it's the "request" function, not just a "check" -
+    // per Expo's own documented behavior, it only shows a native prompt
+    // when status is still undetermined; if already granted or
+    // permanently denied, it just returns the current status silently,
+    // which is exactly the "refresh" behavior wanted here.
+    const cam = await requestCameraPermission().catch((err: any) => {
+      console.warn('Media Base: requestCameraPermission (refresh) threw', err);
       return null;
     });
-    const photo = await ImagePicker.getMediaLibraryPermissionsAsync().catch((err) => {
+    const photo = await ImagePicker.getMediaLibraryPermissionsAsync().catch((err: any) => {
       console.warn('Media Base: getMediaLibraryPermissionsAsync threw', err);
       return null;
     });
-    const notif = await Notifications.getPermissionsAsync().catch((err) => {
+    const notif = await Notifications.getPermissionsAsync().catch((err: any) => {
       console.warn('Media Base: Notifications.getPermissionsAsync threw', err);
       return null;
     });
     if (cam) {
       console.warn('Media Base: camera permission ->', JSON.stringify(cam));
-      setCameraGranted(cam.granted);
-      setCameraCanAskAgain(cam.canAskAgain);
     }
     if (photo) {
       console.warn('Media Base: photo permission ->', JSON.stringify(photo));
@@ -69,7 +76,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
     if (notif) {
       setNotifStatus(notif.status);
     }
-  }, []);
+  }, [requestCameraPermission]);
 
   useFocusEffect(
     useCallback(() => {
@@ -86,7 +93,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
 
   const handleCameraToggle = async (wantsOn: boolean) => {
     if (wantsOn) {
-      if (!cameraCanAskAgain) {
+      if (!(cameraPermission?.canAskAgain ?? true)) {
         Alert.alert(
           'Camera access needed',
           'Camera access was turned off outside the app - open Phone Settings to turn it back on.',
@@ -97,14 +104,9 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         );
         return;
       }
-      const result = await requestCameraPermissionsAsync().catch((err) => {
-        console.warn('Media Base: requestCameraPermissionsAsync threw', err);
-        return null;
+      await requestCameraPermission().catch((err: any) => {
+        console.warn('Media Base: requestCameraPermission threw', err);
       });
-      if (result) {
-        setCameraGranted(result.granted);
-        setCameraCanAskAgain(result.canAskAgain);
-      }
     } else {
       Alert.alert(
         'Turn off camera access',
@@ -130,7 +132,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         );
         return;
       }
-      const result = await ImagePicker.requestMediaLibraryPermissionsAsync().catch((err) => {
+      const result = await ImagePicker.requestMediaLibraryPermissionsAsync().catch((err: any) => {
         console.warn('Media Base: requestMediaLibraryPermissionsAsync threw', err);
         return null;
       });
@@ -209,7 +211,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
             </AppText>
           </View>
           <Switch
-            value={cameraGranted}
+            value={cameraPermission?.granted ?? false}
             onValueChange={handleCameraToggle}
             trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
           />
