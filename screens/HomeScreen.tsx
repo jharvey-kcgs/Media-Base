@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getMovies, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getTVShows, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -18,6 +18,7 @@ const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   books: 'Book',
   comics: 'Comic',
   movies: 'Movie',
+  tvshows: 'TV',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
@@ -26,6 +27,7 @@ type RootStackParamList = {
   Book: undefined;
   Comic: undefined;
   Movie: undefined;
+  TV: undefined;
   Settings: undefined;
 };
 
@@ -99,13 +101,14 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const today = toLocalDateString(new Date());
-    const [books, comics, movies] = await Promise.all([getBooks(), getComics(), getMovies()]);
-    const [booksData, comicsData, moviesData] = await Promise.all([
+    const [books, comics, movies, tvShows] = await Promise.all([getBooks(), getComics(), getMovies(), getTVShows()]);
+    const [booksData, comicsData, moviesData, tvShowsData] = await Promise.all([
       loadWidgetData('books', books, (b) => b.read, 'book', 'books', today),
       loadWidgetData('comics', comics, (c) => c.read, 'entry', 'entries', today),
       loadWidgetData('movies', movies, (m) => m.watched, 'movie', 'movies', today),
+      loadWidgetData('tvshows', tvShows, (t) => t.watched, 'show', 'shows', today),
     ]);
-    setWidgetData({ books: booksData, comics: comicsData, movies: moviesData });
+    setWidgetData({ books: booksData, comics: comicsData, movies: moviesData, tvshows: tvShowsData });
   }, []);
 
   useFocusEffect(
@@ -161,7 +164,7 @@ export default function HomeScreen({ navigation }: any) {
                     <View style={styles.suggestionRow}>
                       <CoverThumbnail
                         uri={data.suggestionCoverImage}
-                        iconName={cat === 'movies' ? 'film-outline' : 'book-outline'}
+                        iconName={cat === 'movies' ? 'film-outline' : cat === 'tvshows' ? 'tv-outline' : 'book-outline'}
                       />
                       <AppText
                         style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, flexShrink: 1 }}

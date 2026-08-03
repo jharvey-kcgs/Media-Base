@@ -76,9 +76,12 @@ regardless).
 
 **TV Shows is in progress** - the data layer (`types/models.ts`'s
 `TVShow`, full CRUD in `lib/storage.ts` including backup/cover wiring,
-and `lib/tvLookup.ts`'s TMDb TV search) is built and wired into the
-backup system, but `screens/TVScreen.tsx` itself doesn't exist yet - the
-Home widget still shows "Coming soon" until the actual screen is built.
+and `lib/tvLookup.ts`'s TMDb TV search) is built, and the Home widget is
+now wired up and reachable (count + daily-pick suggestion, same as every
+other category), but `screens/TVScreen.tsx` itself is still just a
+shell - header, back button, and the ••• menu structure, with no list
+rendering, search, A-Z index, or Add/Edit form yet. Tapping into it
+today shows a placeholder, not a working screen.
 
 ---
 
@@ -177,11 +180,18 @@ screens/
                                     Title Case here specifically, per
                                     explicit request - the same unit
                                     words (book/books, entry/entries,
-                                    movie/movies) are passed in lowercase
-                                    since they're reused elsewhere in
-                                    lowercase contexts, and only
-                                    capitalized at this specific display
-                                    point via a small capitalize() helper.
+                                    movie/movies, show/shows) are passed
+                                    in lowercase since they're reused
+                                    elsewhere in lowercase contexts, and
+                                    only capitalized at this specific
+                                    display point via a small
+                                    capitalize() helper. TV Shows is the
+                                    4th implemented category as of this
+                                    writing - wired in as its own step,
+                                    deliberately separate from
+                                    screens/TVScreen.tsx itself, since the
+                                    screen existing and being reachable
+                                    from Home are two different things.
   OnboardingScreen.tsx             First-launch category picker
 
   BookScreen.tsx                   Books (widget 1 - working)
