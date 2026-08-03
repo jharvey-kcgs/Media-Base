@@ -50,20 +50,29 @@ or transmits about you.
 
 **Where this stands right now:** Onboarding, Home, all of Settings, and
 three categories - Books, Comics/Manga, and Movies - are working
-end-to-end (add, edit, sort/filter, rate, review, delete, real barcode
-scanning). Every other category widget shows "Coming soon" until its own
-screen is built - Movies was built out of the original planned order in
-[Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
-so the remaining order there is Puzzles → Music → TV Shows → Anime →
-Vinyl → Board Games. The A-Z index is shared across all three
-implemented categories via `lib/useAlphabetScroll.ts`; ISBN lookup
-(`lib/isbnLookup.ts`) is shared between Books/Comics specifically, since
-Movies' UPC-based lookup (`lib/upcLookup.ts`) is a genuinely different
-shape - see the Category screen pattern section for what to reuse vs.
-rebuild per category. **Movies needs a one-time setup step Books/Comics
-never did**: a free TMDb API key in `lib/config.ts`, or its UPC/barcode
-auto-fill won't return anything (manual entry always works regardless) -
-see Section 5 below.
+end-to-end: add, edit, sort/filter, search, cover photos, rate, review,
+delete. Every item can be added three ways - real barcode scanning,
+typing the ISBN/UPC directly, or searching by title and picking a real
+result - and every category now shows a cover photo (auto-fetched where
+one's available, or added by hand) both in its list and its Edit screen.
+Settings → Data backs up everything, covers included, to one real file
+rather than pasted text. Every other category widget shows "Coming soon"
+until its own screen is built - Movies was built out of the original
+planned order in [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per
+explicit request, so the remaining order there is Puzzles → Music → TV
+Shows → Anime → Vinyl → Board Games. `lib/useAlphabetScroll.ts` (A-Z
+index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
+`components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
+search, local search, and cover photos) are shared across all three
+implemented categories; `lib/isbnLookup.ts` is shared between Books/
+Comics specifically, since Movies' UPC-based lookup
+(`lib/upcLookup.ts`) is a genuinely different shape - see the Category
+screen pattern section for what to reuse vs. rebuild per category.
+**Movies needs a one-time setup step Books/Comics never did**: a free
+TMDb credential in `lib/config.ts` (see that file's own comments for
+exactly what's needed and where to get it), or its UPC/barcode and
+title-search auto-fill won't return anything (manual entry always works
+regardless).
 
 ---
 

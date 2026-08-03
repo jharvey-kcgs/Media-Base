@@ -32,6 +32,18 @@ const FAQS: { q: string; a: string }[] = [
     q: 'Can a Comic/Manga end up under Books, or a Book under Comics/Manga?',
     a: "No - they're stored completely separately, so nothing added under one screen can ever show up in the other. If you scan or enter an ISBN that's clearly classified as the wrong type, the app won't auto-fill it and tells you which screen to use instead.",
   },
+  {
+    q: "Why didn't I get a cover photo when I added something?",
+    a: "Not every book, comic, or movie has a cover photo indexed anywhere online - same as genre, some entries just don't have one available, which isn't a bug. Tap the cover in Add/Edit to take a photo or choose one from your library instead.",
+  },
+  {
+    q: 'Does my photo get saved anywhere else on my phone?',
+    a: "No - a photo taken through Media Base stays inside the app only. It's never added to your device's Photos app, and no other app can see it.",
+  },
+  {
+    q: 'Does my backup file include cover photos?',
+    a: 'Yes - Settings → Data → Save Backup File includes every cover photo along with your entries, all in one file.',
+  },
 ];
 
 export default function FAQScreen({ navigation }: any) {
