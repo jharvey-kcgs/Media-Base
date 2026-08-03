@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system/legacy';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow } from '../types/models';
 import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
@@ -12,6 +12,7 @@ const KEYS = {
   books: 'mediabase:books',
   comics: 'mediabase:comics',
   movies: 'mediabase:movies',
+  tvShows: 'mediabase:tvShows',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -173,6 +174,44 @@ export async function deleteMovies(ids: string[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteCover('movies', id)));
 }
 
+// --- TV Shows ---
+
+export async function getTVShows(): Promise<TVShow[]> {
+  return getAll<TVShow>(KEYS.tvShows);
+}
+
+export async function addTVShow(input: Omit<TVShow, 'id' | 'createdAt'>, id?: string): Promise<TVShow> {
+  const tvShows = await getTVShows();
+  const tvShow: TVShow = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.tvShows, [...tvShows, tvShow]);
+  return tvShow;
+}
+
+export async function updateTVShow(id: string, updates: Partial<TVShow>): Promise<void> {
+  const tvShows = await getTVShows();
+  const next = tvShows.map((t) => (t.id === id ? { ...t, ...updates } : t));
+  await saveAll(KEYS.tvShows, next);
+}
+
+export async function deleteTVShow(id: string): Promise<void> {
+  const tvShows = await getTVShows();
+  await saveAll(
+    KEYS.tvShows,
+    tvShows.filter((t) => t.id !== id),
+  );
+  await deleteCover('tvshows', id);
+}
+
+export async function deleteTVShows(ids: string[]): Promise<void> {
+  const tvShows = await getTVShows();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.tvShows,
+    tvShows.filter((t) => !idSet.has(t.id)),
+  );
+  await Promise.all(ids.map((id) => deleteCover('tvshows', id)));
+}
+
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar
@@ -236,6 +275,7 @@ const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
   { category: 'books', key: KEYS.books },
   { category: 'comics', key: KEYS.comics },
   { category: 'movies', key: KEYS.movies },
+  { category: 'tvshows', key: KEYS.tvShows },
 ];
 
 /** Builds a full backup - every stored key's data, plus every item's

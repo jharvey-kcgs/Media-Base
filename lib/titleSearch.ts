@@ -33,6 +33,7 @@
 
 import { normalizeGenres } from './isbnLookup';
 import { tmdbSearchMovies, UpcMovieLookupResult } from './upcLookup';
+import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -163,4 +164,15 @@ export async function searchMoviesByTitle(query: string, maxResults = 8): Promis
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   return tmdbSearchMovies(trimmed, maxResults);
+}
+
+/** Searches TMDb by TV show title - thin wrapper around
+ * lib/tvLookup.ts's tmdbSearchTVShows(). TV Shows has no number-entry
+ * pipeline the way Movies' UPC does (confirmed design - title search is
+ * the only assisted entry method for this category), so this is the
+ * only lookup path TVScreen.tsx has at all. */
+export async function searchTVShowsByTitle(query: string, maxResults = 8): Promise<TVShowLookupResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  return tmdbSearchTVShows(trimmed, maxResults);
 }

@@ -108,6 +108,28 @@ export interface Movie {
 
 export type MovieSortField = 'title' | 'genre' | 'watched' | 'rating';
 
+// No author, no barcode/number field at all - confirmed design: title
+// search is the only entry-assist method for TV Shows, no scan or
+// number-entry path the way Books/Comics/Movies have (SCANNABLE_CATEGORIES
+// above already anticipated this: tvshows: false). tmdbId is stored
+// specifically so the "Where to Watch" button can open TMDb's own watch
+// page for this exact show without needing another search - null for an
+// entry added by typing everything by hand rather than through title
+// search, in which case the button just doesn't show (nothing to link to).
+export interface TVShow {
+  id: string;
+  title: string;
+  genres: string[];
+  coverImage: string | null;
+  tmdbId: number | null;
+  watched: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type TVShowSortField = 'title' | 'genre' | 'watched' | 'rating';
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home

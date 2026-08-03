@@ -74,6 +74,12 @@ exactly what's needed and where to get it), or its UPC/barcode and
 title-search auto-fill won't return anything (manual entry always works
 regardless).
 
+**TV Shows is in progress** - the data layer (`types/models.ts`'s
+`TVShow`, full CRUD in `lib/storage.ts` including backup/cover wiring,
+and `lib/tvLookup.ts`'s TMDb TV search) is built and wired into the
+backup system, but `screens/TVScreen.tsx` itself doesn't exist yet - the
+Home widget still shows "Coming soon" until the actual screen is built.
+
 ---
 
 ## 1. Prerequisites
@@ -445,6 +451,40 @@ lib/
                                      Movies-specific) since any future
                                      UPC-based category - Vinyl, Board
                                      Games - could hit the same ambiguity.
+  tvLookup.ts                       TV Shows' TMDb integration - a
+                                     separate file from upcLookup.ts
+                                     despite both using TMDb, since TV has
+                                     its own official genre taxonomy
+                                     (confirmed via TMDb's live API - no
+                                     separate Horror/Thriller/Romance, but
+                                     Kids/News/Reality/Soap/Talk exist
+                                     here that don't for movies) and
+                                     TMDb's TV endpoints use different
+                                     field names entirely (`name` instead
+                                     of `title`, `first_air_date` instead
+                                     of `release_date`). No number-entry
+                                     pipeline at all - confirmed design,
+                                     title search is TV Shows' only
+                                     assisted entry method, so this file
+                                     is simpler than upcLookup.ts: just
+                                     tmdbSearchTVShows() (reused directly
+                                     by lib/titleSearch.ts's
+                                     searchTVShowsByTitle(), same split as
+                                     Movies) and tmdbWatchUrl() for the
+                                     "Where to Watch" button. That button
+                                     deliberately links to TMDb's own
+                                     watch page rather than building a
+                                     custom in-app provider list - that
+                                     data is licensed from JustWatch and
+                                     requires attribution everywhere it's
+                                     shown, not just once in Credits;
+                                     linking to TMDb's own page (which
+                                     already has correct JustWatch
+                                     branding) sidesteps needing to build
+                                     and maintain that ourselves. Defaults
+                                     to the US region - not yet
+                                     configurable, worth revisiting if
+                                     international support is ever needed.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap
