@@ -51,6 +51,7 @@ import { Movie, MovieSortField } from '../types/models';
 const SORT_FIELDS: { field: MovieSortField; label: string }[] = [
   { field: 'title', label: 'Title' },
   { field: 'watched', label: 'Watched?' },
+  { field: 'rating', label: 'Rating' },
 ];
 
 // Only 'title' - no author/director field on this screen to sort by.
@@ -61,6 +62,9 @@ function sortMovies(movies: Movie[], field: MovieSortField): Movie[] {
   const copy = [...movies];
   copy.sort((a, b) => {
     if (field === 'watched') return Number(a.watched) - Number(b.watched);
+    // Descending - 5 stars first, unrated (null) sinks to the very
+    // bottom rather than sorting as if it were a 0-star rating.
+    if (field === 'rating') return (b.rating ?? -1) - (a.rating ?? -1);
     if (field === 'genre') return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '');
     return String(a[field]).localeCompare(String(b[field]));
   });

@@ -839,14 +839,22 @@ into it differs), and only duplicate what's genuinely category-specific
   creating a second copy.
 - **Multi-genre entries**: a book can carry more than one genre tag
   (entered comma-separated, e.g. "Romance, Contemporary"). Genre isn't
-  one of the "Filter by..." **sort** options (Title/Author/Read?) - it
-  used to be, but that was redundant/confusing once genre got its own
-  dedicated menu item: **"Filter by genre..."** in the ••• menu shows
+  one of the "Filter by..." **sort** options (Title/Author/Read?/Rating)
+  - it used to be, but that was redundant/confusing once genre got its
+  own dedicated menu item: **"Filter by genre..."** in the ••• menu shows
   every distinct tag currently in use and narrows the list to books that
   have that tag *anywhere* in their list, not just a "primary" one. The
   active filter shows next to "Sorted by X" and clears with a tap.
   (`genres[0]` is still tracked internally as the nominal first tag, but
   nothing in the UI sorts or groups by it anymore.)
+- **Rating sort**: descending - 5 stars first, then 4, 3, 2, 1. Unrated
+  items (`rating: null`) sink to the very bottom rather than sorting as
+  if they were a 0-star rating, which would otherwise put every
+  not-yet-rated book ahead of a genuine 1-star one. Same flat-list
+  treatment as Read?/Watched? (no A-Z index - not in `ALPHA_FIELDS`),
+  since it isn't alphabetical either. The star count is already visible
+  on every row regardless of sort (`Read · 4★`), so no card changes were
+  needed to make this sort useful to look at.
 - **Real barcode scanning (Books specifically)**: "📷 Scan barcode
   instead" switches the Add/Edit Book modal's content over to a
   full-screen `expo-camera` `CameraView` restricted to `ean13` codes -

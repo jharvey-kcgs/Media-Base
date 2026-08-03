@@ -66,7 +66,7 @@ export interface Book {
   createdAt: string; // ISO timestamp
 }
 
-export type BookSortField = 'title' | 'genre' | 'author' | 'read';
+export type BookSortField = 'title' | 'genre' | 'author' | 'read' | 'rating';
 
 // Structurally identical to Book by design - Comics/Manga entries work the
 // same way (multi-genre, ISBN lookup/scan, a read switch), just with
@@ -86,7 +86,7 @@ export interface Comic {
   createdAt: string;
 }
 
-export type ComicSortField = 'title' | 'genre' | 'author' | 'read';
+export type ComicSortField = 'title' | 'genre' | 'author' | 'read' | 'rating';
 
 // No author/director field - not part of the requested spec, kept
 // deliberately minimal. UPC instead of ISBN (movies aren't catalogued
@@ -106,7 +106,7 @@ export interface Movie {
   createdAt: string;
 }
 
-export type MovieSortField = 'title' | 'genre' | 'watched';
+export type MovieSortField = 'title' | 'genre' | 'watched' | 'rating';
 
 export interface AppSettings {
   onboarded: boolean;

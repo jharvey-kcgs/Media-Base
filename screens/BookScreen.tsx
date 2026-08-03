@@ -53,6 +53,7 @@ const SORT_FIELDS: { field: BookSortField; label: string }[] = [
   { field: 'title', label: 'Title' },
   { field: 'author', label: 'Author' },
   { field: 'read', label: 'Read?' },
+  { field: 'rating', label: 'Rating' },
 ];
 
 // Sort fields where an A-Z jump index actually makes sense.
@@ -106,6 +107,10 @@ function sortBooks(books: Book[], field: BookSortField): Book[] {
   const copy = [...books];
   copy.sort((a, b) => {
     if (field === 'read') return Number(a.read) - Number(b.read);
+    // Descending - 5 stars first, unrated (null) sinks to the very
+    // bottom rather than sorting as if it were a 0-star rating, which
+    // would otherwise put unrated books ahead of a genuine 1-star one.
+    if (field === 'rating') return (b.rating ?? -1) - (a.rating ?? -1);
     if (field === 'genre') return (a.genres[0] ?? '').localeCompare(b.genres[0] ?? '');
     return String(a[field]).localeCompare(String(b[field]));
   });
