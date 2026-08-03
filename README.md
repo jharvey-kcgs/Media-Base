@@ -296,6 +296,46 @@ lib/
                                      still worth treating with the same
                                      caution if a future error traces to
                                      either of those specifically.
+
+                                     **A second real bug, found by
+                                     re-reading this code rather than a
+                                     live report**: editing an existing
+                                     item and changing or removing its
+                                     cover, then hitting Cancel, did NOT
+                                     actually undo it - pickCoverFromLibrary()/
+                                     takeCoverPhoto()/deleteCover() all
+                                     wrote straight to the item's
+                                     permanent path immediately, the
+                                     moment a photo was picked or removed,
+                                     not deferred until Save the way every
+                                     other field already was. Fixed with
+                                     staged variants -
+                                     pickCoverFromLibraryStaged()/
+                                     takeCoverPhotoStaged()/
+                                     downloadRemoteCoverStaged() - that
+                                     write to a temporary location instead;
+                                     commitPendingCover() (called on Save)
+                                     is what actually replaces the
+                                     permanent file, and
+                                     discardPendingCover() (called on
+                                     Cancel) just deletes the temp file,
+                                     leaving the real one exactly as it
+                                     was. Adding a brand new item still
+                                     uses the direct-write functions
+                                     unchanged - there's no pre-existing
+                                     file to protect there, and cancelling
+                                     an Add session already cleans up a
+                                     newly-created cover correctly, so
+                                     that path was never actually broken.
+                                     Each screen now tracks
+                                     `originalCoverImage` (captured when
+                                     the form opens) specifically to tell
+                                     these cases apart on Save/Cancel:
+                                     unchanged (matches the original,
+                                     nothing to do), replaced (a new
+                                     staged file - commit it), or removed
+                                     (null, original was non-null - delete
+                                     now, not when it was tapped).
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.

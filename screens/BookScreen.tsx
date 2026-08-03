@@ -39,7 +39,7 @@ import CoverThumbnail from '../components/CoverThumbnail';
 import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
 import { getBooks, addBook, updateBook, deleteBook, deleteBooks, newId } from '../lib/storage';
-import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover, pickCoverFromLibraryStaged, takeCoverPhotoStaged, downloadRemoteCoverStaged, commitPendingCover, discardPendingCover } from '../lib/coverStorage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
 import { searchBooksByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -295,6 +295,11 @@ export default function BookScreen({ navigation }: any) {
   // lands under the item's real, final id), or the existing item's own
   // id in Edit mode.
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  // Captured when the form opens - the reference point Save/Cancel
+  // compare draft.coverImage against to decide what actually happened to
+  // the cover this session: unchanged, replaced, or removed. null in Add
+  // mode (nothing to compare against - a new item has no original).
+  const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
@@ -356,6 +361,7 @@ export default function BookScreen({ navigation }: any) {
   const openAdd = () => {
     setEditingId(null);
     setActiveItemId(newId());
+    setOriginalCoverImage(null);
     setDraft(EMPTY_DRAFT);
     setIsbnStatus('idle');
     setModalVisible(true);
@@ -364,6 +370,7 @@ export default function BookScreen({ navigation }: any) {
   const openEdit = (book: Book) => {
     setEditingId(book.id);
     setActiveItemId(book.id);
+    setOriginalCoverImage(book.coverImage ?? null);
     setDraft({
       title: book.title,
       genresText: book.genres.join(', '),
@@ -400,19 +407,27 @@ export default function BookScreen({ navigation }: any) {
   };
 
   // Tapping the cover in the Add/Edit form. activeItemId is always set by
-  // this point (openAdd/openEdit both set it before the form can open),
-  // so cover files always land under a real, final id from the start -
-  // no need to move anything once the item is actually saved.
+  // this point (openAdd/openEdit both set it before the form can open).
+  // Add mode writes straight to the item's permanent path (there's no
+  // existing file to protect, and cancelling an Add already cleans up
+  // correctly) - Edit mode stages everything instead, only actually
+  // touching the permanent file on Save, so Cancel genuinely leaves the
+  // original cover untouched.
   const handleCoverPress = () => {
+    const isEditing = !!editingId;
     const buttons: AlertButton[] = [
       { text: 'Take Photo', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await takeCoverPhoto('books', activeItemId);
+        const uri = isEditing
+          ? await takeCoverPhotoStaged('books', activeItemId)
+          : await takeCoverPhoto('books', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
       { text: 'Choose from Library', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await pickCoverFromLibrary('books', activeItemId);
+        const uri = isEditing
+          ? await pickCoverFromLibraryStaged('books', activeItemId)
+          : await pickCoverFromLibrary('books', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
     ];
@@ -421,7 +436,11 @@ export default function BookScreen({ navigation }: any) {
         text: 'Remove Photo',
         style: 'destructive',
         onPress: async () => {
-          if (activeItemId) await deleteCover('books', activeItemId);
+          // Add mode: nothing else to protect, delete right away, same
+          // as before. Edit mode: just clear the draft - handleSave
+          // compares against originalCoverImage and only actually
+          // deletes the permanent file if this sticks through to Save.
+          if (!isEditing && activeItemId) await deleteCover('books', activeItemId);
           setDraft((d) => ({ ...d, coverImage: null }));
         },
       });
@@ -652,9 +671,15 @@ export default function BookScreen({ navigation }: any) {
       // Fire-and-forget: doesn't block the fields above from filling in
       // immediately. Only overwrites an existing cover if this lookup
       // actually found one - a prior manually-picked photo isn't
-      // clobbered by a lookup that came back with nothing.
+      // clobbered by a lookup that came back with nothing. Staged during
+      // Edit, same reasoning as handleCoverPress above - this can happen
+      // mid-edit (re-scanning to refresh a cover), and shouldn't touch
+      // the permanent file until Save.
       if (result.coverUrl && activeItemId) {
-        downloadRemoteCover('books', activeItemId, result.coverUrl).then((uri) => {
+        const download = editingId
+          ? downloadRemoteCoverStaged('books', activeItemId, result.coverUrl)
+          : downloadRemoteCover('books', activeItemId, result.coverUrl);
+        download.then((uri) => {
           if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
         });
       }
@@ -687,12 +712,30 @@ export default function BookScreen({ navigation }: any) {
       return;
     }
 
+    // Resolve the cover to its final state. Add mode: draft.coverImage
+    // is already the real, final path (or null) - nothing extra to do,
+    // that path already writes directly. Edit mode: compare against
+    // originalCoverImage to find out what actually happened this
+    // session - only now, on a confirmed Save, does a staged file
+    // become permanent or a removal actually delete anything.
+    let finalCoverImage = draft.coverImage;
+    if (editingId) {
+      if (draft.coverImage === originalCoverImage) {
+        // untouched this session - nothing to do
+      } else if (draft.coverImage) {
+        finalCoverImage = await commitPendingCover('books', editingId, draft.coverImage);
+      } else if (originalCoverImage) {
+        await deleteCover('books', editingId);
+        finalCoverImage = null;
+      }
+    }
+
     const payload = {
       title: draft.title.trim(),
       genres,
       author: draft.author.trim(),
       isbn: draft.isbn.trim(),
-      coverImage: draft.coverImage,
+      coverImage: finalCoverImage,
       read: draft.read,
       rating: draft.read ? draft.rating || null : null,
       review: draft.read ? draft.review : '',
@@ -712,9 +755,19 @@ export default function BookScreen({ navigation }: any) {
   // forever under an id that never became a real entry - this cleans
   // that up. Editing an existing entry never hits this: editingId is set,
   // so nothing gets deleted just because the edit was cancelled.
+  // Add mode: a picked/downloaded cover was already written straight to
+  // its permanent path - cancelling means it never became a real entry,
+  // so that file would otherwise sit around orphaned forever. Edit mode:
+  // any cover change this session was staged, not written to the
+  // permanent path at all - so cancelling just means discarding that
+  // staged file. Either way, the ORIGINAL permanent cover (if editing an
+  // existing item that already had one) was never touched and needs no
+  // cleanup of its own.
   const handleCancelForm = () => {
     if (!editingId && draft.coverImage && activeItemId) {
       deleteCover('books', activeItemId).catch(() => {});
+    } else if (editingId && draft.coverImage !== originalCoverImage) {
+      discardPendingCover(draft.coverImage).catch(() => {});
     }
     setModalVisible(false);
   };
@@ -1020,7 +1073,10 @@ export default function BookScreen({ navigation }: any) {
                   // it was, same as if this were entered manually.
                   if (r.isbn) applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
                   if (r.coverUrl && activeItemId) {
-                    downloadRemoteCover('books', activeItemId, r.coverUrl).then((uri) => {
+                    const download = editingId
+                      ? downloadRemoteCoverStaged('books', activeItemId, r.coverUrl)
+                      : downloadRemoteCover('books', activeItemId, r.coverUrl);
+                    download.then((uri) => {
                       if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
                     });
                   }

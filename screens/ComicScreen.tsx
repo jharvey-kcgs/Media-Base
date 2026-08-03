@@ -38,7 +38,7 @@ import CoverThumbnail from '../components/CoverThumbnail';
 import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
 import { getComics, addComic, updateComic, deleteComic, deleteComics, newId } from '../lib/storage';
-import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover, pickCoverFromLibraryStaged, takeCoverPhotoStaged, downloadRemoteCoverStaged, commitPendingCover, discardPendingCover } from '../lib/coverStorage';
 import { runIsbnLookup as runIsbnLookupApi } from '../lib/isbnLookup';
 import { searchBooksByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -266,6 +266,7 @@ export default function ComicScreen({ navigation }: any) {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [isbnStatus, setIsbnStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
@@ -326,6 +327,7 @@ export default function ComicScreen({ navigation }: any) {
   const openAdd = () => {
     setEditingId(null);
     setActiveItemId(newId());
+    setOriginalCoverImage(null);
     setDraft(EMPTY_DRAFT);
     setIsbnStatus('idle');
     setModalVisible(true);
@@ -334,6 +336,7 @@ export default function ComicScreen({ navigation }: any) {
   const openEdit = (comic: Comic) => {
     setEditingId(comic.id);
     setActiveItemId(comic.id);
+    setOriginalCoverImage(comic.coverImage ?? null);
     setDraft({
       title: comic.title,
       genresText: comic.genres.join(', '),
@@ -370,15 +373,20 @@ export default function ComicScreen({ navigation }: any) {
   };
 
   const handleCoverPress = () => {
+    const isEditing = !!editingId;
     const buttons: AlertButton[] = [
       { text: 'Take Photo', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await takeCoverPhoto('comics', activeItemId);
+        const uri = isEditing
+          ? await takeCoverPhotoStaged('comics', activeItemId)
+          : await takeCoverPhoto('comics', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
       { text: 'Choose from Library', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await pickCoverFromLibrary('comics', activeItemId);
+        const uri = isEditing
+          ? await pickCoverFromLibraryStaged('comics', activeItemId)
+          : await pickCoverFromLibrary('comics', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
     ];
@@ -387,7 +395,7 @@ export default function ComicScreen({ navigation }: any) {
         text: 'Remove Photo',
         style: 'destructive',
         onPress: async () => {
-          if (activeItemId) await deleteCover('comics', activeItemId);
+          if (!isEditing && activeItemId) await deleteCover('comics', activeItemId);
           setDraft((d) => ({ ...d, coverImage: null }));
         },
       });
@@ -399,6 +407,8 @@ export default function ComicScreen({ navigation }: any) {
   const handleCancelForm = () => {
     if (!editingId && draft.coverImage && activeItemId) {
       deleteCover('comics', activeItemId).catch(() => {});
+    } else if (editingId && draft.coverImage !== originalCoverImage) {
+      discardPendingCover(draft.coverImage).catch(() => {});
     }
     setModalVisible(false);
   };
@@ -605,7 +615,10 @@ export default function ComicScreen({ navigation }: any) {
         genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
       }));
       if (result.coverUrl && activeItemId) {
-        downloadRemoteCover('comics', activeItemId, result.coverUrl).then((uri) => {
+        const download = editingId
+          ? downloadRemoteCoverStaged('comics', activeItemId, result.coverUrl)
+          : downloadRemoteCover('comics', activeItemId, result.coverUrl);
+        download.then((uri) => {
           if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
         });
       }
@@ -644,12 +657,24 @@ export default function ComicScreen({ navigation }: any) {
       return;
     }
 
+    let finalCoverImage = draft.coverImage;
+    if (editingId) {
+      if (draft.coverImage === originalCoverImage) {
+        // untouched this session
+      } else if (draft.coverImage) {
+        finalCoverImage = await commitPendingCover('comics', editingId, draft.coverImage);
+      } else if (originalCoverImage) {
+        await deleteCover('comics', editingId);
+        finalCoverImage = null;
+      }
+    }
+
     const payload = {
       title: draft.title.trim(),
       genres,
       author: draft.author.trim(),
       isbn: draft.isbn.trim(),
-      coverImage: draft.coverImage,
+      coverImage: finalCoverImage,
       read: draft.read,
       rating: draft.read ? draft.rating || null : null,
       review: draft.read ? draft.review : '',
@@ -935,7 +960,10 @@ export default function ComicScreen({ navigation }: any) {
                   // it was, same as if this were entered manually.
                   if (r.isbn) applyIsbnDigits(r.isbn.replace(/[^0-9Xx]/g, ''));
                   if (r.coverUrl && activeItemId) {
-                    downloadRemoteCover('comics', activeItemId, r.coverUrl).then((uri) => {
+                    const download = editingId
+                      ? downloadRemoteCoverStaged('comics', activeItemId, r.coverUrl)
+                      : downloadRemoteCover('comics', activeItemId, r.coverUrl);
+                    download.then((uri) => {
                       if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
                     });
                   }

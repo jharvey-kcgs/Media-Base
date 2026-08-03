@@ -39,7 +39,7 @@ import CoverThumbnail from '../components/CoverThumbnail';
 import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
 import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies, newId } from '../lib/storage';
-import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover } from '../lib/coverStorage';
+import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover, pickCoverFromLibraryStaged, takeCoverPhotoStaged, downloadRemoteCoverStaged, commitPendingCover, discardPendingCover } from '../lib/coverStorage';
 import { runUpcMovieLookup, looksLikeIsbn, TMDB_GENRE_NAMES } from '../lib/upcLookup';
 import { searchMoviesByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
@@ -222,6 +222,7 @@ export default function MovieScreen({ navigation }: any) {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   const [lookingUp, setLookingUp] = useState(false);
   const [upcStatus, setUpcStatus] = useState<'idle' | 'valid' | 'invalid' | 'isbn'>('idle');
@@ -269,6 +270,7 @@ export default function MovieScreen({ navigation }: any) {
   const openAdd = () => {
     setEditingId(null);
     setActiveItemId(newId());
+    setOriginalCoverImage(null);
     setDraft(EMPTY_DRAFT);
     setUpcStatus('idle');
     setModalVisible(true);
@@ -277,6 +279,7 @@ export default function MovieScreen({ navigation }: any) {
   const openEdit = (movie: Movie) => {
     setEditingId(movie.id);
     setActiveItemId(movie.id);
+    setOriginalCoverImage(movie.coverImage ?? null);
     setDraft({
       title: movie.title,
       genresText: movie.genres.join(', '),
@@ -310,15 +313,20 @@ export default function MovieScreen({ navigation }: any) {
   };
 
   const handleCoverPress = () => {
+    const isEditing = !!editingId;
     const buttons: AlertButton[] = [
       { text: 'Take Photo', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await takeCoverPhoto('movies', activeItemId);
+        const uri = isEditing
+          ? await takeCoverPhotoStaged('movies', activeItemId)
+          : await takeCoverPhoto('movies', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
       { text: 'Choose from Library', onPress: async () => {
         if (!activeItemId) return;
-        const uri = await pickCoverFromLibrary('movies', activeItemId);
+        const uri = isEditing
+          ? await pickCoverFromLibraryStaged('movies', activeItemId)
+          : await pickCoverFromLibrary('movies', activeItemId);
         if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
       } },
     ];
@@ -327,7 +335,7 @@ export default function MovieScreen({ navigation }: any) {
         text: 'Remove Photo',
         style: 'destructive',
         onPress: async () => {
-          if (activeItemId) await deleteCover('movies', activeItemId);
+          if (!isEditing && activeItemId) await deleteCover('movies', activeItemId);
           setDraft((d) => ({ ...d, coverImage: null }));
         },
       });
@@ -339,6 +347,8 @@ export default function MovieScreen({ navigation }: any) {
   const handleCancelForm = () => {
     if (!editingId && draft.coverImage && activeItemId) {
       deleteCover('movies', activeItemId).catch(() => {});
+    } else if (editingId && draft.coverImage !== originalCoverImage) {
+      discardPendingCover(draft.coverImage).catch(() => {});
     }
     setModalVisible(false);
   };
@@ -530,7 +540,10 @@ export default function MovieScreen({ navigation }: any) {
         genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
       }));
       if (result.coverUrl && activeItemId) {
-        downloadRemoteCover('movies', activeItemId, result.coverUrl).then((uri) => {
+        const download = editingId
+          ? downloadRemoteCoverStaged('movies', activeItemId, result.coverUrl)
+          : downloadRemoteCover('movies', activeItemId, result.coverUrl);
+        download.then((uri) => {
           if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
         });
       }
@@ -561,11 +574,23 @@ export default function MovieScreen({ navigation }: any) {
       return;
     }
 
+    let finalCoverImage = draft.coverImage;
+    if (editingId) {
+      if (draft.coverImage === originalCoverImage) {
+        // untouched this session
+      } else if (draft.coverImage) {
+        finalCoverImage = await commitPendingCover('movies', editingId, draft.coverImage);
+      } else if (originalCoverImage) {
+        await deleteCover('movies', editingId);
+        finalCoverImage = null;
+      }
+    }
+
     const payload = {
       title: draft.title.trim(),
       genres,
       upc: draft.upc.trim(),
-      coverImage: draft.coverImage,
+      coverImage: finalCoverImage,
       watched: draft.watched,
       rating: draft.watched ? draft.rating || null : null,
       review: draft.watched ? draft.review : '',
@@ -799,7 +824,10 @@ export default function MovieScreen({ navigation }: any) {
                     genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
                   }));
                   if (r.coverUrl && activeItemId) {
-                    downloadRemoteCover('movies', activeItemId, r.coverUrl).then((uri) => {
+                    const download = editingId
+                      ? downloadRemoteCoverStaged('movies', activeItemId, r.coverUrl)
+                      : downloadRemoteCover('movies', activeItemId, r.coverUrl);
+                    download.then((uri) => {
                       if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
                     });
                   }

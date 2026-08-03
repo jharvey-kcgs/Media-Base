@@ -150,3 +150,91 @@ export async function deleteCover(category: string, id: string): Promise<void> {
 export async function deleteAllCovers(): Promise<void> {
   await FileSystem.deleteAsync(COVERS_DIR, { idempotent: true }).catch(() => {});
 }
+
+// --- Staged variants, used only while EDITING an existing item ---
+//
+// Adding a brand new item can safely write straight to its permanent
+// path (the functions above) - there's no pre-existing file to protect,
+// and cancelling an Add session already cleans up any newly-created
+// cover correctly. Editing an EXISTING item is different: writing
+// straight to that item's permanent path the moment a new photo is
+// picked would silently destroy the original cover even if the edit is
+// then cancelled, since nothing else about an edit takes effect until
+// Save is actually pressed - a real bug, found by re-reading this code
+// rather than a live report, since every other field is just draft
+// state until Save, but a cover change is a real file write that was
+// happening immediately regardless.
+//
+// The fix: these write to a temporary location instead. Only
+// commitPendingCover() (called on Save) actually replaces the permanent
+// file; discardPendingCover() (called on Cancel) just deletes the temp
+// file, leaving the real one exactly as it was.
+
+function stagedCoverPath(category: string, id: string): string {
+  return `${FileSystem.cacheDirectory}pending-cover-${category}-${id}-${Date.now()}.jpg`;
+}
+
+async function saveResizedCoverTo(sourceUri: string, destUri: string): Promise<string> {
+  const manipulated = await ImageManipulator.manipulateAsync(
+    sourceUri,
+    [{ resize: { width: 400 } }],
+    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  await FileSystem.copyAsync({ from: manipulated.uri, to: destUri });
+  return destUri;
+}
+
+export async function pickCoverFromLibraryStaged(category: string, id: string): Promise<string | null> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return null;
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 0.8,
+    allowsEditing: true,
+    aspect: [2, 3],
+  });
+  if (result.canceled || !result.assets?.[0]?.uri) return null;
+  return saveResizedCoverTo(result.assets[0].uri, stagedCoverPath(category, id));
+}
+
+export async function takeCoverPhotoStaged(category: string, id: string): Promise<string | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) return null;
+  const result = await ImagePicker.launchCameraAsync({
+    quality: 0.8,
+    allowsEditing: true,
+    aspect: [2, 3],
+    saveToPhotos: false,
+  });
+  if (result.canceled || !result.assets?.[0]?.uri) return null;
+  return saveResizedCoverTo(result.assets[0].uri, stagedCoverPath(category, id));
+}
+
+export async function downloadRemoteCoverStaged(category: string, id: string, url: string): Promise<string | null> {
+  try {
+    const tempSource = `${FileSystem.cacheDirectory}temp-source-cover-${category}-${id}.jpg`;
+    const result = await FileSystem.downloadAsync(url, tempSource);
+    if (result.status !== 200) return null;
+    return await saveResizedCoverTo(result.uri, stagedCoverPath(category, id));
+  } catch (err) {
+    console.warn('Media Base: staged cover download failed', err);
+    return null;
+  }
+}
+
+/** Commits a staged (temp) cover to its item's real, permanent path -
+ * called on Save. */
+export async function commitPendingCover(category: string, id: string, stagedUri: string): Promise<string> {
+  await ensureDirExists(categoryDir(category));
+  const dest = coverPath(category, id);
+  await FileSystem.copyAsync({ from: stagedUri, to: dest });
+  await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
+  return dest;
+}
+
+/** Discards a staged (temp) cover - called on Cancel. Safe to call with
+ * null (nothing was staged this session). */
+export async function discardPendingCover(stagedUri: string | null): Promise<void> {
+  if (!stagedUri) return;
+  await FileSystem.deleteAsync(stagedUri, { idempotent: true }).catch(() => {});
+}
