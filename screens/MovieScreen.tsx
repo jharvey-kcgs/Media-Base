@@ -1,17 +1,16 @@
 // screens/MovieScreen.tsx
 //
-// Built on the same shared foundation as Books/Comics
-// (lib/useAlphabetScroll.ts for the A-Z index), but the entry-assist
-// pipeline is genuinely different: movies aren't catalogued with ISBNs,
-// so this uses a UPC -> rough title (UPCitemdb) -> real movie metadata
-// (TMDb) pipeline instead - see lib/upcLookup.ts for the full story,
-// including the free TMDb API key it needs (lib/config.ts) that Books/
-// Comics' ISBN lookup never required.
-//
-// Deliberately simpler than Book/Comic in one way: no author/director
-// field at all - not part of the requested spec for this screen.
+// Rebuilt to match TVScreen.tsx's structure exactly - barcode/UPC
+// scanning removed entirely after real testing confirmed it was
+// unreliable (the multi-hop UPC -> messy retail title -> TMDb search
+// chain was always the structurally weaker path here, unlike Books/
+// Comics' direct ISBN lookup). Title Search - already the reliable path
+// being used in practice - is now the only entry-assist method, same as
+// TV Shows. Movie and TVShow are now structural twins: both TMDb-backed,
+// both title-search-only, both store a tmdbId for a Where to Watch
+// button. No author field, matching the original spec for this screen.
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -24,14 +23,13 @@ import {
   AlertButton,
   Modal,
   ScrollView,
-  Linking,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import AppText, { FONT_FAMILY } from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import SearchBar from '../components/SearchBar';
@@ -39,8 +37,18 @@ import CoverThumbnail from '../components/CoverThumbnail';
 import CoverPicker from '../components/CoverPicker';
 import { useTheme } from '../lib/theme';
 import { getMovies, addMovie, updateMovie, deleteMovie, deleteMovies, newId } from '../lib/storage';
-import { pickCoverFromLibrary, takeCoverPhoto, downloadRemoteCover, deleteCover, pickCoverFromLibraryStaged, takeCoverPhotoStaged, downloadRemoteCoverStaged, commitPendingCover, discardPendingCover } from '../lib/coverStorage';
-import { runUpcMovieLookup, looksLikeIsbn, TMDB_GENRE_NAMES } from '../lib/upcLookup';
+import {
+  pickCoverFromLibraryStaged,
+  takeCoverPhotoStaged,
+  downloadRemoteCoverStaged,
+  pickCoverFromLibrary,
+  takeCoverPhoto,
+  downloadRemoteCover,
+  deleteCover,
+  commitPendingCover,
+  discardPendingCover,
+} from '../lib/coverStorage';
+import { TMDB_GENRE_NAMES, tmdbMovieWatchUrl } from '../lib/movieLookup';
 import { searchMoviesByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
@@ -86,26 +94,11 @@ function groupByFirstLetter(sorted: Movie[], field: 'title' | 'genre'): { title:
     .map((letter) => ({ title: letter, data: groups[letter] }));
 }
 
-// Standard UPC-A check-digit algorithm: odd positions (1-indexed) x3,
-// even positions x1, check digit = (10 - (sum mod 10)) mod 10. No
-// external library for this the way isbn3 handles ISBN - UPC's checksum
-// is simple enough to inline, and there's no hyphenation/group data to
-// look up the way isbn3 provides for ISBNs.
-function isValidUpcA(digits: string): boolean {
-  if (digits.length !== 12 || !/^\d{12}$/.test(digits)) return false;
-  const sum = digits
-    .slice(0, 11)
-    .split('')
-    .reduce((acc, d, i) => acc + Number(d) * (i % 2 === 0 ? 3 : 1), 0);
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return checkDigit === Number(digits[11]);
-}
-
 interface DraftState {
   title: string;
   genresText: string;
-  upc: string;
   coverImage: string | null;
+  tmdbId: number | null;
   watched: boolean;
   rating: number;
   review: string;
@@ -114,8 +107,8 @@ interface DraftState {
 const EMPTY_DRAFT: DraftState = {
   title: '',
   genresText: '',
-  upc: '',
   coverImage: null,
+  tmdbId: null,
   watched: false,
   rating: 0,
   review: '',
@@ -212,7 +205,6 @@ const AlphabetBar = React.memo(function AlphabetBar({
 
 export default function MovieScreen({ navigation }: any) {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [sortField, setSortField] = useState<MovieSortField>('title');
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
@@ -224,11 +216,6 @@ export default function MovieScreen({ navigation }: any) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
-  const [lookingUp, setLookingUp] = useState(false);
-  const [upcStatus, setUpcStatus] = useState<'idle' | 'valid' | 'invalid' | 'isbn'>('idle');
-  const [scannerVisible, setScannerVisible] = useState(false);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const scanLockRef = useRef(false);
 
   const load = useCallback(async () => {
     setMovies(await getMovies());
@@ -272,7 +259,6 @@ export default function MovieScreen({ navigation }: any) {
     setActiveItemId(newId());
     setOriginalCoverImage(null);
     setDraft(EMPTY_DRAFT);
-    setUpcStatus('idle');
     setModalVisible(true);
   };
 
@@ -283,18 +269,12 @@ export default function MovieScreen({ navigation }: any) {
     setDraft({
       title: movie.title,
       genresText: movie.genres.join(', '),
-      upc: movie.upc ?? '',
       coverImage: movie.coverImage ?? null,
+      tmdbId: movie.tmdbId ?? null,
       watched: movie.watched,
       rating: movie.rating ?? 0,
       review: movie.review,
     });
-    const digits = (movie.upc ?? '').replace(/\D/g, '');
-    if (digits.length === 12 || digits.length === 13) {
-      setUpcStatus(looksLikeIsbn(digits) ? 'isbn' : digits.length === 12 ? (isValidUpcA(digits) ? 'valid' : 'invalid') : 'valid');
-    } else {
-      setUpcStatus('idle');
-    }
     setModalVisible(true);
   };
 
@@ -353,11 +333,8 @@ export default function MovieScreen({ navigation }: any) {
     setModalVisible(false);
   };
 
-  // Entered via long-press on a card now, not a "..." menu item -
-  // matches iOS's own long-press-to-select pattern (Photos, Mail, Files)
-  // rather than a separate menu entry. Selects the long-pressed item
-  // immediately, same as those apps do, rather than opening into an
-  // empty selection.
+  // Entered via long-press on a card, not a "..." menu item - matches
+  // iOS's own long-press-to-select pattern (Photos, Mail, Files).
   const enterSelectionMode = (itemId: string) => {
     setSelectedIds(new Set([itemId]));
     setSelectionMode(true);
@@ -402,11 +379,9 @@ export default function MovieScreen({ navigation }: any) {
     Alert.alert('Sort by', undefined, buttons);
   };
 
-  // Deliberately different from Books/Comics: shows TMDb's full, fixed
-  // 19-genre list directly (the "limited list" requested) rather than
-  // only genres currently in use among stored movies - a stable,
-  // predictable set of filter options regardless of what's been added
-  // so far.
+  // Shows TMDb's full, fixed 19-genre list directly rather than only
+  // genres currently in use - a stable, predictable set of filter
+  // options regardless of what's been added so far.
   const openGenreFilterMenu = () => {
     const buttons: AlertButton[] = [
       { text: 'All genres', onPress: () => setGenreFilter(null) },
@@ -425,134 +400,18 @@ export default function MovieScreen({ navigation }: any) {
     ]);
   };
 
-  const handleScanPress = async () => {
-    if (cameraPermission?.granted) {
-      scanLockRef.current = false;
-      setScannerVisible(true);
-      return;
-    }
-    if (cameraPermission?.canAskAgain ?? true) {
-      const result = await requestCameraPermission();
-      if (result.granted) {
-        scanLockRef.current = false;
-        setScannerVisible(true);
-      }
-      return;
-    }
-    Alert.alert(
-      'Camera access needed',
-      'Camera access was turned off outside the app - open Phone Settings to turn it back on, or use the UPC field below instead.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Phone Settings', onPress: () => Linking.openSettings() },
-      ],
-    );
-  };
-
-  const applyUpcDigits = (digits: string): boolean => {
-    if (digits.length !== 12 && digits.length !== 13) {
-      setUpcStatus('idle');
-      setDraft((d) => ({ ...d, upc: digits }));
-      return false;
-    }
-    setDraft((d) => ({ ...d, upc: digits }));
-    if (looksLikeIsbn(digits)) {
-      setUpcStatus('isbn');
-      return false;
-    }
-    if (digits.length === 13) {
-      // EAN-13 - common for some imported/international discs. No
-      // check-digit validation implemented for this format (diminishing
-      // returns for this app's scope), so this is treated as
-      // plausible-length rather than confirmed-valid.
-      setUpcStatus('valid');
-      return true;
-    }
-    const valid = isValidUpcA(digits);
-    setUpcStatus(valid ? 'valid' : 'invalid');
-    return valid;
-  };
-
-  const handleUpcChange = (text: string) => {
-    applyUpcDigits(text.replace(/\D/g, ''));
-  };
-
-  // Fires once a barcode is in view long enough to decode. Locked with a
-  // ref (not state) so a single barcode sitting in frame doesn't fire
-  // this dozens of times per second. UPC-A (12 digits) and EAN-13 (13
-  // digits, common when a UPC is encoded with a leading 0 for GS1
-  // compatibility) both accepted.
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (scanLockRef.current) return;
-    const digits = data.replace(/\D/g, '');
-    if (digits.length !== 12 && digits.length !== 13) return;
-    scanLockRef.current = true;
-    setScannerVisible(false);
-    if (looksLikeIsbn(digits)) {
-      Alert.alert(
-        "That's an ISBN, not this movie's UPC",
-        "13-digit codes starting 978/979 are book ISBNs. Some movie sets bundle a book or booklet and print both barcodes on the case - this one would look up that bundled book, not the movie. Look for the other barcode (usually a plain 12-digit UPC) and scan that instead.",
-      );
-      return;
-    }
-    const isValid = applyUpcDigits(digits);
-    if (isValid) {
-      runUpcLookup(digits);
-    } else {
-      Alert.alert(
-        "That barcode's check digit looks off",
-        'Might be a damaged or misprinted barcode - try again, or enter the UPC by hand below.',
-      );
-    }
-  };
-
-  const handleUpcBlur = () => {
-    const digits = draft.upc.replace(/\D/g, '');
-    if (digits.length !== 12 && digits.length !== 13) return;
-    if (looksLikeIsbn(digits)) return; // inline status already explains this - see applyUpcDigits
-    runUpcLookup(digits);
-  };
-
-  // Thin wrapper around lib/upcLookup.runUpcMovieLookup - see that file
-  // for the full two-step (UPCitemdb -> TMDb) pipeline and its TMDb API
-  // key requirement (lib/config.ts).
-  const runUpcLookup = async (digits: string) => {
-    setLookingUp(true);
-    try {
-      const result = await runUpcMovieLookup(digits);
-      if (!result) {
-        Alert.alert(
-          "Couldn't find that UPC",
-          "No match found - either the UPC database doesn't have this item, or lib/config.ts needs a free TMDb API key added (see that file). You can still fill in the details by hand.",
-        );
-        return;
-      }
-      if (!result.title && result.genres.length === 0) {
-        Alert.alert(
-          "Found the UPC, but couldn't get details",
-          'The product was found but TMDb has no matching movie record - you can still fill in the details by hand.',
-        );
-        return;
-      }
-      setDraft((d) => ({
-        ...d,
-        title: result.title || d.title,
-        genresText: result.genres.length > 0 ? result.genres.join(', ') : d.genresText,
-      }));
-      if (result.coverUrl && activeItemId) {
-        const download = editingId
-          ? downloadRemoteCoverStaged('movies', activeItemId, result.coverUrl)
-          : downloadRemoteCover('movies', activeItemId, result.coverUrl);
-        download.then((uri) => {
-          if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
-        });
-      }
-    } catch (err) {
-      console.warn('Media Base: UPC lookup failed', err);
-      Alert.alert('Lookup failed', 'Could not reach the lookup services - check your connection, or fill in the details by hand.');
-    } finally {
-      setLookingUp(false);
-    }
+  // Opens TMDb's own watch page for this movie - see
+  // lib/movieLookup.ts's tmdbMovieWatchUrl() for why this links out
+  // rather than building a custom in-app provider list. Only ever
+  // called when draft.tmdbId is set, since the button itself doesn't
+  // render otherwise - nothing to link to for an entry typed in by hand
+  // rather than found through title search.
+  const handleWhereToWatch = () => {
+    if (!draft.tmdbId) return;
+    Linking.openURL(tmdbMovieWatchUrl(draft.tmdbId)).catch((err) => {
+      console.warn('Media Base: failed to open Where to Watch URL', err);
+      Alert.alert("Couldn't open that", 'Something went wrong opening the watch page - please try again.');
+    });
   };
 
   const handleSave = async () => {
@@ -589,8 +448,8 @@ export default function MovieScreen({ navigation }: any) {
     const payload = {
       title: draft.title.trim(),
       genres,
-      upc: draft.upc.trim(),
       coverImage: finalCoverImage,
+      tmdbId: draft.tmdbId,
       watched: draft.watched,
       rating: draft.watched ? draft.rating || null : null,
       review: draft.watched ? draft.review : '',
@@ -748,30 +607,7 @@ export default function MovieScreen({ navigation }: any) {
       </View>
 
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        {scannerVisible ? (
-          <View style={styles.scannerRoot}>
-            <CameraView
-              style={StyleSheet.absoluteFill}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'upc_e', 'ean13'] }}
-              onBarcodeScanned={handleBarcodeScanned}
-            />
-            <View style={[styles.scannerOverlay, { paddingTop: insets.top + 16 }]}>
-              <TouchableOpacity
-                onPress={() => setScannerVisible(false)}
-                style={[styles.scannerCancel, { top: insets.top + 16 }]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <AppText style={{ color: '#FFFFFF', fontSize: 15 * theme.fontScale }}>Cancel</AppText>
-              </TouchableOpacity>
-              <View style={styles.scannerFrame} />
-              <AppText style={{ color: '#FFFFFF', fontSize: 14 * theme.fontScale, textAlign: 'center', marginTop: 16 }}>
-                Line up the barcode on the back of the movie case
-              </AppText>
-            </View>
-          </View>
-        ) : (
-          <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
+        <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
           <ScreenHeader
             title={editingId ? 'Edit Entry' : 'Add Entry'}
             left={
@@ -786,166 +622,122 @@ export default function MovieScreen({ navigation }: any) {
             }
           />
 
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          >
+          <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <ScrollView
               contentContainerStyle={styles.form}
               keyboardShouldPersistTaps="handled"
               automaticallyAdjustKeyboardInsets
             >
-            <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
-              * required
-            </AppText>
-
-            <CoverPicker uri={draft.coverImage} onPress={handleCoverPress} iconName="film-outline" />
-
-            <View style={[styles.field, { zIndex: 20 }]}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Title * (type to search and auto-fill)
+              <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 16 }}>
+                * required
               </AppText>
-              <TitleSearchInput
-                value={draft.title}
-                onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
-                search={(query) => searchMoviesByTitle(query)}
-                getKey={(r) => (r.tmdbId != null ? String(r.tmdbId) : `${r.title}-${r.releaseYear}`)}
-                getLabel={(r) => r.title ?? 'Untitled'}
-                getSubtitle={(r) => r.releaseYear}
-                onSelect={(r) => {
-                  // No UPC to fill from a title match - a UPC identifies
-                  // a specific physical disc/release, not "the movie" as
-                  // a concept, so there's no single correct number to
-                  // backfill here the way there is for Books/Comics'
-                  // ISBN. draft.upc is left untouched.
-                  setDraft((d) => ({
-                    ...d,
-                    title: r.title || d.title,
-                    genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
-                  }));
-                  if (r.coverUrl && activeItemId) {
-                    const download = editingId
-                      ? downloadRemoteCoverStaged('movies', activeItemId, r.coverUrl)
-                      : downloadRemoteCover('movies', activeItemId, r.coverUrl);
-                    download.then((uri) => {
-                      if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
-                    });
-                  }
-                }}
-              />
-            </View>
 
-            <View style={styles.field}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                Genre(s) * (comma-separated, e.g. Action, Comedy)
-              </AppText>
-              <TextInput
-                value={draft.genresText}
-                onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              />
-            </View>
+              <CoverPicker uri={draft.coverImage} onPress={handleCoverPress} iconName="film-outline" />
 
-            <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 8 }]}>
-              Have the disc? (optional - can also fill in the fields above)
-            </AppText>
-
-            <TouchableOpacity
-              onPress={handleScanPress}
-              style={[styles.scanButton, { borderColor: theme.colors.accentReadable }]}
-            >
-              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan its barcode</AppText>
-            </TouchableOpacity>
-
-            <View style={styles.field}>
-              <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                UPC
-              </AppText>
-              <TextInput
-                value={draft.upc}
-                onChangeText={handleUpcChange}
-                onBlur={handleUpcBlur}
-                keyboardType="number-pad"
-                placeholder="e.g. 024543611473"
-                placeholderTextColor={theme.colors.textMuted}
-                style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              />
-              {upcStatus === 'valid' && (
-                <AppText style={{ color: theme.colors.success, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
-                  ✓ Looks like a valid UPC
+              <View style={[styles.field, { zIndex: 20 }]}>
+                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                  Title * (type to search and auto-fill)
                 </AppText>
-              )}
-              {upcStatus === 'invalid' && (
-                <AppText style={{ color: theme.colors.danger, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
-                  ⚠ That check digit doesn't look right - double-check the numbers
-                </AppText>
-              )}
-              {upcStatus === 'isbn' && (
-                <AppText style={{ color: theme.colors.danger, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
-                  ⚠ That's an ISBN (a bundled book, if this set has one) - look for the disc's own UPC instead
-                </AppText>
-              )}
-              {lookingUp && (
-                <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginTop: 4 }}>
-                  Looking up...
-                </AppText>
-              )}
-            </View>
+                <TitleSearchInput
+                  value={draft.title}
+                  onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
+                  search={(query) => searchMoviesByTitle(query)}
+                  getKey={(r) => (r.tmdbId != null ? String(r.tmdbId) : `${r.title}-${r.releaseYear}`)}
+                  getLabel={(r) => r.title ?? 'Untitled'}
+                  getSubtitle={(r) => r.releaseYear}
+                  onSelect={(r) => {
+                    setDraft((d) => ({
+                      ...d,
+                      title: r.title || d.title,
+                      genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
+                      tmdbId: r.tmdbId ?? d.tmdbId,
+                    }));
+                    if (r.coverUrl && activeItemId) {
+                      const download = editingId
+                        ? downloadRemoteCoverStaged('movies', activeItemId, r.coverUrl)
+                        : downloadRemoteCover('movies', activeItemId, r.coverUrl);
+                      download.then((uri) => {
+                        if (uri) setDraft((d) => ({ ...d, coverImage: uri }));
+                      });
+                    }
+                  }}
+                />
+              </View>
 
-
-            <View style={[styles.row, { marginTop: 8 }]}>
-              <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>
-                {REQUIRED_SWITCH_LABEL}
-              </AppText>
-              <Switch
-                value={draft.watched}
-                onValueChange={(watched) => setDraft((d) => ({ ...d, watched }))}
-                trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-              />
-            </View>
-
-            {draft.watched && (
-              <>
-                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
-                  Rating
-                </AppText>
-                <View style={styles.starRow}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <TouchableOpacity key={n} onPress={() => setDraft((d) => ({ ...d, rating: n }))}>
-                      <AppText style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accentReadable : theme.colors.border }}>
-                        ★
-                      </AppText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
-                  Review
+              <View style={styles.field}>
+                <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
+                  Genre(s) * (comma-separated, e.g. Action, Comedy)
                 </AppText>
                 <TextInput
-                  value={draft.review}
-                  onChangeText={(text) => setDraft((d) => ({ ...d, review: text }))}
-                  multiline
-                  style={[styles.input, styles.multiline, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  value={draft.genresText}
+                  onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
+                  style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
                 />
-              </>
-            )}
+              </View>
 
-            {editingId && (
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-                  confirmDelete(editingId, draft.title || 'this entry');
-                }}
-                style={[styles.deleteButton, { borderColor: theme.colors.danger }]}
-              >
-                <AppText style={{ color: theme.colors.danger, fontSize: 15 * theme.fontScale }}>Delete entry</AppText>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
+              {draft.tmdbId && (
+                <TouchableOpacity
+                  onPress={handleWhereToWatch}
+                  style={[styles.watchButton, { borderColor: theme.colors.accentReadable }]}
+                >
+                  <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>
+                    📺 Where to Watch
+                  </AppText>
+                </TouchableOpacity>
+              )}
+
+              <View style={[styles.row, { marginTop: 8 }]}>
+                <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale, flex: 1, paddingRight: 12 }}>
+                  {REQUIRED_SWITCH_LABEL}
+                </AppText>
+                <Switch
+                  value={draft.watched}
+                  onValueChange={(watched) => setDraft((d) => ({ ...d, watched }))}
+                  trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+                />
+              </View>
+
+              {draft.watched && (
+                <>
+                  <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
+                    Rating
+                  </AppText>
+                  <View style={styles.starRow}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <TouchableOpacity key={n} onPress={() => setDraft((d) => ({ ...d, rating: n }))}>
+                        <AppText style={{ fontSize: 28, color: n <= draft.rating ? theme.colors.accentReadable : theme.colors.border }}>
+                          ★
+                        </AppText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale, marginTop: 16 }]}>
+                    Review
+                  </AppText>
+                  <TextInput
+                    value={draft.review}
+                    onChangeText={(text) => setDraft((d) => ({ ...d, review: text }))}
+                    multiline
+                    style={[styles.input, styles.multiline, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
+                  />
+                </>
+              )}
+
+              {editingId && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setModalVisible(false);
+                    confirmDelete(editingId, draft.title || 'this entry');
+                  }}
+                  style={[styles.deleteButton, { borderColor: theme.colors.danger }]}
+                >
+                  <AppText style={{ color: theme.colors.danger, fontSize: 15 * theme.fontScale }}>Delete entry</AppText>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
-        )}
       </Modal>
     </SafeAreaView>
   );
@@ -975,16 +767,6 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 90, textAlignVertical: 'top' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   starRow: { flexDirection: 'row', gap: 8 },
-  scanButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 8 },
+  watchButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 14 },
   deleteButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 28 },
-  scannerRoot: { flex: 1, backgroundColor: '#000000' },
-  scannerOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  scannerCancel: { position: 'absolute', top: 16, left: 20 },
-  scannerFrame: {
-    width: '80%',
-    height: 140,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: 12,
-  },
 });

@@ -1,7 +1,7 @@
 // lib/tvLookup.ts
 //
 // TV Shows' TMDb integration - its own file rather than folded into
-// upcLookup.ts (Movies), even though both use TMDb: TV shows have their
+// lib/movieLookup.ts, even though both use TMDb: TV shows have their
 // own official genre taxonomy (confirmed via TMDb's live API - notably
 // different from Movies': no separate Horror/Thriller/Romance, but
 // Kids/News/Reality/Soap/Talk exist here that don't for movies), and
@@ -10,9 +10,12 @@
 // drop-in reuse of the Movies code despite the surface similarity.
 //
 // TV Shows has no barcode/number entry at all (confirmed design - title
-// search is the only assisted entry method), so unlike upcLookup.ts
-// there's no separate "look up by code" pipeline here - just the search
-// itself, reused directly by lib/titleSearch.ts.
+// search is the only assisted entry method). Movies later dropped its
+// own barcode/UPC entry too, after real testing confirmed it was
+// unreliable - the two are now structural twins in this specific way,
+// though this file stayed separate from movieLookup.ts regardless,
+// since the genre/field-name differences above are real and unrelated
+// to that later change.
 //
 // NOTE: not network-tested from the sandbox this was written in.
 
@@ -52,7 +55,7 @@ export interface TVShowLookupResult {
 
 /** Shared low-level TMDb TV search - returns up to maxResults candidates.
  * Reused directly by lib/titleSearch.ts's searchTVShowsByTitle(), same
- * split as upcLookup.ts's tmdbSearchMovies(). */
+ * split as movieLookup.ts's tmdbSearchMovies(). */
 export async function tmdbSearchTVShows(query: string, maxResults: number): Promise<TVShowLookupResult[]> {
   if (!TMDB_READ_ACCESS_TOKEN) {
     console.warn(

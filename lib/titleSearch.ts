@@ -19,20 +19,22 @@
 // go through the exact same genre-allowlist matching regardless of
 // which source actually answered.
 //
-// Movies reuses lib/upcLookup.ts's tmdbSearchMovies() directly, since
-// that's the same TMDb search the UPC pipeline's second step already
-// calls, just asking for several results instead of one.
+// Movies reuses lib/movieLookup.ts's tmdbSearchMovies() directly -
+// Movies' only entry-assist method now that barcode/UPC scanning has
+// been removed (confirmed unreliable via real testing; Title Search was
+// already the reliable path being used in practice).
 //
 // Deliberately different result shapes per category rather than one
-// forced-generic type: Movies results never carry a UPC at all - UPC
-// identifies a specific physical disc/release, not "the movie" as a
-// concept, so there's no correct number to backfill from a title search
-// the way there is for books.
+// forced-generic type: Movies results never carry a UPC at all - that
+// field doesn't exist on the Movie type anymore, since a UPC identifies
+// a specific physical disc/release, not "the movie" as a concept, so
+// there was never a correct number to backfill from a title search the
+// way there is for books.
 //
 // NOTE: not network-testable from the sandbox this was written in.
 
 import { normalizeGenres } from './isbnLookup';
-import { tmdbSearchMovies, UpcMovieLookupResult } from './upcLookup';
+import { tmdbSearchMovies, MovieLookupResult } from './movieLookup';
 import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
@@ -157,10 +159,11 @@ export async function searchBooksByTitle(
 }
 
 /** Searches TMDb by movie title - thin wrapper around
- * lib/upcLookup.ts's tmdbSearchMovies(), which the UPC pipeline's own
- * second step already uses for a single best match. No UPC field on the
- * result - see the file-level note above for why. */
-export async function searchMoviesByTitle(query: string, maxResults = 8): Promise<UpcMovieLookupResult[]> {
+ * lib/movieLookup.ts's tmdbSearchMovies(), Movies' only entry-assist
+ * method now that barcode/UPC scanning has been removed (confirmed
+ * unreliable via real testing). No UPC field on the result - see the
+ * file-level note above for why. */
+export async function searchMoviesByTitle(query: string, maxResults = 8): Promise<MovieLookupResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   return tmdbSearchMovies(trimmed, maxResults);

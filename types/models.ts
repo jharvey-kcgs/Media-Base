@@ -44,7 +44,7 @@ export const CATEGORY_LABELS: Record<MediaCategory, string> = {
 export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
   books: true,
   comics: true,
-  movies: true,
+  movies: false,
   tvshows: false,
   anime: false,
   music: false, // uses "paste a link" instead of a barcode scan
@@ -88,18 +88,20 @@ export interface Comic {
 
 export type ComicSortField = 'title' | 'genre' | 'author' | 'read' | 'rating';
 
-// No author/director field - not part of the requested spec, kept
-// deliberately minimal. UPC instead of ISBN (movies aren't catalogued
-// with ISBNs), "watched" instead of "read". Genre here comes from
-// TMDb's own fixed, official genre list (lib/upcLookup.ts) rather than
-// an allowlist-matched free-text one, since that source is already
-// clean structured data - no noisy subject headings to filter out.
+// No barcode/number field at all as of this refactor - real testing
+// confirmed UPC scanning was unreliable (the multi-hop UPC -> messy
+// retail title -> TMDb search chain was always the structurally weaker
+// path here, unlike Books/Comics' direct ISBN lookup), and Title Search
+// was already the reliable path being used in practice. Removed scan
+// and UPC entirely rather than half-measures, matching TVShow's shape
+// exactly - Movie and TVShow are now structural twins, both TMDb-backed,
+// both title-search-only, both with a stored tmdbId for Where to Watch.
 export interface Movie {
   id: string;
   title: string;
   genres: string[];
-  upc: string; // optional - if filled in, triggers the same auto-fill lookup as scanning
   coverImage: string | null; // local file URI (lib/coverStorage.ts) - never a remote URL, see that file for why
+  tmdbId: number | null; // for the Where to Watch button - null for anything typed by hand rather than found through title search
   watched: boolean;
   rating: number | null;
   review: string;
