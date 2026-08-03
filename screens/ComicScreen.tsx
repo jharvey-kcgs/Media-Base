@@ -153,6 +153,7 @@ const ComicCard = React.memo(function ComicCard({
   selected,
   selectionMode,
   onPress,
+  onLongPress,
   onAuthorPress,
   onLayout,
 }: {
@@ -160,6 +161,7 @@ const ComicCard = React.memo(function ComicCard({
   selected: boolean;
   selectionMode: boolean;
   onPress: (comic: Comic) => void;
+  onLongPress: (comic: Comic) => void;
   onAuthorPress: (author: string) => void;
   onLayout?: (e: any) => void;
 }) {
@@ -167,6 +169,7 @@ const ComicCard = React.memo(function ComicCard({
   return (
     <TouchableOpacity
       onPress={() => onPress(comic)}
+      onLongPress={() => onLongPress(comic)}
       onLayout={onLayout}
       style={[
         styles.card,
@@ -400,12 +403,13 @@ export default function ComicScreen({ navigation }: any) {
     setModalVisible(false);
   };
 
-  const enterSelectionMode = () => {
-    if (sorted.length === 0) {
-      Alert.alert('No comics yet', 'Add a comic or manga first.');
-      return;
-    }
-    setSelectedIds(new Set());
+  // Entered via long-press on a card now, not a "..." menu item -
+  // matches iOS's own long-press-to-select pattern (Photos, Mail, Files)
+  // rather than a separate menu entry. Selects the long-pressed item
+  // immediately, same as those apps do, rather than opening into an
+  // empty selection.
+  const enterSelectionMode = (itemId: string) => {
+    setSelectedIds(new Set([itemId]));
     setSelectionMode(true);
   };
 
@@ -472,7 +476,6 @@ export default function ComicScreen({ navigation }: any) {
       { text: '+ Add entry', onPress: openAdd },
       { text: 'Filter by...', onPress: openSortMenu },
       { text: 'Filter by genre...', onPress: openGenreFilterMenu },
-      { text: '- Delete entries', style: 'destructive', onPress: enterSelectionMode },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -672,6 +675,13 @@ export default function ComicScreen({ navigation }: any) {
     [selectionMode],
   );
 
+  const handleCardLongPress = useCallback(
+    (comic: Comic) => {
+      if (!selectionMode) enterSelectionMode(comic.id);
+    },
+    [selectionMode],
+  );
+
   const handleAuthorPress = useCallback((author: string) => {
     setGenreFilter(null);
     setAuthorFilter(author);
@@ -684,11 +694,12 @@ export default function ComicScreen({ navigation }: any) {
         selected={selectedIds.has(item.id)}
         selectionMode={selectionMode}
         onPress={handleCardPress}
+        onLongPress={handleCardLongPress}
         onAuthorPress={handleAuthorPress}
         onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
       />
     ),
-    [selectedIds, selectionMode, handleCardPress, handleAuthorPress, recordRowHeight],
+    [selectedIds, selectionMode, handleCardPress, handleCardLongPress, handleAuthorPress, recordRowHeight],
   );
 
   const renderSectionHeader = useCallback(

@@ -817,19 +817,26 @@ into it differs), and only duplicate what's genuinely category-specific
   than reverting to an inline render function for convenience.
 - Header right slot is a **"•••" menu** (`Ionicons ellipsis-horizontal`),
   not a persistent "+ Add" button or a visible filter-chip row - tapping
-  it shows **+ Add entry / Filter by... / Filter by genre... / - Delete
-  entries**. "Add"/"Filter by..."/"Filter by genre..." each open a
-  second native picker (`Alert.alert` with one button per option).
-  "Delete entries" instead switches the whole screen into a **selection
-  mode**: the header becomes Cancel / "N selected" / Delete, tapping a
-  row toggles a checkmark instead of opening it for editing, and Delete
-  bulk-removes everything selected in one call
-  (`storage.deleteBooks(ids)` - one read/write instead of one per item).
-  This replaced an earlier version where "Delete entries" opened a
-  picker listing up to 10 book titles as buttons, one delete at a time -
-  selection mode is both more capable (delete many at once) and doesn't
-  hit the same Android `Alert.alert` 3-button cap that a long title list
-  would.
+  it shows **+ Add entry / Filter by... / Filter by genre...**.
+  Each opens a second native picker (`Alert.alert` with one button per
+  option). Deleting multiple entries is **not** one of this menu's
+  options, deliberately - see the next bullet.
+- **Press and hold any row to bulk-delete** - matches iOS's own
+  long-press-to-select pattern (Photos, Mail, Files), rather than a
+  `•••` menu entry. Switches the whole screen into a **selection
+  mode**: the header becomes Cancel / "N selected" / Delete, the row
+  actually held is already checked (same as those native apps do -
+  never opens into an empty selection), tapping other rows toggles a
+  checkmark instead of opening them for editing, and Delete bulk-removes
+  everything selected in one call (`storage.deleteBooks(ids)` - one
+  read/write instead of one per item). `enterSelectionMode(itemId)` now
+  requires the id of whatever was held, rather than being callable with
+  no argument. This went through two earlier versions before landing
+  here: first a picker listing up to 10 book titles as buttons (hit
+  Android's `Alert.alert` 3-button cap with a long title list), then a
+  "- Delete entries" `•••` menu item - removed specifically to keep that
+  menu from growing further, once long-press was available as a more
+  standard, more discoverable path to the exact same selection mode.
 - **Tapping any row opens it for editing** (outside selection mode) -
   every field is editable, and a **Delete** button lives inside that same
   edit screen for removing just that one entry.

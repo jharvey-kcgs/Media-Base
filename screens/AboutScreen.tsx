@@ -22,7 +22,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Managing your list',
-    body: "The ••• menu (top right of each category screen) has Add entry / Filter by... / Filter by genre... / Delete entries - Delete switches the screen into a selection mode so you can remove one or many entries at once. Every category is stored completely separately, so nothing added under one can ever end up in another. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
+    body: "The ••• menu (top right of each category screen) has Add entry / Filter by... / Filter by genre.... To remove one or many entries at once, press and hold any entry - that switches the screen into a selection mode with the entry you held already checked, tap any others you want to remove, then Delete. Every category is stored completely separately, so nothing added under one can ever end up in another. Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
   },
   {
     title: 'Data',

@@ -178,6 +178,7 @@ const BookCard = React.memo(function BookCard({
   selected,
   selectionMode,
   onPress,
+  onLongPress,
   onAuthorPress,
   onLayout,
 }: {
@@ -185,6 +186,7 @@ const BookCard = React.memo(function BookCard({
   selected: boolean;
   selectionMode: boolean;
   onPress: (book: Book) => void;
+  onLongPress: (book: Book) => void;
   onAuthorPress: (author: string) => void;
   onLayout?: (e: any) => void;
 }) {
@@ -192,6 +194,7 @@ const BookCard = React.memo(function BookCard({
   return (
     <TouchableOpacity
       onPress={() => onPress(book)}
+      onLongPress={() => onLongPress(book)}
       onLayout={onLayout}
       style={[
         styles.card,
@@ -427,12 +430,13 @@ export default function BookScreen({ navigation }: any) {
     Alert.alert('Cover photo', undefined, buttons);
   };
 
-  const enterSelectionMode = () => {
-    if (sorted.length === 0) {
-      Alert.alert('No books yet', 'Add a book first.');
-      return;
-    }
-    setSelectedIds(new Set());
+  // Entered via long-press on a card now, not a "..." menu item -
+  // matches iOS's own long-press-to-select pattern (Photos, Mail, Files)
+  // rather than a separate menu entry. Selects the long-pressed item
+  // immediately, same as those apps do, rather than opening into an
+  // empty selection.
+  const enterSelectionMode = (itemId: string) => {
+    setSelectedIds(new Set([itemId]));
     setSelectionMode(true);
   };
 
@@ -499,7 +503,6 @@ export default function BookScreen({ navigation }: any) {
       { text: '+ Add entry', onPress: openAdd },
       { text: 'Filter by...', onPress: openSortMenu },
       { text: 'Filter by genre...', onPress: openGenreFilterMenu },
-      { text: '- Delete entries', style: 'destructive', onPress: enterSelectionMode },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -733,6 +736,13 @@ export default function BookScreen({ navigation }: any) {
     [selectionMode],
   );
 
+  const handleCardLongPress = useCallback(
+    (book: Book) => {
+      if (!selectionMode) enterSelectionMode(book.id);
+    },
+    [selectionMode],
+  );
+
   // Narrows the list to one author, same as tapping a genre chip does for
   // genre - not a new menu item, deliberately, per explicit request to
   // avoid growing the ••• menu further. Clears the existing genre filter:
@@ -751,11 +761,12 @@ export default function BookScreen({ navigation }: any) {
         selected={selectedIds.has(item.id)}
         selectionMode={selectionMode}
         onPress={handleCardPress}
+        onLongPress={handleCardLongPress}
         onAuthorPress={handleAuthorPress}
         onLayout={(e) => recordRowHeight(e.nativeEvent.layout.height)}
       />
     ),
-    [selectedIds, selectionMode, handleCardPress, handleAuthorPress, recordRowHeight],
+    [selectedIds, selectionMode, handleCardPress, handleCardLongPress, handleAuthorPress, recordRowHeight],
   );
 
   // Stable for the same reason renderItem is: SectionList keeps the current

@@ -26,7 +26,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Can I delete more than one entry at a time?',
-    a: 'Yes - tap ••• → Delete entries to switch into a selection mode, tap as many entries as you want, then Delete.',
+    a: 'Yes - press and hold any entry to switch into a selection mode with that entry already checked, tap any others you want to remove, then Delete.',
   },
   {
     q: 'Can a Comic/Manga end up under Books, or a Book under Comics/Manga?',
