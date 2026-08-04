@@ -58,7 +58,36 @@ const MUSIC_GENRE_ALLOWLIST = [
   'House', 'Techno', 'Dance', 'Disco', 'Grunge', 'Ska', 'K-Pop', 'J-Pop',
   'Singer-Songwriter', 'Soundtrack', 'New Age', 'Experimental', 'Emo',
   'Hardcore', 'Industrial', 'Synth-Pop', 'Progressive Rock', 'Bluegrass',
+  // Added on request. Deliberately one word each, not "Metal Core"/
+  // "Death Core"/"Death Metal" - real-world tags (MusicBrainz included,
+  // confirmed via an actual raw tag from testing: "metalcore") write
+  // these three specifically as single words with no separator at all,
+  // unlike Singer-Songwriter/Synth-Pop above, which are already
+  // hyphenated correctly. Every one of these still displays with a
+  // space - see GENRE_DISPLAY_OVERRIDES below, applied after
+  // normalizeGenres() rather than changing that shared function's
+  // behavior (it's also used by Books).
+  'Metalcore', 'Deathcore', 'Deathmetal',
 ];
+
+// normalizeGenres() (shared with Books - lib/isbnLookup.ts) uses each
+// allowlist entry as both the pattern it matches against a raw tag AND
+// the exact string it returns on a match, so a genre that needs to
+// match a one-word or hyphenated raw tag but display with a space
+// can't just be one allowlist entry - this remaps whichever form
+// actually matched to the same nicer display form afterward,
+// Music-specific, without touching normalizeGenres() itself.
+const GENRE_DISPLAY_OVERRIDES: Record<string, string> = {
+  Metalcore: 'Metal Core',
+  Deathcore: 'Death Core',
+  Deathmetal: 'Death Metal',
+  'Singer-Songwriter': 'Singer Songwriter',
+  'Synth-Pop': 'Synth Pop',
+};
+
+function applyGenreDisplayNames(genres: string[]): string[] {
+  return genres.map((g) => GENRE_DISPLAY_OVERRIDES[g] ?? g);
+}
 
 export interface MusicSearchResult {
   key: string; // MusicBrainz release MBID - stable, unique regardless of whether this matched as an album or a song
@@ -280,7 +309,7 @@ export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
     }
     const json = await res.json();
     const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
-    const genres = normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST);
+    const genres = applyGenreDisplayNames(normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST));
     console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
     if (genres.length > 0) return genres;
 
@@ -306,7 +335,7 @@ async function fetchArtistGenres(artistId: string): Promise<string[]> {
     }
     const json = await res.json();
     const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
-    const genres = normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST);
+    const genres = applyGenreDisplayNames(normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST));
     console.warn('Media Base: MusicBrainz tag lookup (artist)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
     return genres;
   } catch (err) {
