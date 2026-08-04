@@ -20,6 +20,7 @@ import BookScreen from './screens/BookScreen';
 import ComicScreen from './screens/ComicScreen';
 import MovieScreen from './screens/MovieScreen';
 import TVScreen from './screens/TVScreen';
+import AnimeScreen from './screens/AnimeScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { getSettings } from './lib/storage';
 import { scheduleDailyRecommendationNotification } from './lib/notifications';
@@ -181,6 +182,7 @@ function ThemedApp() {
           <Stack.Screen name="Comic" component={ComicScreen} />
           <Stack.Screen name="Movie" component={MovieScreen} />
           <Stack.Screen name="TV" component={TVScreen} />
+          <Stack.Screen name="Anime" component={AnimeScreen} />
         </Stack.Navigator>
       </View>
     </NavigationContainer>

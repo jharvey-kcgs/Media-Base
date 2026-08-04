@@ -91,13 +91,13 @@ that multi-hop lookup chain was unreliable in practice, with Title
 Search already being the reliable path being used - see
 `lib/movieLookup.ts`'s header comment for the full story.
 
-**Anime's data layer is built, but `screens/AnimeScreen.tsx` itself
-doesn't exist yet** - `types/models.ts`'s `Anime`, full CRUD in
-`lib/storage.ts` (including backup/cover wiring), and the two-source
-lookup (`lib/tvLookup.ts` primary, `lib/jikanLookup.ts` fallback, both
-orchestrated by `lib/titleSearch.ts`'s `searchAnimeByTitle()`) are all
-in place - the Home widget still shows "Coming soon" until the screen
-is built, same as TV Shows did at the equivalent point. Anime is a real,
+**Anime is fully working** - `screens/AnimeScreen.tsx` (list, search,
+genre filter, A-Z index, hold-to-select, full Add/Edit) and the Home
+widget are both built now, on top of the data layer (`types/models.ts`'s
+`Anime`, full CRUD in `lib/storage.ts` including backup/cover wiring,
+and the two-source lookup - `lib/tvLookup.ts` primary,
+`lib/jikanLookup.ts` fallback, both orchestrated by
+`lib/titleSearch.ts`'s `searchAnimeByTitle()`). Anime is a real,
 deliberate two-source design, not a reluctant one: TMDb catalogues most
 mainstream-popular anime as a regular TV show already, so it's the
 primary source (genre filter uses the same dynamic "genres actually in

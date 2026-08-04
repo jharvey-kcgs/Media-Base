@@ -85,7 +85,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 4. **TV Shows** ✅ done, also built out of the original planned order per explicit request - title-search only from the start (lib/tvLookup.ts, its own genre taxonomy genuinely different from Movies'). Structural twin of Movies now that Movies dropped its own scan/UPC entry - both share the same "Where to Watch" approach (see above).
 5. Puzzles (manual-only, good simple next target)
 6. Music (link-paste + developer API keys)
-7. **Anime** - data layer done (title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows), screens/AnimeScreen.tsx itself still pending
+7. **Anime** ✅ done - title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows
 8. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
 
 ## Open items not yet decided

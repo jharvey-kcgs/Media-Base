@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getMovies, getTVShows, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getTVShows, getAnime, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -19,6 +19,7 @@ const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   comics: 'Comic',
   movies: 'Movie',
   tvshows: 'TV',
+  anime: 'Anime',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
@@ -28,6 +29,7 @@ type RootStackParamList = {
   Comic: undefined;
   Movie: undefined;
   TV: undefined;
+  Anime: undefined;
   Settings: undefined;
 };
 
@@ -101,14 +103,29 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const today = toLocalDateString(new Date());
-    const [books, comics, movies, tvShows] = await Promise.all([getBooks(), getComics(), getMovies(), getTVShows()]);
-    const [booksData, comicsData, moviesData, tvShowsData] = await Promise.all([
+    const [books, comics, movies, tvShows, anime] = await Promise.all([
+      getBooks(),
+      getComics(),
+      getMovies(),
+      getTVShows(),
+      getAnime(),
+    ]);
+    const [booksData, comicsData, moviesData, tvShowsData, animeData] = await Promise.all([
       loadWidgetData('books', books, (b) => b.read, 'book', 'books', today),
       loadWidgetData('comics', comics, (c) => c.read, 'entry', 'entries', today),
       loadWidgetData('movies', movies, (m) => m.watched, 'movie', 'movies', today),
       loadWidgetData('tvshows', tvShows, (t) => t.watched, 'show', 'shows', today),
+      // "anime" reads correctly as both singular and plural already
+      // (same as "sheep"), so the same word covers both unit slots.
+      loadWidgetData('anime', anime, (a) => a.watched, 'anime', 'anime', today),
     ]);
-    setWidgetData({ books: booksData, comics: comicsData, movies: moviesData, tvshows: tvShowsData });
+    setWidgetData({
+      books: booksData,
+      comics: comicsData,
+      movies: moviesData,
+      tvshows: tvShowsData,
+      anime: animeData,
+    });
   }, []);
 
   useFocusEffect(
@@ -164,7 +181,15 @@ export default function HomeScreen({ navigation }: any) {
                     <View style={styles.suggestionRow}>
                       <CoverThumbnail
                         uri={data.suggestionCoverImage}
-                        iconName={cat === 'movies' ? 'film-outline' : cat === 'tvshows' ? 'tv-outline' : 'book-outline'}
+                        iconName={
+                          cat === 'movies'
+                            ? 'film-outline'
+                            : cat === 'tvshows'
+                              ? 'tv-outline'
+                              : cat === 'anime'
+                                ? 'sparkles-outline'
+                                : 'book-outline'
+                        }
                       />
                       <AppText
                         style={{ color: theme.colors.accentReadable, fontSize: 14 * theme.fontScale, flexShrink: 1 }}
