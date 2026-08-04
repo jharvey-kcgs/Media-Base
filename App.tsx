@@ -40,7 +40,14 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // while the app is closed/backgrounded.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    // shouldShowAlert was replaced by shouldShowBanner + shouldShowList
+    // in the installed expo-notifications version (confirmed via Expo's
+    // own GitHub history, not a guess) - banner is the transient
+    // in-the-moment alert, list is whether it's also kept in the
+    // notification center/history. Both true here to match the original
+    // shouldShowAlert: true behavior as closely as possible.
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),

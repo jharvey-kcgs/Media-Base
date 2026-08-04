@@ -1586,8 +1586,9 @@ Light/Dark on a real device the way Home Base's equivalent system was.
 ## 8. Known setup gotchas
 
 Carried over from Home Base/League Base's setup experience, since this
-project uses the identical Node/Expo stack — nothing below has needed
-fixing here specifically yet, but all of it applies equally.
+project uses the identical Node/Expo stack - #1 through #5 haven't
+needed fixing here specifically, but all of them apply equally. #6 is
+genuinely specific to this project, not inherited.
 
 ### Gotcha #1: Node version
 
@@ -1617,18 +1618,49 @@ Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 `lib/theme.tsx` is named that way specifically because it renders a
 `<Context.Provider>`.
 
-### Gotcha #5: "No safe area value available"
+### Gotcha #6: Expo SDK type drift - real, project-specific, not carried over
 
-`[Error: No safe area value available. Make sure you are rendering
-<SafeAreaProvider> at the top of your app.]` on launch means exactly
-what it says - `App.tsx` needs to wrap everything in `<SafeAreaProvider>`
-(from `react-native-safe-area-context`), above `ThemeProvider`. Nearly
-every screen in this app uses `SafeAreaView` or `useSafeAreaInsets`
-directly (not just React Navigation internally), so this isn't optional
-scaffolding - the app can't render at all without it. This was actually
-missing from the very first scaffold and only surfaced once enough
-screens depended on it to trip the error; if this ever comes back after
-a merge or a copy-paste of `App.tsx`, this is the first thing to check.
+Unlike gotchas #1-5, this one wasn't inherited from Home Base/League
+Base - it's specific to this project's dependencies, found through
+manual code review (checking `.tsx` files directly against the actual
+installed package types) rather than a runtime crash report. Two
+confirmed cases so far, both `expo-notifications`/`expo-image-picker`
+API surfaces that shifted out from under existing code:
+
+- **`App.tsx`'s notification handler**: `shouldShowAlert` was replaced
+  by `shouldShowBanner` + `shouldShowList` in the installed
+  `expo-notifications` version - confirmed via Expo's own GitHub history
+  (PR #36361: "Replaced shouldShowAlert with shouldShowBanner and
+  shouldShowList"), not a guess. Fixed directly - both new fields set to
+  `true` to match the original `shouldShowAlert: true` behavior as
+  closely as possible.
+- **`lib/coverStorage.ts`'s camera calls**: `saveToPhotos` (the flag
+  keeping a taken cover photo out of the device's Photos app -
+  confirmed, tested behavior this app specifically relies on) no longer
+  appears in `launchCameraAsync`'s TypeScript option types. Handled
+  differently from the notification fix, deliberately: rather than
+  removing the option outright on unclear typing evidence - which risks
+  silently reintroducing photos being saved to the Photos app, a real
+  privacy regression - the option is kept with an `as any` cast
+  suppressing just the type error, on the reasoning that a type
+  declaration lagging behind actual native capability is far more likely
+  here than a genuinely removed, still-fundamental camera control. Not
+  verified from this sandbox - worth a real on-device check (take a
+  cover photo, confirm nothing new appears in the Photos app) rather
+  than trusting that reasoning alone.
+
+This project has already hit three other cases of the same underlying
+pattern - `expo-camera`'s standalone permission functions not actually
+existing (fixed by switching to the `useCameraPermissions` hook),
+`expo-file-system`'s promise-based API being deprecated in favor of new
+File/Directory classes (fixed by importing from the `/legacy` subpath),
+and TMDb's v3 API Key getting stuck while the v4 Read Access Token
+worked (an account-side issue, not a types issue, but the same instinct
+- verify against the actual installed/live behavior rather than assume
+docs or memory are current). Worth treating any TypeScript error in this
+project the same way going forward: check what's actually installed and
+what its current API really looks like, rather than assume the original
+code was simply wrong.
 
 ---
 

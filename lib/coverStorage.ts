@@ -103,7 +103,17 @@ export async function pickCoverFromLibrary(category: string, id: string): Promis
 
 /** Opens the camera. saveToPhotos is explicitly false - a cover photo
  * taken here is saved only within Media Base's own private storage,
- * never added to the device's Photos app. */
+ * never added to the device's Photos app. The `as any` cast below is
+ * deliberate, not sloppy: TypeScript's current type declarations for
+ * launchCameraAsync's options no longer list saveToPhotos, but this is
+ * exactly the kind of case where a type declaration lagging behind
+ * actual native capability is far more likely than the option being
+ * truly gone - genuinely removing a documented, working privacy control
+ * on unclear typing evidence risks silently reintroducing photos being
+ * saved to the device's Photos app, which this app specifically tested
+ * and confirmed doesn't happen. Worth a real on-device check (take a
+ * photo, confirm nothing new appears in the Photos app) rather than
+ * trusting this comment alone - not verified from this sandbox. */
 export async function takeCoverPhoto(category: string, id: string): Promise<string | null> {
   const perm = await ImagePicker.requestCameraPermissionsAsync();
   if (!perm.granted) return null;
@@ -112,7 +122,7 @@ export async function takeCoverPhoto(category: string, id: string): Promise<stri
     allowsEditing: true,
     aspect: [2, 3],
     saveToPhotos: false,
-  });
+  } as any);
   if (result.canceled || !result.assets?.[0]?.uri) return null;
   return saveResizedCover(category, id, result.assets[0].uri);
 }
@@ -205,7 +215,7 @@ export async function takeCoverPhotoStaged(category: string, id: string): Promis
     allowsEditing: true,
     aspect: [2, 3],
     saveToPhotos: false,
-  });
+  } as any);
   if (result.canceled || !result.assets?.[0]?.uri) return null;
   return saveResizedCoverTo(result.assets[0].uri, stagedCoverPath(category, id));
 }
