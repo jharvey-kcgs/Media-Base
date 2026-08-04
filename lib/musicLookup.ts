@@ -59,7 +59,7 @@ async function searchReleases(query: string, maxResults: number): Promise<MusicS
     }
     const json = await res.json();
     const items = Array.isArray(json?.releases) ? json.releases : [];
-    return items
+    const mapped = items
       .filter((r: any) => r?.id && r?.title)
       .map((r: any) => ({
         key: r.id,
@@ -68,6 +68,8 @@ async function searchReleases(query: string, maxResults: number): Promise<MusicS
         artist: r['artist-credit']?.[0]?.name ?? 'Unknown artist',
         releaseYear: r.date ? String(r.date).slice(0, 4) : undefined,
       }));
+    console.warn('Media Base: MusicBrainz release search', `"${query}"`, '->', items.length, 'raw,', mapped.length, 'usable, first releaseId:', mapped[0]?.releaseId);
+    return mapped;
   } catch (err) {
     console.warn('Media Base: MusicBrainz release search threw', err);
     return [];
@@ -116,12 +118,22 @@ async function searchRecordings(query: string, maxResults: number): Promise<Musi
  * person picks, it's already resolved to an album-level candidate (a
  * song match already carries its parent release's title/artist/id, not
  * the song's own). Reused directly by lib/titleSearch.ts's
- * searchMusicByTitle(). */
+ * searchMusicByTitle().
+ *
+ * Sequential, not Promise.all - MusicBrainz enforces a real, documented
+ * rate limit (~1 request/second per IP, on average; anything over gets
+ * a 503, and the IP stays throttled until the rate drops, per their own
+ * rate-limiting docs). Firing both search types in the same instant was
+ * already tight against that limit on its own, and this app also fires
+ * a follow-up genre request right after a result gets selected -
+ * running these one after another rather than simultaneously leaves
+ * more headroom before that follow-up call, at the cost of the search
+ * itself taking a bit longer. Confirmed via real testing that the
+ * parallel version was measurably slower than every other category's
+ * search - this is the direct fix for that. */
 export async function searchMusicBrainz(query: string, maxResults: number): Promise<MusicSearchResult[]> {
-  const [albumResults, trackResults] = await Promise.all([
-    searchReleases(query, maxResults),
-    searchRecordings(query, maxResults),
-  ]);
+  const albumResults = await searchReleases(query, maxResults);
+  const trackResults = await searchRecordings(query, maxResults);
 
   // Dedupe by release id - a song match and an album match can easily
   // resolve to the exact same release (e.g. searching "Abbey Road" the
@@ -139,17 +151,32 @@ export async function searchMusicBrainz(query: string, maxResults: number): Prom
 
 /** Cover Art Archive lookup for a release - returns the front cover
  * image URL, or null if this release has no contributed art (a real,
- * expected outcome - not every release has one, see the file header). */
+ * expected outcome - not every release has one, see the file header).
+ *
+ * Logs unconditionally (not just on failure) - a real report from
+ * testing showed cover art never loading across several different
+ * albums, a rate far higher than "sometimes missing" should produce.
+ * That could genuinely be sparse contributor coverage, or it could be
+ * this function misreading the response shape - not verified from the
+ * sandbox this was written in, so rather than guess again, this logs
+ * enough on every call to tell the two apart on the next real test:
+ * the exact URL, status, and what (if anything) was extracted. */
 export async function fetchCoverArtUrl(releaseId: string): Promise<string | null> {
+  const url = `https://coverartarchive.org/release/${releaseId}`;
   try {
-    const res = await fetch(`https://coverartarchive.org/release/${releaseId}`);
-    if (!res.ok) return null; // 404 is the normal "no art yet" case, not an error worth logging
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn('Media Base: Cover Art Archive', url, '->', res.status, res.status === 404 ? '(no art contributed for this release)' : '(unexpected)');
+      return null;
+    }
     const json = await res.json();
     const images = Array.isArray(json?.images) ? json.images : [];
     const front = images.find((img: any) => img?.front);
-    return front?.image ?? images[0]?.image ?? null;
+    const result = front?.image ?? images[0]?.image ?? null;
+    console.warn('Media Base: Cover Art Archive', url, '->', images.length, 'image(s), using', result);
+    return result;
   } catch (err) {
-    console.warn('Media Base: Cover Art Archive lookup threw', err);
+    console.warn('Media Base: Cover Art Archive lookup threw', url, err);
     return null;
   }
 }
@@ -157,18 +184,31 @@ export async function fetchCoverArtUrl(releaseId: string): Promise<string | null
 /** Genre lookup for a release - a separate follow-up call, not part of
  * search results (see file header). Returns an empty array if this
  * release has no community-voted genre tags yet - a real, expected
- * outcome given genres are folksonomy tags, not always present. */
+ * outcome given genres are folksonomy tags, not always present.
+ *
+ * This is also the request most exposed to MusicBrainz's rate limit in
+ * practice: it fires right after the two search requests
+ * searchMusicBrainz() already made to the same musicbrainz.org host, so
+ * a burst of album lookups in a short session (exactly what real
+ * testing did - several albums tried back to back) is a real way to hit
+ * a 503 here specifically. Logs unconditionally so the next real test
+ * shows whether that's what's actually happening versus a release that
+ * genuinely has no genre tags. */
 export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
+  const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=genres&fmt=json`;
   try {
-    const res = await fetch(`https://musicbrainz.org/ws/2/release/${releaseId}?inc=genres&fmt=json`, {
-      headers: { 'User-Agent': USER_AGENT },
-    });
-    if (!res.ok) return [];
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!res.ok) {
+      console.warn('Media Base: MusicBrainz genre lookup', url, '->', res.status, res.status === 503 ? '(rate limited)' : '');
+      return [];
+    }
     const json = await res.json();
     const genres = Array.isArray(json?.genres) ? json.genres : [];
-    return genres.map((g: any) => g?.name).filter(Boolean);
+    const names = genres.map((g: any) => g?.name).filter(Boolean);
+    console.warn('Media Base: MusicBrainz genre lookup', url, '->', names.length, 'genre(s):', names);
+    return names;
   } catch (err) {
-    console.warn('Media Base: MusicBrainz genre lookup threw', err);
+    console.warn('Media Base: MusicBrainz genre lookup threw', url, err);
     return [];
   }
 }
