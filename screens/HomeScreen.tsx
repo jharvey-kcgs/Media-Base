@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getMovies, getTVShows, getAnime, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getTVShows, getAnime, getMusicAlbums, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -20,6 +20,7 @@ const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   movies: 'Movie',
   tvshows: 'TV',
   anime: 'Anime',
+  music: 'Music',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
@@ -30,6 +31,7 @@ type RootStackParamList = {
   Movie: undefined;
   TV: undefined;
   Anime: undefined;
+  Music: undefined;
   Settings: undefined;
 };
 
@@ -103,14 +105,15 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const today = toLocalDateString(new Date());
-    const [books, comics, movies, tvShows, anime] = await Promise.all([
+    const [books, comics, movies, tvShows, anime, music] = await Promise.all([
       getBooks(),
       getComics(),
       getMovies(),
       getTVShows(),
       getAnime(),
+      getMusicAlbums(),
     ]);
-    const [booksData, comicsData, moviesData, tvShowsData, animeData] = await Promise.all([
+    const [booksData, comicsData, moviesData, tvShowsData, animeData, musicData] = await Promise.all([
       loadWidgetData('books', books, (b) => b.read, 'book', 'books', today),
       loadWidgetData('comics', comics, (c) => c.read, 'entry', 'entries', today),
       loadWidgetData('movies', movies, (m) => m.watched, 'movie', 'movies', today),
@@ -118,6 +121,7 @@ export default function HomeScreen({ navigation }: any) {
       // "anime" reads correctly as both singular and plural already
       // (same as "sheep"), so the same word covers both unit slots.
       loadWidgetData('anime', anime, (a) => a.watched, 'anime', 'anime', today),
+      loadWidgetData('music', music, (m) => m.listened, 'album', 'albums', today),
     ]);
     setWidgetData({
       books: booksData,
@@ -125,6 +129,7 @@ export default function HomeScreen({ navigation }: any) {
       movies: moviesData,
       tvshows: tvShowsData,
       anime: animeData,
+      music: musicData,
     });
   }, []);
 
@@ -188,7 +193,9 @@ export default function HomeScreen({ navigation }: any) {
                               ? 'tv-outline'
                               : cat === 'anime'
                                 ? 'sparkles-outline'
-                                : 'book-outline'
+                                : cat === 'music'
+                                  ? 'musical-notes-outline'
+                                  : 'book-outline'
                         }
                       />
                       <AppText

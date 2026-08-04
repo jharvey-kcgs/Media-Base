@@ -110,26 +110,27 @@ fallback won't have a Where to Watch button** - MyAnimeList doesn't
 cross-reference TMDb, so there's no `tmdbId` to build that link from,
 the same graceful-hide behavior already used for a hand-typed entry.
 
-**Music's data layer is built, but `screens/MusicScreen.tsx` itself
-doesn't exist yet** - `types/models.ts`'s `MusicAlbum`, full CRUD in
-`lib/storage.ts` (including backup/cover wiring), and the lookup
-(`lib/musicLookup.ts`, orchestrated by `lib/titleSearch.ts`'s
-`searchMusicByTitle()`) are all in place - the Home widget still shows
-"Coming soon" until the screen is built, same as every prior category
-at the equivalent point. **Deliberately not Spotify for data** - despite
-the original Roadmap note assuming it, Spotify's Web API changed in
-February 2026, moving away from allowing simple, no-login "Client
-Credentials" access to metadata endpoints for free-tier developer apps.
-MusicBrainz + Cover Art Archive (both free, fully keyless) took its
-place for search/metadata/cover art. Album is the tracked unit (same
-"one release = one entry" philosophy as every other category), but
-search covers both album titles and song titles together - whichever
-matches, the result resolves to that song's album, not the song itself.
-Spotify still has a role, just not for data: "Where to Listen" is a
-plain Spotify search link (`spotifySearchUrl()`), not a precise deep
-link - that would need the now-restricted API - so unlike Where to
-Watch, this button always shows regardless of how the entry was added,
-since it needs no external id at all.
+**Music is fully working** - `screens/MusicScreen.tsx` (list, search,
+genre filter, A-Z index, hold-to-select, full Add/Edit) and the Home
+widget are both built now, on top of the data layer (`types/models.ts`'s
+`MusicAlbum`, full CRUD in `lib/storage.ts` including backup/cover
+wiring, and the lookup in `lib/musicLookup.ts`, orchestrated by
+`lib/titleSearch.ts`'s `searchMusicByTitle()`). **Deliberately not
+Spotify for data** - despite the original Roadmap note assuming it,
+Spotify's Web API changed in February 2026, moving away from allowing
+simple, no-login "Client Credentials" access to metadata endpoints for
+free-tier developer apps. MusicBrainz + Cover Art Archive (both free,
+fully keyless) took its place for search/metadata/cover art. Album is
+the tracked unit (same "one release = one entry" philosophy as every
+other category), but search covers both album titles and song titles
+together - whichever matches, the result resolves to that song's album,
+not the song itself. Confirmed design: plain 1-5 album-level rating,
+no per-track breakdown for v1. Spotify still has a role, just not for
+data: "Where to Listen" is a plain Spotify search link
+(`spotifySearchUrl()`), not a precise deep link - that would need the
+now-restricted API - so unlike Where to Watch, this button always shows
+regardless of how the entry was added, since it needs no external id at
+all.
 
 ---
 
@@ -313,6 +314,55 @@ screens/
                                      graceful hide, not a disabled
                                      button, for anything typed in by
                                      hand instead.
+  AnimeScreen.tsx                   Anime (widget 5 - fully working).
+                                     Mirrors TVScreen.tsx's structure
+                                     closely, with two genuine
+                                     differences: title search
+                                     (lib/titleSearch.ts's
+                                     searchAnimeByTitle()) orchestrates
+                                     TWO sources - TMDb primary, Jikan
+                                     (MyAnimeList) fallback only when
+                                     TMDb comes back empty, same
+                                     multi-source resilience pattern as
+                                     Books/Comics. Genre filter is
+                                     dynamic ("genres actually in your
+                                     list", same pattern as Books/Comics)
+                                     rather than either source's fixed
+                                     list, since TMDb and Jikan use
+                                     genuinely different genre
+                                     vocabularies. Where to Watch only
+                                     renders when draft.tmdbId is set -
+                                     never true for an entry found only
+                                     through the Jikan fallback, a real
+                                     and deliberate consequence of the
+                                     two-source design, not a bug.
+  MusicScreen.tsx                   Music (widget 6 - fully working).
+                                     Mirrors AnimeScreen.tsx's shape
+                                     (dynamic genre filter, same cover/
+                                     staging system, hold-to-select) with
+                                     BookScreen.tsx's tap-an-author-to-
+                                     filter pattern extended to Artist -
+                                     a natural fit, same reasoning that
+                                     justified it for Books/Comics. Two
+                                     genuine differences from every prior
+                                     category screen: selecting a
+                                     title-search result only fills
+                                     Title/Artist immediately - cover art
+                                     (lib/musicLookup.ts's
+                                     fetchCoverArtUrl()) and genre
+                                     (fetchReleaseGenres()) are BOTH
+                                     separate follow-up calls, not
+                                     included in the search result
+                                     itself, same pattern as cover-photo
+                                     auto-fill everywhere else just
+                                     extended to two background fetches;
+                                     and "Where to Listen" always shows,
+                                     unlike Where to Watch's tmdbId-gated
+                                     button - it's a plain Spotify search
+                                     (spotifySearchUrl()) built from
+                                     artist+title text every entry
+                                     already has, not a precise deep link
+                                     needing an external id.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
