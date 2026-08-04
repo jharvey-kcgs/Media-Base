@@ -795,7 +795,25 @@ lib/
                                      the artist's MusicBrainz id on hand,
                                      and only makes the extra request to
                                      check the artist's own tags if the
-                                     release itself had nothing.
+                                     release itself had nothing. Confirmed
+                                     working via real testing on
+                                     metal/rock releases specifically -
+                                     the artist fallback found genres a
+                                     release-only lookup missed.
+
+                                     **A third, UX-only fix**: the
+                                     combined release+artist genre lookup
+                                     can genuinely take 5-10 seconds, and
+                                     a silent wait that long looked broken
+                                     even though it wasn't. MusicScreen.tsx
+                                     now shows a small, transient "Looking
+                                     up genre - can take several
+                                     seconds…" label next to the Genre
+                                     field while a lookup is actually in
+                                     flight (`genreLookupInProgress`) -
+                                     not a permanent part of the form, so
+                                     the steady-state view stays exactly
+                                     as simple as it was.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap

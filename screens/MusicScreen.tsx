@@ -245,6 +245,14 @@ export default function MusicScreen({ navigation }: any) {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [originalCoverImage, setOriginalCoverImage] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
+  // Genre auto-fill can genuinely take 5-10 seconds (a release lookup,
+  // sometimes followed by an artist-level fallback lookup - see
+  // lib/musicLookup.ts's fetchReleaseGenres()) - confirmed via real
+  // testing that a silent wait that long looks broken even when it
+  // isn't. This only drives a small, transient "Looking up genre..."
+  // label shown next to the field while waiting, not a permanent part
+  // of the form.
+  const [genreLookupInProgress, setGenreLookupInProgress] = useState(false);
 
   const load = useCallback(async () => {
     setAlbums(await getMusicAlbums());
@@ -301,6 +309,7 @@ export default function MusicScreen({ navigation }: any) {
     setActiveItemId(newId());
     setOriginalCoverImage(null);
     setDraft(EMPTY_DRAFT);
+    setGenreLookupInProgress(false);
     setModalVisible(true);
   };
 
@@ -317,6 +326,7 @@ export default function MusicScreen({ navigation }: any) {
       rating: item.rating ?? 0,
       review: item.review,
     });
+    setGenreLookupInProgress(false);
     setModalVisible(true);
   };
 
@@ -737,9 +747,12 @@ export default function MusicScreen({ navigation }: any) {
                         });
                       });
                     }
-                    fetchReleaseGenres(r.releaseId).then((genres) => {
-                      if (genres.length > 0) setDraft((d) => ({ ...d, genresText: genres.join(', ') }));
-                    });
+                    setGenreLookupInProgress(true);
+                    fetchReleaseGenres(r.releaseId)
+                      .then((genres) => {
+                        if (genres.length > 0) setDraft((d) => ({ ...d, genresText: genres.join(', ') }));
+                      })
+                      .finally(() => setGenreLookupInProgress(false));
                   }}
                 />
               </View>
@@ -759,6 +772,11 @@ export default function MusicScreen({ navigation }: any) {
                 <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
                   Genre(s) * (comma-separated, e.g. Rock, Indie)
                 </AppText>
+                {genreLookupInProgress && (
+                  <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale, marginBottom: 6 }}>
+                    Looking up genre - can take several seconds…
+                  </AppText>
+                )}
                 <TextInput
                   value={draft.genresText}
                   onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
