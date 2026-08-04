@@ -759,6 +759,43 @@ lib/
                                      help in diagnosing all of the above
                                      from an actual device console rather
                                      than guessing blind.
+
+                                     **A second round of fixes from
+                                     further real testing.** (4) Cover
+                                     art logged a successful fetch but
+                                     never actually appeared in the app -
+                                     a real, confirmed bug this time, not
+                                     a data gap: the logs showed Cover
+                                     Art Archive sometimes returning a
+                                     plain `http://` URL for the same
+                                     image, and iOS blocks a plain-HTTP
+                                     download outright via App Transport
+                                     Security, silently - the exact same
+                                     issue this project already hit and
+                                     fixed once before for Google Books'
+                                     thumbnail URLs, just not carried
+                                     over to this file. fetchCoverArtUrl()
+                                     now upgrades `http://` to `https://`
+                                     before returning a URL, same fix.
+                                     (5) Genre still came back empty on
+                                     specific metal/rock releases even
+                                     with the broader `inc=tags` change -
+                                     confirmed via logs showing a
+                                     genuinely empty raw tag list at the
+                                     release level, not a bug. Added an
+                                     artist-level fallback
+                                     (fetchArtistGenres()): a specific
+                                     pressing can have zero community
+                                     tags while its artist has plenty,
+                                     since artists get far more community
+                                     tagging attention than any one
+                                     release does - fetchReleaseGenres()
+                                     now requests
+                                     `inc=tags+artist-credits` so it has
+                                     the artist's MusicBrainz id on hand,
+                                     and only makes the extra request to
+                                     check the artist's own tags if the
+                                     release itself had nothing.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap

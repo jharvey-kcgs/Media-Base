@@ -224,8 +224,17 @@ export async function fetchCoverArtUrl(releaseId: string): Promise<string | null
     const json = await res.json();
     const images = Array.isArray(json?.images) ? json.images : [];
     const front = images.find((img: any) => img?.front);
-    const result = front?.image ?? images[0]?.image ?? null;
-    console.warn('Media Base: Cover Art Archive', url, '->', images.length, 'image(s), using', result);
+    const raw = front?.image ?? images[0]?.image ?? null;
+    // Confirmed real bug via testing: Cover Art Archive sometimes
+    // returns a plain http:// URL (not https://) for the same image -
+    // iOS blocks a plain-HTTP download outright via App Transport
+    // Security, silently, with no error surfaced back through this
+    // function's own try/catch (the failure happens later, inside
+    // coverStorage.ts's download call, which just resolves to null).
+    // Exact same issue this project already hit and fixed once before
+    // for Google Books' thumbnail URLs - same fix here.
+    const result = raw ? raw.replace(/^http:\/\//, 'https://') : null;
+    console.warn('Media Base: Cover Art Archive', url, '->', images.length, 'image(s), using', result, raw !== result ? '(upgraded from http://)' : '');
     return result;
   } catch (err) {
     console.warn('Media Base: Cover Art Archive lookup threw', url, err);
@@ -234,10 +243,15 @@ export async function fetchCoverArtUrl(releaseId: string): Promise<string | null
 }
 
 /** Genre lookup for a release - a separate follow-up call, not part of
- * search results (see file header). Returns an empty array if nothing
- * on this release's raw tag list matches a real genre term - a real,
- * expected outcome given tags are community-submitted, not always
- * present or genre-shaped.
+ * search results (see file header). Tries the release's own tags first,
+ * then falls back to the artist's tags if the release has none - a
+ * specific pressing can genuinely have zero community tags while its
+ * artist has plenty, confirmed via real testing on less-mainstream
+ * metal/rock releases specifically, where individual releases get far
+ * less community tagging attention than the artist entity does. Returns
+ * an empty array only if NEITHER has anything matching a real genre
+ * term - a real, expected outcome even then, given tags are
+ * community-submitted, not always present or genre-shaped.
  *
  * Uses inc=tags (every community tag) rather than inc=genres
  * (MusicBrainz's own pre-filtered "official genre" subset) - real
@@ -250,13 +264,14 @@ export async function fetchCoverArtUrl(releaseId: string): Promise<string | null
  *
  * This is also the request most exposed to MusicBrainz's rate limit in
  * practice: it fires right after the two search requests
- * searchMusicBrainz() already made to the same musicbrainz.org host, so
- * a burst of album lookups in a short session is a real way to hit a
- * 503 here specifically. Logs unconditionally so a real test shows
- * whether that's what's happening versus a release that genuinely has
- * no matching tags. */
+ * searchMusicBrainz() already made to the same musicbrainz.org host,
+ * and the artist fallback below adds a THIRD request on top of that
+ * when it's needed - a burst of album lookups in a short session is a
+ * real way to hit a 503 here specifically. Logs unconditionally so a
+ * real test shows whether that's what's happening versus a release (and
+ * its artist) that genuinely have no matching tags. */
 export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
-  const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=tags&fmt=json`;
+  const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=tags+artist-credits&fmt=json`;
   try {
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!res.ok) {
@@ -266,10 +281,36 @@ export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
     const json = await res.json();
     const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
     const genres = normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST);
-    console.warn('Media Base: MusicBrainz tag lookup', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
-    return genres;
+    console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
+    if (genres.length > 0) return genres;
+
+    const artistId = json?.['artist-credit']?.[0]?.artist?.id;
+    if (!artistId) {
+      console.warn('Media Base: no artist id on release', releaseId, '- skipping artist-level genre fallback');
+      return [];
+    }
+    return await fetchArtistGenres(artistId);
   } catch (err) {
     console.warn('Media Base: MusicBrainz tag lookup threw', url, err);
+    return [];
+  }
+}
+
+async function fetchArtistGenres(artistId: string): Promise<string[]> {
+  const url = `https://musicbrainz.org/ws/2/artist/${artistId}?inc=tags&fmt=json`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    if (!res.ok) {
+      console.warn('Media Base: MusicBrainz tag lookup (artist)', url, '->', res.status, res.status === 503 ? '(rate limited)' : '');
+      return [];
+    }
+    const json = await res.json();
+    const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
+    const genres = normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST);
+    console.warn('Media Base: MusicBrainz tag lookup (artist)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
+    return genres;
+  } catch (err) {
+    console.warn('Media Base: MusicBrainz artist tag lookup threw', url, err);
     return [];
   }
 }
