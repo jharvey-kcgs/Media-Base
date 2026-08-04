@@ -47,7 +47,7 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 | Comics/Manga | Enter or scan (ISBN barcode) | Title, genre, author, read switch | Same as Books — comics/manga have ISBNs, reliable |
 | Movies | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - originally planned with UPC scanning too, removed after real testing confirmed it was unreliable |
 | TV Shows | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - confirmed design from the start, no scan/number-entry ever planned |
-| Anime | Enter only (no scan) | Title, genre, episodes, watched switch | N/A — manual entry; see "where to watch" below |
+| Anime | Enter or search by title (data layer done, screen pending) | Title, genre, watched switch | Title search, TMDb primary + Jikan (MyAnimeList, free/keyless) fallback - same multi-source resilience pattern as Books/Comics |
 | Vinyl/Records | Enter or scan (UPC barcode) | Title, genre, artist, listened switch | Discogs API — has strong UPC-to-release lookup, best barcode match of the physical-media categories |
 | Music (digital) | Enter or paste Spotify/Apple/YouTube link | Genre, artist, title, listened switch | Public catalog API (developer key, not user OAuth) — genre often missing at song level, so expect manual edits here often; see "where to listen" below |
 | Puzzles | Enter only (no scan) | Genre (people/place/animal/food), pieces, completed switch | No barcode database exists for jigsaw puzzles |
@@ -60,7 +60,7 @@ Every entry screen has a manual-entry path as the default; scanning/link-pasting
 ## "Listen on Spotify" / "Where to Watch"
 Not part of the core entry flow, layered on top once basic entries exist for each category:
 - **Music** — each entry gets a "Listen on Spotify" link. Spotify's Web API supports catalog search via an app-level developer key (Client Credentials — no user login), so even manually-typed title/artist can resolve to a link. Not built yet.
-- **Movies & TV Shows** ✅ done — each entry added through title search gets a "Where to Watch" button. Built simpler than originally planned here: rather than a custom in-app popup listing providers (which would need ongoing JustWatch attribution everywhere it's shown, not just once in Credits), the button opens TMDb's own watch page directly (`tmdbMovieWatchUrl()` / `tmdbWatchUrl()`) - that page already has correct JustWatch branding built in, so nothing needed to be built or maintained for it. Region-aware but not yet configurable (defaults to US). Only shows on an entry with a stored `tmdbId` (came from title search) - a graceful hide, not a disabled button, for anything typed in by hand. Anime wasn't built yet, but should be able to reuse this exact approach once it exists, per the note below.
+- **Movies & TV Shows** ✅ done — each entry added through title search gets a "Where to Watch" button. Built simpler than originally planned here: rather than a custom in-app popup listing providers (which would need ongoing JustWatch attribution everywhere it's shown, not just once in Credits), the button opens TMDb's own watch page directly (`tmdbMovieWatchUrl()` / `tmdbWatchUrl()`) - that page already has correct JustWatch branding built in, so nothing needed to be built or maintained for it. Region-aware but not yet configurable (defaults to US). Only shows on an entry with a stored `tmdbId` (came from title search) - a graceful hide, not a disabled button, for anything typed in by hand. Anime's data layer reuses this exact approach (its title search is TMDb-primary, same `tmdbId`), but with one real added case: an entry found only through Anime's Jikan fallback (MyAnimeList doesn't cross-reference TMDb) also won't have this button - same graceful hide, just triggered by which source actually found it.
 
 ## Recommendation & rating logic
 - Switch = **No** (not read/watched/listened/played) → that category's widget shows one random not-done item as "try this today," refreshed daily, one per widget (not one global pick).
@@ -70,7 +70,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 ## Filters per category screen
 - Movies: Title / Genre / Watched / Rating
 - TV Shows: Title / Genre / Watched / Rating
-- Anime: Title / Genre / Episodes / Watched
+- Anime: Title / Genre / Watched / Rating
 - Books: Title / Genre / Author / Read / Rating
 - Comics/Manga: Title / Genre / Author / Read / Rating
 - Puzzles: Piece Count / Genre / Manufacturer / Completed
@@ -85,7 +85,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 4. **TV Shows** ✅ done, also built out of the original planned order per explicit request - title-search only from the start (lib/tvLookup.ts, its own genre taxonomy genuinely different from Movies'). Structural twin of Movies now that Movies dropped its own scan/UPC entry - both share the same "Where to Watch" approach (see above).
 5. Puzzles (manual-only, good simple next target)
 6. Music (link-paste + developer API keys)
-7. Anime (same TMDb/title-search family as Movies/TV Shows - likely the fastest of the remaining categories to build, given how close its shape is to what's already proven)
+7. **Anime** - data layer done (title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows), screens/AnimeScreen.tsx itself still pending
 8. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
 
 ## Open items not yet decided

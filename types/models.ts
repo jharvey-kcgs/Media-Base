@@ -132,6 +132,34 @@ export interface TVShow {
 
 export type TVShowSortField = 'title' | 'genre' | 'watched' | 'rating';
 
+// Same shape as TVShow (own separate storage/list/daily-pick pool
+// regardless), reflecting a real, deliberate two-source design: TMDb is
+// the primary source (reuses lib/tvLookup.ts's tmdbSearchTVShows() -
+// same TV search TV Shows already uses, since most mainstream-popular
+// anime is catalogued there as a regular TV show), with Jikan
+// (lib/jikanLookup.ts, MyAnimeList data) as a fallback for anything
+// TMDb doesn't have - same multi-source resilience pattern already
+// established for Books/Comics (Google Books primary, Open Library
+// fallback). tmdbId stays null for anything found only via the Jikan
+// fallback, not just anything typed by hand - Jikan doesn't carry a
+// TMDb cross-reference, so a Jikan-sourced entry gets real title/genre/
+// cover data but no Where to Watch button, same graceful-hide behavior
+// already built for a hand-typed entry, just triggered by which source
+// actually found it.
+export interface Anime {
+  id: string;
+  title: string;
+  genres: string[];
+  coverImage: string | null;
+  tmdbId: number | null;
+  watched: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home

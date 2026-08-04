@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system/legacy';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime } from '../types/models';
 import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
@@ -13,6 +13,7 @@ const KEYS = {
   comics: 'mediabase:comics',
   movies: 'mediabase:movies',
   tvShows: 'mediabase:tvShows',
+  anime: 'mediabase:anime',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -212,6 +213,44 @@ export async function deleteTVShows(ids: string[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteCover('tvshows', id)));
 }
 
+// --- Anime ---
+
+export async function getAnime(): Promise<Anime[]> {
+  return getAll<Anime>(KEYS.anime);
+}
+
+export async function addAnime(input: Omit<Anime, 'id' | 'createdAt'>, id?: string): Promise<Anime> {
+  const anime = await getAnime();
+  const entry: Anime = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.anime, [...anime, entry]);
+  return entry;
+}
+
+export async function updateAnime(id: string, updates: Partial<Anime>): Promise<void> {
+  const anime = await getAnime();
+  const next = anime.map((a) => (a.id === id ? { ...a, ...updates } : a));
+  await saveAll(KEYS.anime, next);
+}
+
+export async function deleteAnime(id: string): Promise<void> {
+  const anime = await getAnime();
+  await saveAll(
+    KEYS.anime,
+    anime.filter((a) => a.id !== id),
+  );
+  await deleteCover('anime', id);
+}
+
+export async function deleteAnimeEntries(ids: string[]): Promise<void> {
+  const anime = await getAnime();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.anime,
+    anime.filter((a) => !idSet.has(a.id)),
+  );
+  await Promise.all(ids.map((id) => deleteCover('anime', id)));
+}
+
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar
@@ -276,6 +315,7 @@ const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
   { category: 'comics', key: KEYS.comics },
   { category: 'movies', key: KEYS.movies },
   { category: 'tvshows', key: KEYS.tvShows },
+  { category: 'anime', key: KEYS.anime },
 ];
 
 /** Builds a full backup - every stored key's data, plus every item's

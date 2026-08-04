@@ -91,6 +91,25 @@ that multi-hop lookup chain was unreliable in practice, with Title
 Search already being the reliable path being used - see
 `lib/movieLookup.ts`'s header comment for the full story.
 
+**Anime's data layer is built, but `screens/AnimeScreen.tsx` itself
+doesn't exist yet** - `types/models.ts`'s `Anime`, full CRUD in
+`lib/storage.ts` (including backup/cover wiring), and the two-source
+lookup (`lib/tvLookup.ts` primary, `lib/jikanLookup.ts` fallback, both
+orchestrated by `lib/titleSearch.ts`'s `searchAnimeByTitle()`) are all
+in place - the Home widget still shows "Coming soon" until the screen
+is built, same as TV Shows did at the equivalent point. Anime is a real,
+deliberate two-source design, not a reluctant one: TMDb catalogues most
+mainstream-popular anime as a regular TV show already, so it's the
+primary source (genre filter uses the same dynamic "genres actually in
+your list" approach Books/Comics already use, rather than either
+source's fixed list, since TMDb and Jikan use different genre
+vocabularies) - Jikan (MyAnimeList data, free and keyless) only gets
+tried when TMDb comes back with nothing. One real, deliberate
+consequence worth knowing: **an entry found only through the Jikan
+fallback won't have a Where to Watch button** - MyAnimeList doesn't
+cross-reference TMDb, so there's no `tmdbId` to build that link from,
+the same graceful-hide behavior already used for a hand-typed entry.
+
 ---
 
 ## 1. Prerequisites
@@ -552,6 +571,34 @@ lib/
                                      to the US region - not yet
                                      configurable, worth revisiting if
                                      international support is ever needed.
+  jikanLookup.ts                    Anime's fallback data source -
+                                     MyAnimeList data via Jikan
+                                     (api.jikan.moe), a free, keyless REST
+                                     wrapper. Tried only when TMDb (Anime's
+                                     primary source, reusing
+                                     tvLookup.ts's tmdbSearchTVShows() -
+                                     most mainstream-popular anime is
+                                     catalogued there as a regular TV
+                                     show) comes back with nothing - same
+                                     multi-source resilience pattern
+                                     already established for Books/Comics
+                                     (Google Books primary, Open Library
+                                     fallback). Genuinely different result
+                                     shape from TMDb: MyAnimeList's own
+                                     genre taxonomy (Isekai, Mecha,
+                                     Shounen, etc. - meaningfully more
+                                     anime-specific than TMDb's generic TV
+                                     genres) and different field names
+                                     (mal_id instead of id,
+                                     images.jpg.large_image_url instead of
+                                     poster_path). A Jikan-sourced result
+                                     never carries a tmdbId - MyAnimeList
+                                     doesn't cross-reference TMDb, so an
+                                     anime found only through this
+                                     fallback gets real title/genre/cover
+                                     data but no Where to Watch button, a
+                                     real and deliberate consequence of
+                                     this design, not an oversight.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap

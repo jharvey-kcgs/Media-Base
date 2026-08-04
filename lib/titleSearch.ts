@@ -36,6 +36,7 @@
 import { normalizeGenres } from './isbnLookup';
 import { tmdbSearchMovies, MovieLookupResult } from './movieLookup';
 import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
+import { searchJikanAnime } from './jikanLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -178,4 +179,58 @@ export async function searchTVShowsByTitle(query: string, maxResults = 8): Promi
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   return tmdbSearchTVShows(trimmed, maxResults);
+}
+
+export interface AnimeSearchResult {
+  key: string;
+  title: string;
+  genres: string[];
+  releaseYear?: string;
+  coverUrl?: string;
+  // Only set when this result came from TMDb - a Jikan-sourced result
+  // never has one, since MyAnimeList doesn't carry a TMDb cross-
+  // reference. AnimeScreen.tsx's Where to Watch button only shows when
+  // this is present, same graceful-hide behavior as an entry typed in
+  // by hand - just triggered by which source actually found it here.
+  tmdbId?: number;
+}
+
+/** Searches for anime by title - TMDb first (most mainstream-popular
+ * anime is catalogued there as a regular TV show, and it's the source
+ * that makes Where to Watch possible), falling back to Jikan
+ * (lib/jikanLookup.ts, MyAnimeList data) only when TMDb comes back with
+ * nothing. Same multi-source resilience pattern already established for
+ * Books/Comics (Google Books primary, Open Library fallback) - a real,
+ * deliberate design, not a reluctant workaround. */
+export async function searchAnimeByTitle(query: string, maxResults = 8): Promise<AnimeSearchResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  const tmdbResults = await tmdbSearchTVShows(trimmed, maxResults).catch((err) => {
+    console.warn('Media Base: TMDb anime search threw', err);
+    return [];
+  });
+  if (tmdbResults.length > 0) {
+    return tmdbResults.map((r) => ({
+      key: r.tmdbId != null ? String(r.tmdbId) : `${r.title}-${r.firstAirYear}`,
+      title: r.title ?? 'Untitled',
+      genres: r.genres,
+      releaseYear: r.firstAirYear,
+      coverUrl: r.coverUrl,
+      tmdbId: r.tmdbId,
+    }));
+  }
+
+  const jikanResults = await searchJikanAnime(trimmed, maxResults).catch((err) => {
+    console.warn('Media Base: Jikan anime search threw', err);
+    return [];
+  });
+  return jikanResults.map((r) => ({
+    key: r.key,
+    title: r.title,
+    genres: r.genres,
+    releaseYear: r.releaseYear,
+    coverUrl: r.coverUrl,
+    // no tmdbId - see the interface comment above
+  }));
 }
