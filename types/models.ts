@@ -47,7 +47,7 @@ export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
   movies: false,
   tvshows: false,
   anime: false,
-  music: false, // uses "paste a link" instead of a barcode scan
+  music: false, // title search (MusicBrainz), not a barcode scan
   vinyl: true,
   puzzles: false,
   boardgames: true,
@@ -159,6 +159,35 @@ export interface Anime {
 }
 
 export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
+
+// Album is the tracked unit here - confirmed design, same "one release =
+// one entry" philosophy as every other category (TV Shows tracks the
+// whole series, not each episode; Music tracks the whole album, not
+// each song). Searching by either a song or an album title both
+// resolve to this same album-level shape - see lib/musicLookup.ts.
+// Genuinely no author-equivalent-but-different field here: "artist" is
+// its own field (not reusing Book's `author`), since an album can have
+// one or several credited artists as free text, same as how genre
+// already allows several comma-separated values.
+//
+// No external id stored (unlike Movie/TVShow/Anime's tmdbId) - Where to
+// Listen needs none, since it's a plain Spotify search link built from
+// artist+title text every entry already has, not a precise deep link
+// requiring a specific catalog id. That button always shows here,
+// unlike Where to Watch's graceful-hide-without-an-id behavior.
+export interface MusicAlbum {
+  id: string;
+  title: string; // the album title
+  artist: string;
+  genres: string[];
+  coverImage: string | null;
+  listened: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type MusicAlbumSortField = 'title' | 'artist' | 'genre' | 'listened' | 'rating';
 
 export interface AppSettings {
   onboarded: boolean;

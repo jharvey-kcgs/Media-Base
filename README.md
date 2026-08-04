@@ -110,6 +110,27 @@ fallback won't have a Where to Watch button** - MyAnimeList doesn't
 cross-reference TMDb, so there's no `tmdbId` to build that link from,
 the same graceful-hide behavior already used for a hand-typed entry.
 
+**Music's data layer is built, but `screens/MusicScreen.tsx` itself
+doesn't exist yet** - `types/models.ts`'s `MusicAlbum`, full CRUD in
+`lib/storage.ts` (including backup/cover wiring), and the lookup
+(`lib/musicLookup.ts`, orchestrated by `lib/titleSearch.ts`'s
+`searchMusicByTitle()`) are all in place - the Home widget still shows
+"Coming soon" until the screen is built, same as every prior category
+at the equivalent point. **Deliberately not Spotify for data** - despite
+the original Roadmap note assuming it, Spotify's Web API changed in
+February 2026, moving away from allowing simple, no-login "Client
+Credentials" access to metadata endpoints for free-tier developer apps.
+MusicBrainz + Cover Art Archive (both free, fully keyless) took its
+place for search/metadata/cover art. Album is the tracked unit (same
+"one release = one entry" philosophy as every other category), but
+search covers both album titles and song titles together - whichever
+matches, the result resolves to that song's album, not the song itself.
+Spotify still has a role, just not for data: "Where to Listen" is a
+plain Spotify search link (`spotifySearchUrl()`), not a precise deep
+link - that would need the now-restricted API - so unlike Where to
+Watch, this button always shows regardless of how the entry was added,
+since it needs no external id at all.
+
 ---
 
 ## 1. Prerequisites
@@ -599,6 +620,51 @@ lib/
                                      data but no Where to Watch button, a
                                      real and deliberate consequence of
                                      this design, not an oversight.
+  musicLookup.ts                    Music's title-search lookup -
+                                     MusicBrainz (search/metadata) and
+                                     Cover Art Archive (album art), both
+                                     free and fully keyless (just a
+                                     User-Agent header, no signup).
+                                     Deliberately NOT Spotify for data,
+                                     despite the original Roadmap note -
+                                     Spotify's Web API changed in
+                                     February 2026, explicitly moving
+                                     away from allowing simple, no-login
+                                     "Client Credentials" access to
+                                     metadata endpoints for free-tier
+                                     developer apps. Album is the tracked
+                                     unit (same "one release = one entry"
+                                     philosophy as every other category),
+                                     but search covers both album titles
+                                     ("releases") and song titles
+                                     ("recordings") together via
+                                     searchMusicBrainz() - a song match
+                                     already resolves to its parent
+                                     album, not the song itself, so a
+                                     true single needs no special
+                                     handling (it's just its own release
+                                     in MusicBrainz's model). Genre
+                                     (fetchReleaseGenres()) and cover art
+                                     (fetchCoverArtUrl()) are BOTH
+                                     separate follow-up calls after a
+                                     result is selected, not part of the
+                                     initial search results - genres are
+                                     community-voted tags only returned
+                                     via a specific lookup, and cover art
+                                     is a wholly separate service. Same
+                                     pattern already used for cover-photo
+                                     auto-fill everywhere else in this
+                                     app, just extended to two background
+                                     fetches instead of one. Also exports
+                                     spotifySearchUrl() for "Where to
+                                     Listen" - a plain Spotify search
+                                     link, not a precise deep link (that
+                                     would need the now-restricted API) -
+                                     always shown wherever it's used,
+                                     unlike Where to Watch's tmdbId-gated
+                                     button, since it needs no external
+                                     id at all, just artist+title text
+                                     every entry already has.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap
