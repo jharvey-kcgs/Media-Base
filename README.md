@@ -715,6 +715,50 @@ lib/
                                      button, since it needs no external
                                      id at all, just artist+title text
                                      every entry already has.
+
+                                     **Fixed after real testing surfaced
+                                     three genuine problems.** (1) Search
+                                     was noticeably slower than every
+                                     other category and genre/cover art
+                                     kept coming back empty - traced to
+                                     MusicBrainz's real, documented rate
+                                     limit (~1 request/second per IP;
+                                     over that gets a 503 and throttles
+                                     the IP). searchReleases()/
+                                     searchRecordings() now run
+                                     sequentially instead of in parallel,
+                                     and TitleSearchInput's search
+                                     debounce is 900ms here specifically
+                                     (see components/TitleSearchInput.tsx's
+                                     new debounceMs prop) rather than the
+                                     400ms every other category uses.
+                                     (2) A short, common title ("Away",
+                                     "Lost", "Embrace") returned a page
+                                     of unrelated matches with no way to
+                                     narrow them - added
+                                     splitArtistTitle(), which parses an
+                                     "Artist - Title" pattern typed into
+                                     the SAME search box (no second input
+                                     field added to the form) into a
+                                     combined `artist:` + `release:`/
+                                     `recording:` MusicBrainz query.
+                                     (3) Genre was coming back empty far
+                                     more than expected - switched
+                                     fetchReleaseGenres() from
+                                     `inc=genres` (MusicBrainz's own
+                                     pre-filtered "official genre" list)
+                                     to `inc=tags` (every community tag),
+                                     filtered through the same
+                                     normalizeGenres() helper Books
+                                     already uses on Open Library/Google
+                                     Books' equally noisy raw data,
+                                     against a new music-specific
+                                     allowlist. All three fetch functions
+                                     now log unconditionally (URL,
+                                     status, what was extracted) - a real
+                                     help in diagnosing all of the above
+                                     from an actual device console rather
+                                     than guessing blind.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap
@@ -996,7 +1040,16 @@ components/
                                      itself in `{ zIndex: 20 }`), or
                                      later fields would paint over the
                                      dropdown instead of the other way
-                                     around.
+                                     around. Debounce delay is
+                                     configurable via an optional
+                                     `debounceMs` prop (defaults to
+                                     400ms) - added specifically for
+                                     Music, which uses 900ms given
+                                     MusicBrainz's real, tight rate limit
+                                     (~1 request/second per IP); every
+                                     other category's source handles the
+                                     default pace fine and doesn't pass
+                                     this prop at all.
   SearchBar.tsx                     Simple inline search filter for
                                      narrowing an already-loaded list by
                                      title (+ author on Books/Comics,
@@ -1780,6 +1833,19 @@ setup mistake. This project targets **SDK 54** for exactly that reason.
 Any file with JSX syntax (`<Component>` tags) must use `.tsx`.
 `lib/theme.tsx` is named that way specifically because it renders a
 `<Context.Provider>`.
+
+### Gotcha #5: "No safe area value available"
+
+`[Error: No safe area value available. Make sure you are rendering
+<SafeAreaProvider> at the top of your app.]` on launch means exactly
+what it says - `App.tsx` needs to wrap everything in `<SafeAreaProvider>`
+(from `react-native-safe-area-context`), above `ThemeProvider`. Nearly
+every screen in this app uses `SafeAreaView` or `useSafeAreaInsets`
+directly (not just React Navigation internally), so this isn't optional
+scaffolding - the app can't render at all without it. This was actually
+missing from the very first scaffold and only surfaced once enough
+screens depended on it to trip the error; if this ever comes back after
+a merge or a copy-paste of `App.tsx`, this is the first thing to check.
 
 ### Gotcha #6: Expo SDK type drift - real, project-specific, not carried over
 

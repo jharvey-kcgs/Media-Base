@@ -19,7 +19,7 @@ import { View, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react
 import AppText, { FONT_FAMILY } from './AppText';
 import { useTheme } from '../lib/theme';
 
-const DEBOUNCE_MS = 400;
+const DEFAULT_DEBOUNCE_MS = 400;
 const MIN_QUERY_LENGTH = 2;
 const INPUT_FONT = { fontFamily: FONT_FAMILY.body };
 
@@ -32,6 +32,12 @@ interface TitleSearchInputProps<T> {
   getSubtitle?: (result: T) => string | undefined;
   onSelect: (result: T) => void;
   placeholder?: string;
+  // Longer than the 400ms default for a source with a tight rate limit
+  // (Music/MusicBrainz - real testing showed active typing tripping a
+  // ~1 request/second-per-IP limit even with search's own two calls
+  // already run sequentially) - every other category's source can
+  // comfortably handle the default pace.
+  debounceMs?: number;
 }
 
 export default function TitleSearchInput<T>({
@@ -43,6 +49,7 @@ export default function TitleSearchInput<T>({
   getSubtitle,
   onSelect,
   placeholder,
+  debounceMs = DEFAULT_DEBOUNCE_MS,
 }: TitleSearchInputProps<T>) {
   const { theme } = useTheme();
   const [results, setResults] = useState<T[]>([]);
@@ -85,7 +92,7 @@ export default function TitleSearchInput<T>({
       } finally {
         if (latestQueryRef.current === trimmed) setSearching(false);
       }
-    }, DEBOUNCE_MS);
+    }, debounceMs);
   };
 
   const handleSelect = (result: T) => {

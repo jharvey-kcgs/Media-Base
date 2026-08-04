@@ -707,12 +707,13 @@ export default function MusicScreen({ navigation }: any) {
 
               <View style={[styles.field, { zIndex: 20 }]}>
                 <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                  Title * (album or song - type to search and auto-fill)
+                  Title * (or "Artist - Title" for a common title - type to search and auto-fill)
                 </AppText>
                 <TitleSearchInput
                   value={draft.title}
                   onChangeText={(text) => setDraft((d) => ({ ...d, title: text }))}
                   search={(query) => searchMusicByTitle(query)}
+                  debounceMs={900}
                   getKey={(r) => r.key}
                   getLabel={(r) => r.title ?? 'Untitled'}
                   getSubtitle={(r) => (r.artist ? `${r.artist}${r.releaseYear ? ` · ${r.releaseYear}` : ''}` : r.releaseYear)}
