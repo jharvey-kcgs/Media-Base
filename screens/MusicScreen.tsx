@@ -66,7 +66,7 @@ import { MusicAlbum, MusicAlbumSortField } from '../types/models';
 // Genre isn't listed here - "Filter by genre..." (its own menu item,
 // below) is the dedicated place to interact with genre.
 const SORT_FIELDS: { field: MusicAlbumSortField; label: string }[] = [
-  { field: 'title', label: 'Title' },
+  { field: 'title', label: 'Album' },
   { field: 'artist', label: 'Artist' },
   { field: 'listened', label: 'Listened?' },
   { field: 'rating', label: 'Rating' },
@@ -289,7 +289,7 @@ export default function MusicScreen({ navigation }: any) {
   }, [albums, genreFilter, artistFilter, searchQuery]);
 
   const sorted = useMemo(() => sortAlbums(filteredAlbums, sortField), [filteredAlbums, sortField]);
-  const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Title';
+  const sortLabel = SORT_FIELDS.find((f) => f.field === sortField)?.label ?? 'Album';
   const isAlpha = ALPHA_FIELDS.includes(sortField);
   const sections = useMemo(
     () => (isAlpha ? groupByFirstLetter(sorted, sortField as 'title' | 'artist' | 'genre') : []),
@@ -492,7 +492,7 @@ export default function MusicScreen({ navigation }: any) {
       .filter(Boolean);
 
     if (!draft.title.trim() || genres.length === 0) {
-      Alert.alert('Missing info', 'Title and at least one genre are both required.');
+      Alert.alert('Missing info', 'Album and at least one genre are both required.');
       return;
     }
 
@@ -717,7 +717,7 @@ export default function MusicScreen({ navigation }: any) {
 
               <View style={[styles.field, { zIndex: 20 }]}>
                 <AppText style={[styles.label, { color: theme.colors.textSecondary, fontSize: 13 * theme.fontScale }]}>
-                  Title * (or "Artist - Title" for a common title - type to search and auto-fill)
+                  Album * (or a song from it, or "Artist - Album" for a common title - type to search and auto-fill)
                 </AppText>
                 <TitleSearchInput
                   value={draft.title}
@@ -725,7 +725,7 @@ export default function MusicScreen({ navigation }: any) {
                   search={(query) => searchMusicByTitle(query)}
                   debounceMs={900}
                   getKey={(r) => r.key}
-                  getLabel={(r) => r.title ?? 'Untitled'}
+                  getLabel={(r) => r.title ?? 'Untitled album'}
                   getSubtitle={(r) => (r.artist ? `${r.artist}${r.releaseYear ? ` · ${r.releaseYear}` : ''}` : r.releaseYear)}
                   onSelect={(r) => {
                     setDraft((d) => ({
