@@ -8,7 +8,7 @@
 //
 // 1. Selecting a title-search result only fills Title/Artist
 //    immediately - cover art and genre are BOTH separate follow-up
-//    calls (lib/musicLookup.ts's fetchCoverArtUrl()/fetchReleaseGenres()),
+//    calls (lib/musicLookup.ts's fetchCoverArtUrl()/fetchReleaseGenresAndLink()),
 //    not included in the search result itself. Same pattern as
 //    cover-photo auto-fill everywhere else, just extended to two
 //    background fetches instead of one, and either can come back empty
@@ -57,7 +57,7 @@ import {
   commitPendingCover,
   discardPendingCover,
 } from '../lib/coverStorage';
-import { fetchCoverArtUrl, fetchReleaseGenres, spotifySearchUrl } from '../lib/musicLookup';
+import { fetchCoverArtUrl, fetchReleaseGenresAndLink, spotifySearchUrl } from '../lib/musicLookup';
 import { searchMusicByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
@@ -108,6 +108,7 @@ interface DraftState {
   artist: string;
   genresText: string;
   coverImage: string | null;
+  spotifyUrl: string | null;
   listened: boolean;
   rating: number;
   review: string;
@@ -118,6 +119,7 @@ const EMPTY_DRAFT: DraftState = {
   artist: '',
   genresText: '',
   coverImage: null,
+  spotifyUrl: null,
   listened: false,
   rating: 0,
   review: '',
@@ -247,7 +249,7 @@ export default function MusicScreen({ navigation }: any) {
   const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
   // Genre auto-fill can genuinely take 5-10 seconds (a release lookup,
   // sometimes followed by an artist-level fallback lookup - see
-  // lib/musicLookup.ts's fetchReleaseGenres()) - confirmed via real
+  // lib/musicLookup.ts's fetchReleaseGenresAndLink()) - confirmed via real
   // testing that a silent wait that long looks broken even when it
   // isn't. This only drives a small, transient "Looking up genre..."
   // label shown next to the field while waiting, not a permanent part
@@ -322,6 +324,7 @@ export default function MusicScreen({ navigation }: any) {
       artist: item.artist,
       genresText: item.genres.join(', '),
       coverImage: item.coverImage ?? null,
+      spotifyUrl: item.spotifyUrl ?? null,
       listened: item.listened,
       rating: item.rating ?? 0,
       review: item.review,
@@ -473,11 +476,22 @@ export default function MusicScreen({ navigation }: any) {
     setArtistFilter(artist);
   }, []);
 
-  // Opens a plain Spotify search - see lib/musicLookup.ts's
-  // spotifySearchUrl() for why this isn't a precise deep link. Always
-  // available (no gating), since it only needs the artist/title text
-  // every entry already has.
+  // Prefers a real, direct Spotify album page when one was found via
+  // MusicBrainz's community-contributed relationship data
+  // (draft.spotifyUrl - see lib/musicLookup.ts's
+  // fetchReleaseGenresAndLink()) - falls back to a plain search
+  // (spotifySearchUrl()) when none was recorded, or for an entry typed
+  // in entirely by hand. Always available either way (no gating), since
+  // the fallback only needs the artist/title text every entry already
+  // has.
   const handleWhereToListen = () => {
+    if (draft.spotifyUrl) {
+      Linking.openURL(draft.spotifyUrl).catch((err) => {
+        console.warn('Media Base: failed to open Spotify album URL', err);
+        Alert.alert("Couldn't open that", 'Something went wrong opening Spotify - please try again.');
+      });
+      return;
+    }
     if (!draft.artist.trim() && !draft.title.trim()) return;
     Linking.openURL(spotifySearchUrl(draft.artist, draft.title)).catch((err) => {
       console.warn('Media Base: failed to open Where to Listen URL', err);
@@ -521,6 +535,7 @@ export default function MusicScreen({ navigation }: any) {
       artist: draft.artist.trim(),
       genres,
       coverImage: finalCoverImage,
+      spotifyUrl: draft.spotifyUrl,
       listened: draft.listened,
       rating: draft.listened ? draft.rating || null : null,
       review: draft.listened ? draft.review : '',
@@ -732,10 +747,17 @@ export default function MusicScreen({ navigation }: any) {
                       ...d,
                       title: r.title || d.title,
                       artist: r.artist || d.artist,
+                      // Cleared immediately, not just left stale - if
+                      // this is a re-selection of a different result
+                      // after an earlier one already set a link, that
+                      // old link shouldn't survive until the new lookup
+                      // resolves.
+                      spotifyUrl: null,
                     }));
-                    // Cover art and genre are BOTH separate follow-up
-                    // calls - see the file header for why. Either can
-                    // come back empty; that's expected, not an error.
+                    // Cover art and genre/link are BOTH separate
+                    // follow-up calls - see the file header for why.
+                    // Either can come back empty; that's expected, not
+                    // an error.
                     if (activeItemId) {
                       fetchCoverArtUrl(r.releaseId).then((url) => {
                         if (!url || !activeItemId) return;
@@ -748,9 +770,13 @@ export default function MusicScreen({ navigation }: any) {
                       });
                     }
                     setGenreLookupInProgress(true);
-                    fetchReleaseGenres(r.releaseId)
-                      .then((genres) => {
-                        if (genres.length > 0) setDraft((d) => ({ ...d, genresText: genres.join(', ') }));
+                    fetchReleaseGenresAndLink(r.releaseId)
+                      .then(({ genres, spotifyUrl }) => {
+                        setDraft((d) => ({
+                          ...d,
+                          genresText: genres.length > 0 ? genres.join(', ') : d.genresText,
+                          spotifyUrl,
+                        }));
                       })
                       .finally(() => setGenreLookupInProgress(false));
                   }}

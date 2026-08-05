@@ -350,7 +350,7 @@ screens/
                                      Title/Artist immediately - cover art
                                      (lib/musicLookup.ts's
                                      fetchCoverArtUrl()) and genre
-                                     (fetchReleaseGenres()) are BOTH
+                                     (fetchReleaseGenresAndLink()) are BOTH
                                      separate follow-up calls, not
                                      included in the search result
                                      itself, same pattern as cover-photo
@@ -584,11 +584,42 @@ lib/
                                      number of people who applied that
                                      tag. `sortTagNamesByCount()` sorts by
                                      that before matching now, in both
-                                     `fetchReleaseGenres()` and
+                                     `fetchReleaseGenresAndLink()` and
                                      `fetchArtistGenres()` - the 4 genres
                                      that make the cap are the
                                      best-supported ones, not just
                                      whatever came back first.
+
+                                     **A sixth improvement, requested
+                                     directly: "Where to Listen" now
+                                     tries to open a real, specific
+                                     Spotify album page, not just a
+                                     generic search.** MusicBrainz tracks
+                                     community-contributed "external
+                                     links" per release, and a direct
+                                     Spotify album page is a real,
+                                     documented relationship type there -
+                                     fetched via `inc=url-rels` on the
+                                     exact same request
+                                     `fetchReleaseGenresAndLink()`
+                                     already makes for genres, so this
+                                     costs no extra network call.
+                                     `MusicAlbum` gained a `spotifyUrl`
+                                     field (persisted like `tmdbId` is
+                                     for Movies/TV/Anime, but without the
+                                     hard on/off gating those have, since
+                                     a fallback always exists here) -
+                                     `handleWhereToListen()` in
+                                     `screens/MusicScreen.tsx` opens that
+                                     direct link when one was found,
+                                     falling back to
+                                     `spotifySearchUrl()`'s plain search
+                                     when none was recorded (community-
+                                     contributed, so genuinely not every
+                                     release has one - same caveat as
+                                     genre tags and cover art throughout
+                                     this whole build) or for an entry
+                                     typed in entirely by hand.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
@@ -783,7 +814,7 @@ lib/
                                      true single needs no special
                                      handling (it's just its own release
                                      in MusicBrainz's model). Genre
-                                     (fetchReleaseGenres()) and cover art
+                                     (fetchReleaseGenresAndLink()) and cover art
                                      (fetchCoverArtUrl()) are BOTH
                                      separate follow-up calls after a
                                      result is selected, not part of the
@@ -833,7 +864,7 @@ lib/
                                      `recording:` MusicBrainz query.
                                      (3) Genre was coming back empty far
                                      more than expected - switched
-                                     fetchReleaseGenres() from
+                                     fetchReleaseGenresAndLink() from
                                      `inc=genres` (MusicBrainz's own
                                      pre-filtered "official genre" list)
                                      to `inc=tags` (every community tag),
@@ -878,9 +909,9 @@ lib/
                                      tags while its artist has plenty,
                                      since artists get far more community
                                      tagging attention than any one
-                                     release does - fetchReleaseGenres()
+                                     release does - fetchReleaseGenresAndLink()
                                      now requests
-                                     `inc=tags+artist-credits` so it has
+                                     `inc=tags+artist-credits+url-rels` so it has
                                      the artist's MusicBrainz id on hand,
                                      and only makes the extra request to
                                      check the artist's own tags if the

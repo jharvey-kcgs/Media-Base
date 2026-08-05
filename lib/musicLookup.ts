@@ -344,29 +344,57 @@ function sortTagNamesByCount(tags: any[]): string[] {
     .map((t) => t.name as string);
 }
 
-export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
-  const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=tags+artist-credits&fmt=json`;
+export interface ReleaseGenresAndLink {
+  genres: string[];
+  spotifyUrl: string | null;
+}
+
+// The Spotify link comes from this same request via inc=url-rels -
+// MusicBrainz tracks community-contributed "external links" per
+// release, and a direct Spotify album page is a real, documented
+// relationship type there, not a guess. No extra request needed - it's
+// already part of the same response fetchReleaseGenresAndLink() was
+// making anyway for genres. Community-contributed means not every
+// release has one recorded, same as genre/cover art elsewhere - null
+// here just means MusicScreen.tsx falls back to a plain Spotify search
+// instead, not that anything failed.
+function extractSpotifyAlbumUrl(json: any): string | null {
+  const relations = Array.isArray(json?.relations) ? json.relations : [];
+  const spotify = relations.find(
+    (r: any) => typeof r?.url?.resource === 'string' && r.url.resource.includes('open.spotify.com/album/'),
+  );
+  return spotify?.url?.resource ?? null;
+}
+
+export async function fetchReleaseGenresAndLink(releaseId: string): Promise<ReleaseGenresAndLink> {
+  const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=tags+artist-credits+url-rels&fmt=json`;
   try {
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!res.ok) {
       console.warn('Media Base: MusicBrainz tag lookup', url, '->', res.status, res.status === 503 ? '(rate limited)' : '');
-      return [];
+      return { genres: [], spotifyUrl: null };
     }
     const json = await res.json();
     const rawTags = Array.isArray(json?.tags) ? sortTagNamesByCount(json.tags) : [];
     const genres = applyGenreDisplayNames(normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST));
-    console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s) by vote count:', rawTags, '->', genres.length, 'genre(s):', genres);
-    if (genres.length > 0) return genres;
+    const spotifyUrl = extractSpotifyAlbumUrl(json);
+    console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s) by vote count:', rawTags, '->', genres.length, 'genre(s):', genres, '| Spotify link:', spotifyUrl ?? '(none recorded)');
+    if (genres.length > 0) return { genres, spotifyUrl };
 
     const artistId = json?.['artist-credit']?.[0]?.artist?.id;
     if (!artistId) {
       console.warn('Media Base: no artist id on release', releaseId, '- skipping artist-level genre fallback');
-      return [];
+      return { genres: [], spotifyUrl };
     }
-    return await fetchArtistGenres(artistId);
+    // Only the release itself is checked for a Spotify link, not this
+    // artist-level fallback - an artist's own Spotify link would be
+    // their profile page, not this specific album, so it wouldn't
+    // actually answer "where can I listen to this."
+    const fallbackGenres = await fetchArtistGenres(artistId);
+    return { genres: fallbackGenres, spotifyUrl };
   } catch (err) {
     console.warn('Media Base: MusicBrainz tag lookup threw', url, err);
-    return [];
+    return { genres: [], spotifyUrl: null };
   }
 }
 

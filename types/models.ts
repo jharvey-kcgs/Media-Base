@@ -175,12 +175,22 @@ export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
 // artist+title text every entry already has, not a precise deep link
 // requiring a specific catalog id. That button always shows here,
 // unlike Where to Watch's graceful-hide-without-an-id behavior.
+// spotifyUrl: a real, direct Spotify album page - found via
+// MusicBrainz's own community-contributed "external links" data
+// (fetched alongside genre, no extra request), not Spotify's own API
+// (restricted for this exact use case as of February 2026, see
+// lib/musicLookup.ts). Community-contributed means not every release
+// has one recorded - null falls back to a plain Spotify search instead
+// of a dead end, same "graceful, not disabled" spirit as tmdbId
+// elsewhere, just without the hard on/off gating those have, since a
+// fallback always exists here.
 export interface MusicAlbum {
   id: string;
   title: string; // the album title
   artist: string;
   genres: string[];
   coverImage: string | null;
+  spotifyUrl: string | null;
   listened: boolean;
   rating: number | null;
   review: string;
