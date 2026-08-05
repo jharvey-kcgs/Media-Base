@@ -161,11 +161,29 @@ function extensionFromUrl(url: string): string {
 // low-cost thing to try given the pattern.
 const DOWNLOAD_USER_AGENT = 'MediaBase/1.0 ( https://github.com/JHarvey/Media-Base )';
 
+// Confirmed via further real testing that the User-Agent header above
+// wasn't enough on its own - a 500 still happened on this exact
+// download step even with it in place. Internet Archive's
+// infrastructure (which serves Cover Art Archive) is well documented to
+// be flaky under moderate load, and a 500 from it is often transient -
+// the same request can succeed seconds later. This retries once after
+// a short delay specifically for a 500 - never for any other status,
+// since those aren't the kind of failure a retry would help with.
+async function downloadWithRetryOn500(url: string, tempUri: string) {
+  let result = await FileSystem.downloadAsync(url, tempUri, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
+  if (result.status === 500) {
+    console.warn('Media Base: cover download got 500 from', url, '- retrying once after a short delay');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    result = await FileSystem.downloadAsync(url, tempUri, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
+  }
+  return result;
+}
+
 export async function downloadRemoteCover(category: string, id: string, url: string): Promise<string | null> {
   try {
     await ensureDirExists(categoryDir(category));
     const tempUri = `${FileSystem.cacheDirectory}temp-cover-${category}-${id}${extensionFromUrl(url)}`;
-    const result = await FileSystem.downloadAsync(url, tempUri, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
+    const result = await downloadWithRetryOn500(url, tempUri);
     if (result.status !== 200) {
       // Previously a silent return - the exact failure this was tracking
       // down (a confirmed URL never actually appearing) never printed
@@ -257,7 +275,7 @@ export async function takeCoverPhotoStaged(category: string, id: string): Promis
 export async function downloadRemoteCoverStaged(category: string, id: string, url: string): Promise<string | null> {
   try {
     const tempSource = `${FileSystem.cacheDirectory}temp-source-cover-${category}-${id}${extensionFromUrl(url)}`;
-    const result = await FileSystem.downloadAsync(url, tempSource, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
+    const result = await downloadWithRetryOn500(url, tempSource);
     if (result.status !== 200) {
       console.warn('Media Base: staged cover download got non-200 status', result.status, url);
       return null;

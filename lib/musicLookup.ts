@@ -242,10 +242,28 @@ export async function searchMusicBrainz(query: string, maxResults: number): Prom
  * sandbox this was written in, so rather than guess again, this logs
  * enough on every call to tell the two apart on the next real test:
  * the exact URL, status, and what (if anything) was extracted. */
+// Internet Archive's infrastructure (which serves Cover Art Archive) is
+// well documented to be flaky under moderate load - confirmed via real
+// testing that a 500 here is often transient (the same request can
+// succeed seconds later), unlike a 404 (a clean, real "no art
+// contributed" signal that should never be retried - retrying that
+// would just waste a request for no benefit).
+async function fetchWithRetryOn500(url: string, init?: RequestInit, retries = 1): Promise<Response> {
+  let res = await fetch(url, init);
+  let attempt = 0;
+  while (res.status === 500 && attempt < retries) {
+    attempt++;
+    console.warn('Media Base: got 500 from', url, '- retrying once after a short delay');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    res = await fetch(url, init);
+  }
+  return res;
+}
+
 export async function fetchCoverArtUrl(releaseId: string): Promise<string | null> {
   const url = `https://coverartarchive.org/release/${releaseId}`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithRetryOn500(url, { headers: { 'User-Agent': USER_AGENT } });
     if (!res.ok) {
       console.warn('Media Base: Cover Art Archive', url, '->', res.status, res.status === 404 ? '(no art contributed for this release)' : '(unexpected)');
       return null;

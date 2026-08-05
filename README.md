@@ -524,32 +524,50 @@ lib/
                                      let this go unexplained across two
                                      rounds of testing.
 
-                                     **A fourth issue, still being
-                                     investigated as of this writing**:
-                                     with the extension bug fixed and
-                                     real logging in place, testing then
-                                     surfaced a real 500 from Cover Art
-                                     Archive on the actual file download
-                                     - and confirmed it happening across
-                                     6 *different* albums in one session,
-                                     not one consistently broken file, a
-                                     pattern more consistent with the
-                                     request itself being treated oddly
-                                     than 6 coincidentally broken files.
-                                     Both download functions now send a
-                                     `User-Agent` header on that specific
-                                     request (`DOWNLOAD_USER_AGENT`) -
-                                     Internet Archive's infrastructure
-                                     (which serves Cover Art Archive) is
-                                     known to be inconsistent toward a
-                                     request with no identifying header
-                                     at all, and this request previously
-                                     sent none. Not confirmed fixed yet -
-                                     a 500 can still genuinely be a
-                                     transient server-side issue on their
-                                     end regardless of headers, so this
-                                     is a real, reasoned attempt worth
-                                     testing rather than a verified fix.
+                                     **A fourth issue, refined further
+                                     after more testing**: with the
+                                     extension bug fixed and real logging
+                                     in place, testing surfaced a real
+                                     500 from Cover Art Archive on the
+                                     actual file download, confirmed
+                                     happening across 6 *different*
+                                     albums in one session - a pattern
+                                     more consistent with the request
+                                     itself being treated oddly than 6
+                                     coincidentally broken files. Both
+                                     download functions send a
+                                     `User-Agent` header on that request
+                                     (`DOWNLOAD_USER_AGENT`) now, which
+                                     helped but didn't fully resolve it -
+                                     confirmed via further testing that a
+                                     500 could still happen on this exact
+                                     step (and separately, on
+                                     `fetchCoverArtUrl()`'s own metadata
+                                     fetch, which never had a User-Agent
+                                     at all until this round) even with
+                                     that header in place. The remaining
+                                     explanation: Internet Archive's
+                                     infrastructure, which serves Cover
+                                     Art Archive, is well documented to
+                                     be flaky under moderate load, and a
+                                     500 from it is often transient - the
+                                     same request can succeed seconds
+                                     later. Both `fetchCoverArtUrl()` and
+                                     the two download functions now retry
+                                     once after a short delay
+                                     specifically on a 500
+                                     (`fetchWithRetryOn500()` /
+                                     `downloadWithRetryOn500()`) - never
+                                     on a 404, which is a clean, real "no
+                                     art contributed" signal that a retry
+                                     would never help with. Still not
+                                     claimed as fully solved - about half
+                                     of attempts were failing before this
+                                     round, and a single retry narrows
+                                     that window without guaranteeing it
+                                     shut, since the underlying service's
+                                     own reliability is outside anything
+                                     this app controls.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
