@@ -148,11 +148,24 @@ function extensionFromUrl(url: string): string {
   return match ? `.${match[1].toLowerCase()}` : '.jpg';
 }
 
+// Identifies this app to whatever server the actual cover file is
+// downloaded from - some hosts (Internet Archive's infrastructure,
+// which serves Cover Art Archive, in particular) are known to behave
+// inconsistently toward a request with no identifying header at all.
+// Confirmed via real testing that a 500 on this specific download step
+// showed up across 6 different albums in one session, not one
+// consistently broken file - a pattern more consistent with the
+// request itself being treated oddly than with genuinely broken
+// individual files on their end. Not guaranteed to fix it - a 500 can
+// still just be a real, transient server-side issue - but a real,
+// low-cost thing to try given the pattern.
+const DOWNLOAD_USER_AGENT = 'MediaBase/1.0 ( https://github.com/JHarvey/Media-Base )';
+
 export async function downloadRemoteCover(category: string, id: string, url: string): Promise<string | null> {
   try {
     await ensureDirExists(categoryDir(category));
     const tempUri = `${FileSystem.cacheDirectory}temp-cover-${category}-${id}${extensionFromUrl(url)}`;
-    const result = await FileSystem.downloadAsync(url, tempUri);
+    const result = await FileSystem.downloadAsync(url, tempUri, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
     if (result.status !== 200) {
       // Previously a silent return - the exact failure this was tracking
       // down (a confirmed URL never actually appearing) never printed
@@ -244,7 +257,7 @@ export async function takeCoverPhotoStaged(category: string, id: string): Promis
 export async function downloadRemoteCoverStaged(category: string, id: string, url: string): Promise<string | null> {
   try {
     const tempSource = `${FileSystem.cacheDirectory}temp-source-cover-${category}-${id}${extensionFromUrl(url)}`;
-    const result = await FileSystem.downloadAsync(url, tempSource);
+    const result = await FileSystem.downloadAsync(url, tempSource, { headers: { 'User-Agent': DOWNLOAD_USER_AGENT } });
     if (result.status !== 200) {
       console.warn('Media Base: staged cover download got non-200 status', result.status, url);
       return null;

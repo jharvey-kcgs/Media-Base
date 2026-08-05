@@ -523,6 +523,33 @@ lib/
                                      trace at all - exactly the gap that
                                      let this go unexplained across two
                                      rounds of testing.
+
+                                     **A fourth issue, still being
+                                     investigated as of this writing**:
+                                     with the extension bug fixed and
+                                     real logging in place, testing then
+                                     surfaced a real 500 from Cover Art
+                                     Archive on the actual file download
+                                     - and confirmed it happening across
+                                     6 *different* albums in one session,
+                                     not one consistently broken file, a
+                                     pattern more consistent with the
+                                     request itself being treated oddly
+                                     than 6 coincidentally broken files.
+                                     Both download functions now send a
+                                     `User-Agent` header on that specific
+                                     request (`DOWNLOAD_USER_AGENT`) -
+                                     Internet Archive's infrastructure
+                                     (which serves Cover Art Archive) is
+                                     known to be inconsistent toward a
+                                     request with no identifying header
+                                     at all, and this request previously
+                                     sent none. Not confirmed fixed yet -
+                                     a 500 can still genuinely be a
+                                     transient server-side issue on their
+                                     end regardless of headers, so this
+                                     is a real, reasoned attempt worth
+                                     testing rather than a verified fix.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
