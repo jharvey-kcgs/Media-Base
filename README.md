@@ -568,6 +568,27 @@ lib/
                                      shut, since the underlying service's
                                      own reliability is outside anything
                                      this app controls.
+
+                                     **A fifth issue, about genre
+                                     selection quality rather than
+                                     availability**: flagged directly -
+                                     the 4-genre cap was just keeping
+                                     whichever 4 unique matches happened
+                                     to appear first in the order
+                                     MusicBrainz's API returned raw tags,
+                                     not necessarily the ones the
+                                     community most agrees on. MusicBrainz
+                                     tag objects carry a real signal for
+                                     this that was being thrown away
+                                     entirely: a `count` field, the
+                                     number of people who applied that
+                                     tag. `sortTagNamesByCount()` sorts by
+                                     that before matching now, in both
+                                     `fetchReleaseGenres()` and
+                                     `fetchArtistGenres()` - the 4 genres
+                                     that make the cap are the
+                                     best-supported ones, not just
+                                     whatever came back first.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.

@@ -52,12 +52,22 @@ const USER_AGENT = 'MediaBase/1.0 ( https://github.com/JHarvey/Media-Base )';
 // set instead and does its own filtering, rather than trusting their
 // pre-filtered subset to be complete.
 const MUSIC_GENRE_ALLOWLIST = [
+  // More specific genres deliberately listed before the generic terms
+  // they'd otherwise be shadowed by - normalizeGenres() matches in
+  // array order and stops at the first hit, so "Classic Rock" or
+  // "Progressive Rock" needs to be checked before plain "Rock" ever
+  // gets a chance, or a tag like "classic rock" would always match the
+  // generic "Rock" first and never reach the more specific term at all.
+  // Confirmed via real testing: "Progressive Rock" already had this
+  // exact bug before Classic Rock/Pop Rock were even added, just never
+  // surfaced since nothing had flagged it yet.
+  'Classic Rock', 'Pop Rock', 'Progressive Rock',
   'Rock', 'Pop', 'Hip Hop', 'Rap', 'R&B', 'Country', 'Jazz', 'Classical',
   'Electronic', 'Folk', 'Metal', 'Blues', 'Reggae', 'Punk', 'Indie',
   'Alternative', 'Soul', 'Funk', 'Gospel', 'Latin', 'World', 'Ambient',
   'House', 'Techno', 'Dance', 'Disco', 'Grunge', 'Ska', 'K-Pop', 'J-Pop',
   'Singer-Songwriter', 'Soundtrack', 'New Age', 'Experimental', 'Emo',
-  'Hardcore', 'Industrial', 'Synth-Pop', 'Progressive Rock', 'Bluegrass',
+  'Hardcore', 'Industrial', 'Synth-Pop', 'Bluegrass',
   // Added on request. Deliberately one word each, not "Metal Core"/
   // "Death Core"/"Death Metal" - real-world tags (MusicBrainz included,
   // confirmed via an actual raw tag from testing: "metalcore") write
@@ -317,6 +327,23 @@ export async function fetchCoverArtUrl(releaseId: string): Promise<string | null
  * real way to hit a 503 here specifically. Logs unconditionally so a
  * real test shows whether that's what's happening versus a release (and
  * its artist) that genuinely have no matching tags. */
+// MusicBrainz tags carry a real popularity signal that was previously
+// being thrown away entirely: each tag object includes a `count` - how
+// many people applied it. Without this, the 4-genre cap just kept
+// whatever 4 unique matches showed up first in the API's own tag order
+// (not necessarily sorted by anything meaningful), rather than the ones
+// the community actually agrees on most - flagged directly as a real
+// concern, not a hypothetical one. Sorting by count first means the
+// genres that make the cut are the best-supported ones, and also means
+// a broader, more representative set survives the cap instead of
+// accidentally ignoring real votes.
+function sortTagNamesByCount(tags: any[]): string[] {
+  return [...tags]
+    .filter((t) => t?.name)
+    .sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
+    .map((t) => t.name as string);
+}
+
 export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
   const url = `https://musicbrainz.org/ws/2/release/${releaseId}?inc=tags+artist-credits&fmt=json`;
   try {
@@ -326,9 +353,9 @@ export async function fetchReleaseGenres(releaseId: string): Promise<string[]> {
       return [];
     }
     const json = await res.json();
-    const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
+    const rawTags = Array.isArray(json?.tags) ? sortTagNamesByCount(json.tags) : [];
     const genres = applyGenreDisplayNames(normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST));
-    console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
+    console.warn('Media Base: MusicBrainz tag lookup (release)', url, '->', rawTags.length, 'raw tag(s) by vote count:', rawTags, '->', genres.length, 'genre(s):', genres);
     if (genres.length > 0) return genres;
 
     const artistId = json?.['artist-credit']?.[0]?.artist?.id;
@@ -352,9 +379,9 @@ async function fetchArtistGenres(artistId: string): Promise<string[]> {
       return [];
     }
     const json = await res.json();
-    const rawTags = Array.isArray(json?.tags) ? json.tags.map((t: any) => t?.name).filter(Boolean) : [];
+    const rawTags = Array.isArray(json?.tags) ? sortTagNamesByCount(json.tags) : [];
     const genres = applyGenreDisplayNames(normalizeGenres(rawTags, MUSIC_GENRE_ALLOWLIST));
-    console.warn('Media Base: MusicBrainz tag lookup (artist)', url, '->', rawTags.length, 'raw tag(s):', rawTags, '->', genres.length, 'genre(s):', genres);
+    console.warn('Media Base: MusicBrainz tag lookup (artist)', url, '->', rawTags.length, 'raw tag(s) by vote count:', rawTags, '->', genres.length, 'genre(s):', genres);
     return genres;
   } catch (err) {
     console.warn('Media Base: MusicBrainz artist tag lookup threw', url, err);
