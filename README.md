@@ -500,6 +500,29 @@ lib/
                                      staged file - commit it), or removed
                                      (null, original was non-null - delete
                                      now, not when it was tapped).
+
+                                     **A third real bug, found via real
+                                     Music testing**: downloadRemoteCover()/
+                                     downloadRemoteCoverStaged() hardcoded
+                                     their temp download file to a `.jpg`
+                                     extension regardless of the actual
+                                     format being downloaded - confirmed
+                                     via testing that every cover which
+                                     ever successfully appeared was a
+                                     `.jpg` URL, and every one reported as
+                                     silently failing (a confirmed valid
+                                     URL that never actually showed up)
+                                     was a `.png`. Both functions now
+                                     derive the real extension from the
+                                     URL itself (`extensionFromUrl()`),
+                                     falling back to `.jpg` only when the
+                                     URL doesn't make the format clear.
+                                     Also added logging on a non-200
+                                     download status, previously a
+                                     completely silent return with no
+                                     trace at all - exactly the gap that
+                                     let this go unexplained across two
+                                     rounds of testing.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.

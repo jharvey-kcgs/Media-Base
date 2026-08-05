@@ -133,15 +133,36 @@ export async function takeCoverPhoto(category: string, id: string): Promise<stri
  * null if the download fails, which isn't treated as an app error - it's
  * the same "genuinely not available" case already handled for missing
  * genre data, not every book/movie has cover art indexed anywhere. */
+// Confirmed real issue via testing: every cover that ever successfully
+// downloaded was a .jpg URL, and every one reported as failing (found a
+// valid URL, logged "using [url]", but never actually appeared) was a
+// .png. The temp file below used to be hardcoded to a .jpg extension
+// regardless of what format was actually being downloaded - PNG bytes
+// were being written into a file literally named .jpg, which some image
+// processing steps use as a hint for how to decode the file rather than
+// sniffing the actual content. This derives the real extension from the
+// URL instead, falling back to .jpg only when the URL doesn't make it
+// clear.
+function extensionFromUrl(url: string): string {
+  const match = url.match(/\.(jpe?g|png|webp|gif)(?:\?|$)/i);
+  return match ? `.${match[1].toLowerCase()}` : '.jpg';
+}
+
 export async function downloadRemoteCover(category: string, id: string, url: string): Promise<string | null> {
   try {
     await ensureDirExists(categoryDir(category));
-    const tempUri = `${FileSystem.cacheDirectory}temp-cover-${category}-${id}.jpg`;
+    const tempUri = `${FileSystem.cacheDirectory}temp-cover-${category}-${id}${extensionFromUrl(url)}`;
     const result = await FileSystem.downloadAsync(url, tempUri);
-    if (result.status !== 200) return null;
+    if (result.status !== 200) {
+      // Previously a silent return - the exact failure this was tracking
+      // down (a confirmed URL never actually appearing) never printed
+      // anything at all, since this wasn't logged before.
+      console.warn('Media Base: cover download got non-200 status', result.status, url);
+      return null;
+    }
     return await saveResizedCover(category, id, result.uri);
   } catch (err) {
-    console.warn('Media Base: cover download failed', err);
+    console.warn('Media Base: cover download failed', url, err);
     return null;
   }
 }
@@ -222,12 +243,15 @@ export async function takeCoverPhotoStaged(category: string, id: string): Promis
 
 export async function downloadRemoteCoverStaged(category: string, id: string, url: string): Promise<string | null> {
   try {
-    const tempSource = `${FileSystem.cacheDirectory}temp-source-cover-${category}-${id}.jpg`;
+    const tempSource = `${FileSystem.cacheDirectory}temp-source-cover-${category}-${id}${extensionFromUrl(url)}`;
     const result = await FileSystem.downloadAsync(url, tempSource);
-    if (result.status !== 200) return null;
+    if (result.status !== 200) {
+      console.warn('Media Base: staged cover download got non-200 status', result.status, url);
+      return null;
+    }
     return await saveResizedCoverTo(result.uri, stagedCoverPath(category, id));
   } catch (err) {
-    console.warn('Media Base: staged cover download failed', err);
+    console.warn('Media Base: staged cover download failed', url, err);
     return null;
   }
 }
