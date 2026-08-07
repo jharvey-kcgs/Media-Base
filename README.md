@@ -20,8 +20,8 @@ alongside the in-app About/FAQ screens as more categories get built.*
 
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
-(Books, Comics/Manga, Movies, TV Shows, Anime, Vinyl/Records,
-Board Games), each with its own dedicated screen for adding,
+(Books, Comics/Manga, Movies, TV Shows, Anime, Vinyl/CD,
+Tabletop Games), each with its own dedicated screen for adding,
 rating, and reviewing entries, plus a Settings area covering Profile,
 Theme, Data (backup/restore/delete), Permissions, About, and FAQ.
 
@@ -60,7 +60,7 @@ rather than pasted text. Every other category widget shows "Coming soon"
 until its own screen is built - Movies, TV Shows, and Anime were all
 built out of the original planned order in
 [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
-so the remaining order there is Vinyl/Records → Board Games (Music,
+so the remaining order there is Vinyl/CD → Tabletop Games (Music,
 originally next in that order, was built and later removed entirely -
 see below; Puzzles was dropped from the plan before ever being built).
 `lib/useAlphabetScroll.ts` (A-Z
@@ -126,10 +126,10 @@ the same *kind* of thing). An album pointed at a streaming service you
 don't own anything on is a genuinely different category of entry than
 everything else here, and no amount of reliability fixes changes that.
 Removed by explicit request rather than left in as a lesser-used
-category. If digital Music is ever reconsidered, Vinyl/Records (still
+category. If digital Music is ever reconsidered, Vinyl/CD (still
 on the Roadmap) is the version of "music" that actually fits this
-project's philosophy - tracking records you physically own, not a
-streaming pointer.
+project's philosophy - tracking records and CDs you physically own,
+not a streaming pointer.
 
 ---
 
@@ -593,9 +593,9 @@ lib/
                                      searchMoviesByTitle()), and
                                      looksLikeIsbn() (not Movies-specific
                                      logic, kept for any future UPC-based
-                                     category - Vinyl, Board Games - that
-                                     could hit the same bundled-print-
-                                     material ambiguity). Removed the
+                                     category - Vinyl/CD, Tabletop Games
+                                     - that could hit the same bundled-
+                                     print-material ambiguity). Removed the
                                      UPCitemdb lookup and title-cleaning
                                      regex as genuinely dead code rather
                                      than leaving them unused. Added
@@ -1030,7 +1030,7 @@ assets/
 ### Category screen pattern (applies to every future category, not just Books)
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
-building the remaining categories (Vinyl/Records, Board Games) -
+building the remaining categories (Vinyl/CD, Tabletop Games) -
 `screens/ComicScreen.tsx`, `screens/MovieScreen.tsx`, and
 `screens/TVScreen.tsx` are three real examples of that copy already
 done, showing genuinely different degrees of reuse:
@@ -1073,8 +1073,8 @@ A future category screen should follow this same split: reuse
 `lib/useAlphabetScroll.ts` unconditionally (any category with an A-Z
 index benefits from its four rounds of bug fixes), reuse
 `lib/isbnLookup.ts` only if the category actually has ISBNs (Books,
-Comics/Manga - not Movies, TV Shows, Vinyl, Board Games, which all need
-their own lookup shape per the Roadmap doc), reuse
+Comics/Manga - not Movies, TV Shows, Vinyl/CD, Tabletop Games, which all
+need their own lookup shape per the Roadmap doc), reuse
 `components/TitleSearchInput.tsx` for the title-search entry method
 regardless of category (only the search function/result shape passed
 into it differs), and only duplicate what's genuinely category-specific
@@ -1432,7 +1432,7 @@ has changed or the previous pick got marked read/deleted since.
 ## 5. Permissions
 
 Camera access is used for exactly one thing: the optional barcode-scan
-shortcut when adding an entry (Books, Comics/Manga, Movies, Vinyl, Board
+shortcut when adding an entry (Books, Comics/Manga, Vinyl/CD, Tabletop
 Games). It is never required — every entry screen supports full manual
 typing regardless of permission state.
 
@@ -1838,9 +1838,9 @@ code was simply wrong.
   the Category screen pattern section above. Movies originally had its
   own UPC/barcode scanning too, removed after real testing confirmed it
   was unreliable; TV Shows never had it at all (confirmed design from
-  the start). Both are title-search only now. Vinyl and Board Games
-  still need their own barcode-type/lookup wiring since their data
-  sources differ again.
+  the start). Both are title-search only now. Vinyl/CD and Tabletop
+  Games still need their own barcode-type/lookup wiring since their
+  data sources differ again.
 - **Notifications**: daily 10am reminder confirmed working on-device,
   including the badge (fixed - the scheduled notification wasn't
   setting one at all).
@@ -1867,15 +1867,15 @@ code was simply wrong.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Vinyl/Records → Board Games, in that order (Books,
+- Vinyl/CD → Tabletop Games, in that order (Books,
   Comics/Manga, Movies, TV Shows, and Anime are all done - Movies, TV
   Shows, and Anime all built out of the original planned sequence per
   explicit request; Music was also built out of sequence, reached a
   fully working state, and was later removed entirely - see the top
   overview and Section 6 for why; Puzzles was dropped from the plan
   before ever being built, on reflection not something worth tracking)
-- Real barcode scanning for Vinyl and Board Games (Books/Comics share
-  `lib/isbnLookup.ts` for this - Movies originally had its own
+- Real barcode scanning for Vinyl/CD and Tabletop Games (Books/Comics
+  share `lib/isbnLookup.ts` for this - Movies originally had its own
   `lib/upcLookup.ts` too, removed after real testing confirmed it was
   unreliable; Movies, TV Shows, and Anime are all title-search only now
   - see the Category screen pattern section above for what each

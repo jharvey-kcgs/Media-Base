@@ -10,15 +10,19 @@ import { ALL_CATEGORIES, CATEGORY_LABELS, MediaCategory, DEFAULT_SETTINGS } from
 
 // Simple visual variety per category so the list isn't just plain rows of
 // text - a real illustration set is a nice-to-have for later, this is the
-// quick version.
+// quick version. Vinyl/CD and Tabletop Games each use two emoji rather
+// than one, deliberately - both categories cover two related-but-
+// distinct physical formats (vinyl records + CDs; board games + card
+// games), and a single icon couldn't represent both halves at once the
+// way one icon fairly represents every other category here.
 const CATEGORY_ICONS: Record<MediaCategory, string> = {
   books: '📚',
   comics: '💥',
   movies: '🎬',
   tvshows: '📺',
   anime: '🎌',
-  vinyl: '💿',
-  boardgames: '🎲',
+  vinyl: '💿🎵',
+  tabletop: '🎲🃏',
 };
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {

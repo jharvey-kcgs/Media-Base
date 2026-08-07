@@ -17,7 +17,7 @@ export type MediaCategory =
   | 'tvshows'
   | 'anime'
   | 'vinyl'
-  | 'boardgames';
+  | 'tabletop';
 
 export const ALL_CATEGORIES: MediaCategory[] = [
   'books',
@@ -26,7 +26,7 @@ export const ALL_CATEGORIES: MediaCategory[] = [
   'tvshows',
   'anime',
   'vinyl',
-  'boardgames',
+  'tabletop',
 ];
 
 export const CATEGORY_LABELS: Record<MediaCategory, string> = {
@@ -35,8 +35,8 @@ export const CATEGORY_LABELS: Record<MediaCategory, string> = {
   movies: 'Movies',
   tvshows: 'TV Shows',
   anime: 'Anime',
-  vinyl: 'Vinyl/Records',
-  boardgames: 'Board Games',
+  vinyl: 'Vinyl/CD',
+  tabletop: 'Tabletop Games',
 };
 
 // Which categories support a scan-to-fill shortcut, vs. manual entry only.
@@ -49,7 +49,7 @@ export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
   tvshows: false,
   anime: false,
   vinyl: true,
-  boardgames: true,
+  tabletop: true,
 };
 
 export interface Book {

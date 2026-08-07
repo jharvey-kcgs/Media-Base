@@ -12,7 +12,7 @@
 // regex, and the two-step orchestration function) as genuinely dead
 // code rather than leaving it unused. looksLikeIsbn() also stayed - not
 // Movies-specific logic, still relevant if a future UPC-based category
-// (Vinyl, Board Games) is ever built.
+// (Vinyl/CD, Tabletop Games) is ever built.
 
 import { TMDB_READ_ACCESS_TOKEN } from './config';
 
@@ -57,7 +57,7 @@ export interface MovieLookupResult {
 // An ISBN is structurally just an EAN-13 barcode in the reserved
 // "Bookland" 978/979 prefix range - always true, not a guess. Not
 // Movies-specific despite living in this file - kept for any future
-// UPC-based category (Vinyl, Board Games) that could hit the same
+// UPC-based category (Vinyl/CD, Tabletop Games) that could hit the same
 // bundled-print-material ambiguity a physical UPC-scanning item can have
 // (a boxed set that bundles a book/booklet, printing both barcodes on
 // the case). Currently unused by Movies itself, which dropped UPC
