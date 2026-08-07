@@ -20,7 +20,7 @@ alongside the in-app About/FAQ screens as more categories get built.*
 
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
-(Books, Comics/Manga, Movies, TV Shows, Anime, Music, Vinyl/Records,
+(Books, Comics/Manga, Movies, TV Shows, Anime, Vinyl/Records,
 Puzzles, Board Games), each with its own dedicated screen for adding,
 rating, and reviewing entries, plus a Settings area covering Profile,
 Theme, Data (backup/restore/delete), Permissions, About, and FAQ.
@@ -57,32 +57,36 @@ result - and every category now shows a cover photo (auto-fetched where
 one's available, or added by hand) both in its list and its Edit screen.
 Settings → Data backs up everything, covers included, to one real file
 rather than pasted text. Every other category widget shows "Coming soon"
-until its own screen is built - Movies was built out of the original
-planned order in [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per
-explicit request, so the remaining order there is Puzzles → Music → TV
-Shows → Anime → Vinyl → Board Games. `lib/useAlphabetScroll.ts` (A-Z
+until its own screen is built - Movies, TV Shows, and Anime were all
+built out of the original planned order in
+[Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
+so the remaining order there is Puzzles → Vinyl/Records → Board Games
+(Music, originally next in that order, was built and later removed
+entirely - see below). `lib/useAlphabetScroll.ts` (A-Z
 index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
 `components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
-search, local search, and cover photos) are shared across all four
+search, local search, and cover photos) are shared across all five
 implemented categories; `lib/isbnLookup.ts` is Books/Comics-specific,
-since both use ISBN lookup directly - Movies and TV Shows are both
-TMDb-backed instead (`lib/movieLookup.ts`, `lib/tvLookup.ts`), and
-title-search-only, having no ISBN/barcode concept at all - see the
+since both use ISBN lookup directly - Movies, TV Shows, and Anime are
+all TMDb-backed instead (`lib/movieLookup.ts`, `lib/tvLookup.ts`, and
+Anime reuses tvLookup.ts directly), and title-search-only, having no
+ISBN/barcode concept at all - see the
 Category screen pattern section for what to reuse vs. rebuild per
 category.
-**Movies and TV Shows need a one-time setup step Books/Comics never
-did**: a free TMDb credential in `lib/config.ts` (see that file's own
-comments for exactly what's needed and where to get it), or their
+**Movies, TV Shows, and Anime need a one-time setup step Books/Comics
+never did**: a free TMDb credential in `lib/config.ts` (see that file's
+own comments for exactly what's needed and where to get it), or their
 title-search auto-fill won't return anything (manual entry always works
 regardless).
 
-**All four implemented categories are fully working** - Books,
-Comics/Manga, Movies, and TV Shows all have working list/search/genre
-filter/A-Z index/hold-to-select and full Add/Edit. Movies and TV Shows
-are structural twins: both TMDb-backed, both title-search-only (no
-camera/scanner, no barcode/number entry of any kind - confirmed design,
-not a gap), both with a "Where to Watch" button that opens TMDb's own
-watch page. That button only shows on an entry added through title
+**All five implemented categories are fully working** - Books,
+Comics/Manga, Movies, TV Shows, and Anime all have working list/search/
+genre filter/A-Z index/hold-to-select and full Add/Edit. Movies, TV
+Shows, and Anime are structural twins: all TMDb-backed (Anime with a
+Jikan/MyAnimeList fallback when TMDb has nothing), all title-search-only
+(no camera/scanner, no barcode/number entry of any kind - confirmed
+design, not a gap), all with a "Where to Watch" button that opens TMDb's
+own watch page. That button only shows on an entry added through title
 search (needs a stored `tmdbId` to link to anything) - not shown at all
 for an entry typed in by hand, a graceful hide rather than a disabled
 button. Movies didn't start this way - it originally had UPC/barcode
@@ -110,27 +114,21 @@ fallback won't have a Where to Watch button** - MyAnimeList doesn't
 cross-reference TMDb, so there's no `tmdbId` to build that link from,
 the same graceful-hide behavior already used for a hand-typed entry.
 
-**Music is fully working** - `screens/MusicScreen.tsx` (list, search,
-genre filter, A-Z index, hold-to-select, full Add/Edit) and the Home
-widget are both built now, on top of the data layer (`types/models.ts`'s
-`MusicAlbum`, full CRUD in `lib/storage.ts` including backup/cover
-wiring, and the lookup in `lib/musicLookup.ts`, orchestrated by
-`lib/titleSearch.ts`'s `searchMusicByTitle()`). **Deliberately not
-Spotify for data** - despite the original Roadmap note assuming it,
-Spotify's Web API changed in February 2026, moving away from allowing
-simple, no-login "Client Credentials" access to metadata endpoints for
-free-tier developer apps. MusicBrainz + Cover Art Archive (both free,
-fully keyless) took its place for search/metadata/cover art. Album is
-the tracked unit (same "one release = one entry" philosophy as every
-other category), but search covers both album titles and song titles
-together - whichever matches, the result resolves to that song's album,
-not the song itself. Confirmed design: plain 1-5 album-level rating,
-no per-track breakdown for v1. Spotify still has a role, just not for
-data: "Where to Listen" is a plain Spotify search link
-(`spotifySearchUrl()`), not a precise deep link - that would need the
-now-restricted API - so unlike Where to Watch, this button always shows
-regardless of how the entry was added, since it needs no external id at
-all.
+**Music (digital, via streaming) was built, then removed.** It reached
+a fully working state - MusicBrainz + Cover Art Archive for search/
+metadata/cover art, a direct Spotify album link when one existed via
+MusicBrainz's community-contributed relationship data, five real bugs
+found and fixed through real device testing - but even working well,
+it never fit this project's core: physical, owned media (or, for TV
+Shows/Anime, a complete work you watched in full, not a disc but still
+the same *kind* of thing). An album pointed at a streaming service you
+don't own anything on is a genuinely different category of entry than
+everything else here, and no amount of reliability fixes changes that.
+Removed by explicit request rather than left in as a lesser-used
+category. If digital Music is ever reconsidered, Vinyl/Records (still
+on the Roadmap) is the version of "music" that actually fits this
+project's philosophy - tracking records you physically own, not a
+streaming pointer.
 
 ---
 
@@ -336,33 +334,6 @@ screens/
                                      through the Jikan fallback, a real
                                      and deliberate consequence of the
                                      two-source design, not a bug.
-  MusicScreen.tsx                   Music (widget 6 - fully working).
-                                     Mirrors AnimeScreen.tsx's shape
-                                     (dynamic genre filter, same cover/
-                                     staging system, hold-to-select) with
-                                     BookScreen.tsx's tap-an-author-to-
-                                     filter pattern extended to Artist -
-                                     a natural fit, same reasoning that
-                                     justified it for Books/Comics. Two
-                                     genuine differences from every prior
-                                     category screen: selecting a
-                                     title-search result only fills
-                                     Title/Artist immediately - cover art
-                                     (lib/musicLookup.ts's
-                                     fetchCoverArtUrl()) and genre
-                                     (fetchReleaseGenresAndLink()) are BOTH
-                                     separate follow-up calls, not
-                                     included in the search result
-                                     itself, same pattern as cover-photo
-                                     auto-fill everywhere else just
-                                     extended to two background fetches;
-                                     and "Where to Listen" always shows,
-                                     unlike Where to Watch's tmdbId-gated
-                                     button - it's a plain Spotify search
-                                     (spotifySearchUrl()) built from
-                                     artist+title text every entry
-                                     already has, not a precise deep link
-                                     needing an external id.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
@@ -501,125 +472,39 @@ lib/
                                      (null, original was non-null - delete
                                      now, not when it was tapped).
 
-                                     **A third real bug, found via real
-                                     Music testing**: downloadRemoteCover()/
-                                     downloadRemoteCoverStaged() hardcoded
-                                     their temp download file to a `.jpg`
-                                     extension regardless of the actual
-                                     format being downloaded - confirmed
-                                     via testing that every cover which
-                                     ever successfully appeared was a
-                                     `.jpg` URL, and every one reported as
-                                     silently failing (a confirmed valid
-                                     URL that never actually showed up)
-                                     was a `.png`. Both functions now
-                                     derive the real extension from the
-                                     URL itself (`extensionFromUrl()`),
-                                     falling back to `.jpg` only when the
-                                     URL doesn't make the format clear.
-                                     Also added logging on a non-200
-                                     download status, previously a
-                                     completely silent return with no
-                                     trace at all - exactly the gap that
-                                     let this go unexplained across two
-                                     rounds of testing.
-
-                                     **A fourth issue, refined further
-                                     after more testing**: with the
-                                     extension bug fixed and real logging
-                                     in place, testing surfaced a real
-                                     500 from Cover Art Archive on the
-                                     actual file download, confirmed
-                                     happening across 6 *different*
-                                     albums in one session - a pattern
-                                     more consistent with the request
-                                     itself being treated oddly than 6
-                                     coincidentally broken files. Both
-                                     download functions send a
-                                     `User-Agent` header on that request
-                                     (`DOWNLOAD_USER_AGENT`) now, which
-                                     helped but didn't fully resolve it -
-                                     confirmed via further testing that a
-                                     500 could still happen on this exact
-                                     step (and separately, on
-                                     `fetchCoverArtUrl()`'s own metadata
-                                     fetch, which never had a User-Agent
-                                     at all until this round) even with
-                                     that header in place. The remaining
-                                     explanation: Internet Archive's
-                                     infrastructure, which serves Cover
-                                     Art Archive, is well documented to
-                                     be flaky under moderate load, and a
-                                     500 from it is often transient - the
-                                     same request can succeed seconds
-                                     later. Both `fetchCoverArtUrl()` and
-                                     the two download functions now retry
-                                     once after a short delay
-                                     specifically on a 500
-                                     (`fetchWithRetryOn500()` /
-                                     `downloadWithRetryOn500()`) - never
-                                     on a 404, which is a clean, real "no
-                                     art contributed" signal that a retry
-                                     would never help with. Still not
-                                     claimed as fully solved - about half
-                                     of attempts were failing before this
-                                     round, and a single retry narrows
-                                     that window without guaranteeing it
-                                     shut, since the underlying service's
-                                     own reliability is outside anything
-                                     this app controls.
-
-                                     **A fifth issue, about genre
-                                     selection quality rather than
-                                     availability**: flagged directly -
-                                     the 4-genre cap was just keeping
-                                     whichever 4 unique matches happened
-                                     to appear first in the order
-                                     MusicBrainz's API returned raw tags,
-                                     not necessarily the ones the
-                                     community most agrees on. MusicBrainz
-                                     tag objects carry a real signal for
-                                     this that was being thrown away
-                                     entirely: a `count` field, the
-                                     number of people who applied that
-                                     tag. `sortTagNamesByCount()` sorts by
-                                     that before matching now, in both
-                                     `fetchReleaseGenresAndLink()` and
-                                     `fetchArtistGenres()` - the 4 genres
-                                     that make the cap are the
-                                     best-supported ones, not just
-                                     whatever came back first.
-
-                                     **A sixth improvement, requested
-                                     directly: "Where to Listen" now
-                                     tries to open a real, specific
-                                     Spotify album page, not just a
-                                     generic search.** MusicBrainz tracks
-                                     community-contributed "external
-                                     links" per release, and a direct
-                                     Spotify album page is a real,
-                                     documented relationship type there -
-                                     fetched via `inc=url-rels` on the
-                                     exact same request
-                                     `fetchReleaseGenresAndLink()`
-                                     already makes for genres, so this
-                                     costs no extra network call.
-                                     `MusicAlbum` gained a `spotifyUrl`
-                                     field (persisted like `tmdbId` is
-                                     for Movies/TV/Anime, but without the
-                                     hard on/off gating those have, since
-                                     a fallback always exists here) -
-                                     `handleWhereToListen()` in
-                                     `screens/MusicScreen.tsx` opens that
-                                     direct link when one was found,
-                                     falling back to
-                                     `spotifySearchUrl()`'s plain search
-                                     when none was recorded (community-
-                                     contributed, so genuinely not every
-                                     release has one - same caveat as
-                                     genre tags and cover art throughout
-                                     this whole build) or for an entry
-                                     typed in entirely by hand.
+                                     **Two further real bugs, found via
+                                     testing before Music was removed,
+                                     but fixed in this shared file and
+                                     still relevant to every category's
+                                     cover downloads.** First:
+                                     downloadRemoteCover()/
+                                     downloadRemoteCoverStaged() used to
+                                     hardcode their temp download file to
+                                     a `.jpg` extension regardless of the
+                                     actual format being downloaded - a
+                                     PNG source image being written into
+                                     a file literally named `.jpg` could
+                                     silently fail the image-processing
+                                     step that runs next. Both functions
+                                     now derive the real extension from
+                                     the URL itself
+                                     (`extensionFromUrl()`), falling back
+                                     to `.jpg` only when the URL doesn't
+                                     make the format clear. Second: both
+                                     download functions now retry once
+                                     after a short delay specifically on
+                                     a 500 response
+                                     (`downloadWithRetryOn500()`) - never
+                                     on a 404, which is a clean "no art
+                                     available" signal a retry would
+                                     never help with. Some image hosts
+                                     are known to be flaky under load, and
+                                     a 500 from one is often transient -
+                                     the same request can succeed seconds
+                                     later. Also added logging on a
+                                     non-200 download status, previously
+                                     a completely silent `return null`
+                                     with no trace at all.
   theme.tsx                        App-wide theme via React Context -
                                      colors, Light/Dark mode, font scale.
                                      Independent from Home Base/League Base.
@@ -790,150 +675,6 @@ lib/
                                      data but no Where to Watch button, a
                                      real and deliberate consequence of
                                      this design, not an oversight.
-  musicLookup.ts                    Music's title-search lookup -
-                                     MusicBrainz (search/metadata) and
-                                     Cover Art Archive (album art), both
-                                     free and fully keyless (just a
-                                     User-Agent header, no signup).
-                                     Deliberately NOT Spotify for data,
-                                     despite the original Roadmap note -
-                                     Spotify's Web API changed in
-                                     February 2026, explicitly moving
-                                     away from allowing simple, no-login
-                                     "Client Credentials" access to
-                                     metadata endpoints for free-tier
-                                     developer apps. Album is the tracked
-                                     unit (same "one release = one entry"
-                                     philosophy as every other category),
-                                     but search covers both album titles
-                                     ("releases") and song titles
-                                     ("recordings") together via
-                                     searchMusicBrainz() - a song match
-                                     already resolves to its parent
-                                     album, not the song itself, so a
-                                     true single needs no special
-                                     handling (it's just its own release
-                                     in MusicBrainz's model). Genre
-                                     (fetchReleaseGenresAndLink()) and cover art
-                                     (fetchCoverArtUrl()) are BOTH
-                                     separate follow-up calls after a
-                                     result is selected, not part of the
-                                     initial search results - genres are
-                                     community-voted tags only returned
-                                     via a specific lookup, and cover art
-                                     is a wholly separate service. Same
-                                     pattern already used for cover-photo
-                                     auto-fill everywhere else in this
-                                     app, just extended to two background
-                                     fetches instead of one. Also exports
-                                     spotifySearchUrl() for "Where to
-                                     Listen" - a plain Spotify search
-                                     link, not a precise deep link (that
-                                     would need the now-restricted API) -
-                                     always shown wherever it's used,
-                                     unlike Where to Watch's tmdbId-gated
-                                     button, since it needs no external
-                                     id at all, just artist+title text
-                                     every entry already has.
-
-                                     **Fixed after real testing surfaced
-                                     three genuine problems.** (1) Search
-                                     was noticeably slower than every
-                                     other category and genre/cover art
-                                     kept coming back empty - traced to
-                                     MusicBrainz's real, documented rate
-                                     limit (~1 request/second per IP;
-                                     over that gets a 503 and throttles
-                                     the IP). searchReleases()/
-                                     searchRecordings() now run
-                                     sequentially instead of in parallel,
-                                     and TitleSearchInput's search
-                                     debounce is 900ms here specifically
-                                     (see components/TitleSearchInput.tsx's
-                                     new debounceMs prop) rather than the
-                                     400ms every other category uses.
-                                     (2) A short, common title ("Away",
-                                     "Lost", "Embrace") returned a page
-                                     of unrelated matches with no way to
-                                     narrow them - added
-                                     splitArtistTitle(), which parses an
-                                     "Artist - Title" pattern typed into
-                                     the SAME search box (no second input
-                                     field added to the form) into a
-                                     combined `artist:` + `release:`/
-                                     `recording:` MusicBrainz query.
-                                     (3) Genre was coming back empty far
-                                     more than expected - switched
-                                     fetchReleaseGenresAndLink() from
-                                     `inc=genres` (MusicBrainz's own
-                                     pre-filtered "official genre" list)
-                                     to `inc=tags` (every community tag),
-                                     filtered through the same
-                                     normalizeGenres() helper Books
-                                     already uses on Open Library/Google
-                                     Books' equally noisy raw data,
-                                     against a new music-specific
-                                     allowlist. All three fetch functions
-                                     now log unconditionally (URL,
-                                     status, what was extracted) - a real
-                                     help in diagnosing all of the above
-                                     from an actual device console rather
-                                     than guessing blind.
-
-                                     **A second round of fixes from
-                                     further real testing.** (4) Cover
-                                     art logged a successful fetch but
-                                     never actually appeared in the app -
-                                     a real, confirmed bug this time, not
-                                     a data gap: the logs showed Cover
-                                     Art Archive sometimes returning a
-                                     plain `http://` URL for the same
-                                     image, and iOS blocks a plain-HTTP
-                                     download outright via App Transport
-                                     Security, silently - the exact same
-                                     issue this project already hit and
-                                     fixed once before for Google Books'
-                                     thumbnail URLs, just not carried
-                                     over to this file. fetchCoverArtUrl()
-                                     now upgrades `http://` to `https://`
-                                     before returning a URL, same fix.
-                                     (5) Genre still came back empty on
-                                     specific metal/rock releases even
-                                     with the broader `inc=tags` change -
-                                     confirmed via logs showing a
-                                     genuinely empty raw tag list at the
-                                     release level, not a bug. Added an
-                                     artist-level fallback
-                                     (fetchArtistGenres()): a specific
-                                     pressing can have zero community
-                                     tags while its artist has plenty,
-                                     since artists get far more community
-                                     tagging attention than any one
-                                     release does - fetchReleaseGenresAndLink()
-                                     now requests
-                                     `inc=tags+artist-credits+url-rels` so it has
-                                     the artist's MusicBrainz id on hand,
-                                     and only makes the extra request to
-                                     check the artist's own tags if the
-                                     release itself had nothing. Confirmed
-                                     working via real testing on
-                                     metal/rock releases specifically -
-                                     the artist fallback found genres a
-                                     release-only lookup missed.
-
-                                     **A third, UX-only fix**: the
-                                     combined release+artist genre lookup
-                                     can genuinely take 5-10 seconds, and
-                                     a silent wait that long looked broken
-                                     even though it wasn't. MusicScreen.tsx
-                                     now shows a small, transient "Looking
-                                     up genre - can take several
-                                     seconds…" label next to the Genre
-                                     field while a lookup is actually in
-                                     flight (`genreLookupInProgress`) -
-                                     not a permanent part of the form, so
-                                     the steady-state view stays exactly
-                                     as simple as it was.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap
@@ -1218,13 +959,14 @@ components/
                                      around. Debounce delay is
                                      configurable via an optional
                                      `debounceMs` prop (defaults to
-                                     400ms) - added specifically for
-                                     Music, which uses 900ms given
-                                     MusicBrainz's real, tight rate limit
-                                     (~1 request/second per IP); every
-                                     other category's source handles the
-                                     default pace fine and doesn't pass
-                                     this prop at all.
+                                     400ms) - added for a since-removed
+                                     category (Music) whose data source
+                                     had a real, tight rate limit
+                                     (~1 request/second per IP); no
+                                     current category needs a
+                                     non-default value, but the prop
+                                     stays available for a future
+                                     category that might.
   SearchBar.tsx                     Simple inline search filter for
                                      narrowing an already-loaded list by
                                      title (+ author on Books/Comics,
@@ -2124,15 +1866,16 @@ code was simply wrong.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Puzzles → Music → Anime → Vinyl → Board Games, in that order (Books,
-  Comics/Manga, Movies, and TV Shows are all done - Movies and TV Shows
-  both built out of the original planned sequence per explicit request)
+- Puzzles → Vinyl/Records → Board Games, in that order (Books,
+  Comics/Manga, Movies, TV Shows, and Anime are all done - Movies, TV
+  Shows, and Anime all built out of the original planned sequence per
+  explicit request; Music was also built out of sequence, reached a
+  fully working state, and was later removed entirely - see the top
+  overview and Section 6 for why)
 - Real barcode scanning for Vinyl and Board Games (Books/Comics share
   `lib/isbnLookup.ts` for this - Movies originally had its own
   `lib/upcLookup.ts` too, removed after real testing confirmed it was
-  unreliable; Movies and TV Shows are both title-search only now - see
-  the Category screen pattern section above for what each category
-  actually reuses)
-- "Listen on Spotify" (Music) and a "Where to Watch"-style popup for
-  Anime, matching what Movies/TV Shows already have
+  unreliable; Movies, TV Shows, and Anime are all title-search only now
+  - see the Category screen pattern section above for what each
+  category actually reuses)
 - Share sheet wiring (native OS share, per item)

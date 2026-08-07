@@ -37,7 +37,6 @@ import { normalizeGenres } from './isbnLookup';
 import { tmdbSearchMovies, MovieLookupResult } from './movieLookup';
 import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 import { searchJikanAnime } from './jikanLookup';
-import { searchMusicBrainz, MusicSearchResult } from './musicLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -234,15 +233,4 @@ export async function searchAnimeByTitle(query: string, maxResults = 8): Promise
     coverUrl: r.coverUrl,
     // no tmdbId - see the interface comment above
   }));
-}
-
-/** Searches for albums/songs by title - thin wrapper around
- * lib/musicLookup.ts's searchMusicBrainz(), which itself merges two
- * MusicBrainz search types (album titles and song titles) into one
- * result list. No fallback source needed here the way Anime has one -
- * MusicBrainz alone already covers both search shapes Music needs. */
-export async function searchMusicByTitle(query: string, maxResults = 8): Promise<MusicSearchResult[]> {
-  const trimmed = query.trim();
-  if (trimmed.length < 2) return [];
-  return searchMusicBrainz(trimmed, maxResults);
 }

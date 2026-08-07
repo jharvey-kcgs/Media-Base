@@ -17,7 +17,6 @@ const CATEGORY_ICONS: Record<MediaCategory, string> = {
   movies: '🎬',
   tvshows: '📺',
   anime: '🎌',
-  music: '🎵',
   vinyl: '💿',
   puzzles: '🧩',
   boardgames: '🎲',

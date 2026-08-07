@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system/legacy';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime, MusicAlbum } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime } from '../types/models';
 import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
@@ -14,7 +14,6 @@ const KEYS = {
   movies: 'mediabase:movies',
   tvShows: 'mediabase:tvShows',
   anime: 'mediabase:anime',
-  music: 'mediabase:music',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -252,44 +251,6 @@ export async function deleteAnimeEntries(ids: string[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteCover('anime', id)));
 }
 
-// --- Music ---
-
-export async function getMusicAlbums(): Promise<MusicAlbum[]> {
-  return getAll<MusicAlbum>(KEYS.music);
-}
-
-export async function addMusicAlbum(input: Omit<MusicAlbum, 'id' | 'createdAt'>, id?: string): Promise<MusicAlbum> {
-  const albums = await getMusicAlbums();
-  const entry: MusicAlbum = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
-  await saveAll(KEYS.music, [...albums, entry]);
-  return entry;
-}
-
-export async function updateMusicAlbum(id: string, updates: Partial<MusicAlbum>): Promise<void> {
-  const albums = await getMusicAlbums();
-  const next = albums.map((a) => (a.id === id ? { ...a, ...updates } : a));
-  await saveAll(KEYS.music, next);
-}
-
-export async function deleteMusicAlbum(id: string): Promise<void> {
-  const albums = await getMusicAlbums();
-  await saveAll(
-    KEYS.music,
-    albums.filter((a) => a.id !== id),
-  );
-  await deleteCover('music', id);
-}
-
-export async function deleteMusicAlbums(ids: string[]): Promise<void> {
-  const albums = await getMusicAlbums();
-  const idSet = new Set(ids);
-  await saveAll(
-    KEYS.music,
-    albums.filter((a) => !idSet.has(a.id)),
-  );
-  await Promise.all(ids.map((id) => deleteCover('music', id)));
-}
-
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar
@@ -355,7 +316,6 @@ const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
   { category: 'movies', key: KEYS.movies },
   { category: 'tvshows', key: KEYS.tvShows },
   { category: 'anime', key: KEYS.anime },
-  { category: 'music', key: KEYS.music },
 ];
 
 /** Builds a full backup - every stored key's data, plus every item's

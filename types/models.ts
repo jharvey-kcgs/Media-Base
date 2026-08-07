@@ -1,15 +1,18 @@
 // types/models.ts
 
 // The full v1 category list. Video Games intentionally excluded (Steam
-// already covers that for the user). Order here is also the order shown
-// on OnboardingScreen and, once picked, on the HomeScreen widget stack.
+// already covers that for the user). Music (digital, via streaming)
+// was tried and removed - see the project README/Roadmap doc for why;
+// it didn't fit this project's physical/owned-media philosophy the way
+// TV Shows/Anime still do despite lacking a literal disc. Order here is
+// also the order shown on OnboardingScreen and, once picked, on the
+// HomeScreen widget stack.
 export type MediaCategory =
   | 'books'
   | 'comics'
   | 'movies'
   | 'tvshows'
   | 'anime'
-  | 'music'
   | 'vinyl'
   | 'puzzles'
   | 'boardgames';
@@ -20,7 +23,6 @@ export const ALL_CATEGORIES: MediaCategory[] = [
   'movies',
   'tvshows',
   'anime',
-  'music',
   'vinyl',
   'puzzles',
   'boardgames',
@@ -32,7 +34,6 @@ export const CATEGORY_LABELS: Record<MediaCategory, string> = {
   movies: 'Movies',
   tvshows: 'TV Shows',
   anime: 'Anime',
-  music: 'Music',
   vinyl: 'Vinyl/Records',
   puzzles: 'Puzzles',
   boardgames: 'Board Games',
@@ -47,7 +48,6 @@ export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
   movies: false,
   tvshows: false,
   anime: false,
-  music: false, // title search (MusicBrainz), not a barcode scan
   vinyl: true,
   puzzles: false,
   boardgames: true,
@@ -159,45 +159,6 @@ export interface Anime {
 }
 
 export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
-
-// Album is the tracked unit here - confirmed design, same "one release =
-// one entry" philosophy as every other category (TV Shows tracks the
-// whole series, not each episode; Music tracks the whole album, not
-// each song). Searching by either a song or an album title both
-// resolve to this same album-level shape - see lib/musicLookup.ts.
-// Genuinely no author-equivalent-but-different field here: "artist" is
-// its own field (not reusing Book's `author`), since an album can have
-// one or several credited artists as free text, same as how genre
-// already allows several comma-separated values.
-//
-// No external id stored (unlike Movie/TVShow/Anime's tmdbId) - Where to
-// Listen needs none, since it's a plain Spotify search link built from
-// artist+title text every entry already has, not a precise deep link
-// requiring a specific catalog id. That button always shows here,
-// unlike Where to Watch's graceful-hide-without-an-id behavior.
-// spotifyUrl: a real, direct Spotify album page - found via
-// MusicBrainz's own community-contributed "external links" data
-// (fetched alongside genre, no extra request), not Spotify's own API
-// (restricted for this exact use case as of February 2026, see
-// lib/musicLookup.ts). Community-contributed means not every release
-// has one recorded - null falls back to a plain Spotify search instead
-// of a dead end, same "graceful, not disabled" spirit as tmdbId
-// elsewhere, just without the hard on/off gating those have, since a
-// fallback always exists here.
-export interface MusicAlbum {
-  id: string;
-  title: string; // the album title
-  artist: string;
-  genres: string[];
-  coverImage: string | null;
-  spotifyUrl: string | null;
-  listened: boolean;
-  rating: number | null;
-  review: string;
-  createdAt: string;
-}
-
-export type MusicAlbumSortField = 'title' | 'artist' | 'genre' | 'listened' | 'rating';
 
 export interface AppSettings {
   onboarded: boolean;
