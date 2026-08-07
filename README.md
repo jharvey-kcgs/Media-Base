@@ -21,7 +21,7 @@ alongside the in-app About/FAQ screens as more categories get built.*
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
 (Books, Comics/Manga, Movies, TV Shows, Anime, Vinyl/Records,
-Puzzles, Board Games), each with its own dedicated screen for adding,
+Board Games), each with its own dedicated screen for adding,
 rating, and reviewing entries, plus a Settings area covering Profile,
 Theme, Data (backup/restore/delete), Permissions, About, and FAQ.
 
@@ -60,9 +60,10 @@ rather than pasted text. Every other category widget shows "Coming soon"
 until its own screen is built - Movies, TV Shows, and Anime were all
 built out of the original planned order in
 [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
-so the remaining order there is Puzzles → Vinyl/Records → Board Games
-(Music, originally next in that order, was built and later removed
-entirely - see below). `lib/useAlphabetScroll.ts` (A-Z
+so the remaining order there is Vinyl/Records → Board Games (Music,
+originally next in that order, was built and later removed entirely -
+see below; Puzzles was dropped from the plan before ever being built).
+`lib/useAlphabetScroll.ts` (A-Z
 index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
 `components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
 search, local search, and cover photos) are shared across all five
@@ -1029,7 +1030,7 @@ assets/
 ### Category screen pattern (applies to every future category, not just Books)
 
 `screens/BookScreen.tsx` is the reference implementation to copy when
-building the remaining categories (Puzzles, etc.) -
+building the remaining categories (Vinyl/Records, Board Games) -
 `screens/ComicScreen.tsx`, `screens/MovieScreen.tsx`, and
 `screens/TVScreen.tsx` are three real examples of that copy already
 done, showing genuinely different degrees of reuse:
@@ -1866,12 +1867,13 @@ code was simply wrong.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Puzzles → Vinyl/Records → Board Games, in that order (Books,
+- Vinyl/Records → Board Games, in that order (Books,
   Comics/Manga, Movies, TV Shows, and Anime are all done - Movies, TV
   Shows, and Anime all built out of the original planned sequence per
   explicit request; Music was also built out of sequence, reached a
   fully working state, and was later removed entirely - see the top
-  overview and Section 6 for why)
+  overview and Section 6 for why; Puzzles was dropped from the plan
+  before ever being built, on reflection not something worth tracking)
 - Real barcode scanning for Vinyl and Board Games (Books/Comics share
   `lib/isbnLookup.ts` for this - Movies originally had its own
   `lib/upcLookup.ts` too, removed after real testing confirmed it was

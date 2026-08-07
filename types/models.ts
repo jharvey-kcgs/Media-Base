@@ -4,9 +4,12 @@
 // already covers that for the user). Music (digital, via streaming)
 // was tried and removed - see the project README/Roadmap doc for why;
 // it didn't fit this project's physical/owned-media philosophy the way
-// TV Shows/Anime still do despite lacking a literal disc. Order here is
-// also the order shown on OnboardingScreen and, once picked, on the
-// HomeScreen widget stack.
+// TV Shows/Anime still do despite lacking a literal disc. Puzzles was
+// also dropped from the plan before ever being built - no real
+// assisted-entry story (no barcode database exists for jigsaw puzzles
+// at all) and, on reflection, not something worth tracking here. Order
+// here is also the order shown on OnboardingScreen and, once picked, on
+// the HomeScreen widget stack.
 export type MediaCategory =
   | 'books'
   | 'comics'
@@ -14,7 +17,6 @@ export type MediaCategory =
   | 'tvshows'
   | 'anime'
   | 'vinyl'
-  | 'puzzles'
   | 'boardgames';
 
 export const ALL_CATEGORIES: MediaCategory[] = [
@@ -24,7 +26,6 @@ export const ALL_CATEGORIES: MediaCategory[] = [
   'tvshows',
   'anime',
   'vinyl',
-  'puzzles',
   'boardgames',
 ];
 
@@ -35,7 +36,6 @@ export const CATEGORY_LABELS: Record<MediaCategory, string> = {
   tvshows: 'TV Shows',
   anime: 'Anime',
   vinyl: 'Vinyl/Records',
-  puzzles: 'Puzzles',
   boardgames: 'Board Games',
 };
 
@@ -49,7 +49,6 @@ export const SCANNABLE_CATEGORIES: Record<MediaCategory, boolean> = {
   tvshows: false,
   anime: false,
   vinyl: true,
-  puzzles: false,
   boardgames: true,
 };
 

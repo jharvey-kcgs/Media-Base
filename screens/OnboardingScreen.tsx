@@ -18,7 +18,6 @@ const CATEGORY_ICONS: Record<MediaCategory, string> = {
   tvshows: '📺',
   anime: '🎌',
   vinyl: '💿',
-  puzzles: '🧩',
   boardgames: '🎲',
 };
 

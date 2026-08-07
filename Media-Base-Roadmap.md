@@ -11,12 +11,15 @@ A personal media collection & tracker app. Companion to [Home Base](https://gith
 - Repo: `Media-Base` (GitHub, public, mirrors the other two repos' README/App-Store-Info doc structure)
 
 ## v1 categories
-Books, Movies, Puzzles, Board Games, TV Shows, Comics/Manga, Vinyl/Records, Anime.
+Books, Movies, Board Games, TV Shows, Comics/Manga, Vinyl/Records, Anime.
 (Video Games intentionally excluded — Steam already covers that.
 Music (digital, via streaming) was tried and removed — see the
 project README's top overview for why; it didn't fit this project's
 physical/owned-media philosophy. Vinyl/Records above is the version
-of "music" that actually fits it.)
+of "music" that actually fits it. Puzzles was dropped from the plan
+before ever being built — no real assisted-entry story existed for it
+in the first place, and on reflection it wasn't something worth
+tracking here.)
 
 ## Screens
 
@@ -53,7 +56,6 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 | TV Shows | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - confirmed design from the start, no scan/number-entry ever planned |
 | Anime | Enter or search by title ✅ done | Title, genre, watched switch | Title search, TMDb primary + Jikan (MyAnimeList, free/keyless) fallback - same multi-source resilience pattern as Books/Comics |
 | Vinyl/Records | Enter or scan (UPC barcode) | Title, genre, artist, listened switch | Discogs API — has strong UPC-to-release lookup, best barcode match of the physical-media categories |
-| Puzzles | Enter only (no scan) | Genre (people/place/animal/food), pieces, completed switch | No barcode database exists for jigsaw puzzles |
 | Board Games | Enter or scan (UPC barcode) | Title, manufacturer, genre, players, play time, played switch | UPC lookup → name match against BoardGameGeek — weakest match of the barcode categories, expect frequent manual correction |
 
 Every entry screen has a manual-entry path as the default; scanning/link-pasting is always an optional shortcut, never required. The camera icon only requests OS camera permission when tapped (lazy, not on screen load), matching Home Base's lazy notification-permission pattern. Regardless of entry method, all required fields for that category must be filled before saving.
@@ -75,7 +77,6 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - Anime: Title / Genre / Watched / Rating
 - Books: Title / Genre / Author / Read / Rating
 - Comics/Manga: Title / Genre / Author / Read / Rating
-- Puzzles: Piece Count / Genre / Manufacturer / Completed
 - Vinyl/Records: Title / Genre / Artist / Listened
 - Board Games: Genre / Play Time / Manufacturer / Title / Played
 
@@ -84,9 +85,8 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 2. **Comics/Manga** (same ISBN pattern, near-zero extra lookup work) ✅ done — built on shared lib/isbnLookup.ts and lib/useAlphabetScroll.ts rather than a second copy, with its own genre allowlist that adds manga demographic labels (Shonen/Shoujo/Seinen/Josei) alongside standard genres
 3. **Movies** ✅ done, built out of the original planned order per explicit request - originally had its own UPC/barcode scanning too (lib/upcLookup.ts), removed later after real testing confirmed that lookup chain was unreliable in practice. Now title-search only, via lib/movieLookup.ts. Needs a free TMDb credential added to lib/config.ts before title-search auto-fill will work; manual entry works regardless.
 4. **TV Shows** ✅ done, also built out of the original planned order per explicit request - title-search only from the start (lib/tvLookup.ts, its own genre taxonomy genuinely different from Movies'). Structural twin of Movies now that Movies dropped its own scan/UPC entry - both share the same "Where to Watch" approach (see above).
-5. Puzzles (manual-only, good simple next target)
-6. **Anime** ✅ done - title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows
-7. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
+5. **Anime** ✅ done - title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows
+6. Vinyl/Records → Board Games (UPC-with-fuzzy-match family, most correction-prone)
 
 ## Open items not yet decided
 - Exact API/developer accounts to register (OMDb/TMDb, Discogs, Spotify developer keys) — Movies and TV Shows both already need a free TMDb credential in lib/config.ts for their title-search auto-fill to work. The rest can still be done incrementally per widget as you build it.
