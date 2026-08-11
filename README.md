@@ -57,36 +57,43 @@ result - and every category now shows a cover photo (auto-fetched where
 one's available, or added by hand) both in its list and its Edit screen.
 Settings → Data backs up everything, covers included, to one real file
 rather than pasted text. Every other category widget shows "Coming soon"
-until its own screen is built - Movies, TV Shows, and Anime were all
-built out of the original planned order in
+until its own screen is built - Movies, TV Shows, Anime, and Vinyl/CD
+were all built out of the original planned order in
 [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
-so the remaining order there is Vinyl/CD → Tabletop Games (Music,
+so the remaining order there is just Tabletop Games now (Music,
 originally next in that order, was built and later removed entirely -
 see below; Puzzles was dropped from the plan before ever being built).
 `lib/useAlphabetScroll.ts` (A-Z
 index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
 `components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
-search, local search, and cover photos) are shared across all five
+search, local search, and cover photos) are shared across all six
 implemented categories; `lib/isbnLookup.ts` is Books/Comics-specific,
 since both use ISBN lookup directly - Movies, TV Shows, and Anime are
 all TMDb-backed instead (`lib/movieLookup.ts`, `lib/tvLookup.ts`, and
 Anime reuses tvLookup.ts directly), and title-search-only, having no
-ISBN/barcode concept at all - see the
+ISBN/barcode concept at all. Vinyl/CD sits in neither camp - its own
+`lib/discogsLookup.ts`, and unlike Movies/TV/Anime it does support a
+real barcode (a direct match via Discogs, not the ISBN checksum/
+formatting Books/Comics have via `isbn3` - no equivalent library exists
+for UPC/EAN codes, so that field just holds raw digits) - see the
 Category screen pattern section for what to reuse vs. rebuild per
 category.
 **Movies, TV Shows, and Anime need a one-time setup step Books/Comics
 never did**: a free TMDb credential in `lib/config.ts` (see that file's
 own comments for exactly what's needed and where to get it), or their
 title-search auto-fill won't return anything (manual entry always works
-regardless).
+regardless). **Vinyl/CD needs its own separate credential** the same
+way - a free Discogs personal token, also in `lib/config.ts`
+(`DISCOGS_USER_TOKEN`).
 
-**All five implemented categories are fully working** - Books,
-Comics/Manga, Movies, TV Shows, and Anime all have working list/search/
-genre filter/A-Z index/hold-to-select and full Add/Edit. Movies, TV
-Shows, and Anime are structural twins: all TMDb-backed (Anime with a
-Jikan/MyAnimeList fallback when TMDb has nothing), all title-search-only
-(no camera/scanner, no barcode/number entry of any kind - confirmed
-design, not a gap), all with a "Where to Watch" button that opens TMDb's
+**All six implemented categories are fully working** - Books,
+Comics/Manga, Movies, TV Shows, Anime, and Vinyl/CD all have working
+list/search/genre filter/A-Z index/hold-to-select and full Add/Edit.
+Movies, TV Shows, and Anime are structural twins: all TMDb-backed (Anime
+with a Jikan/MyAnimeList fallback when TMDb has nothing), all
+title-search-only (no camera/scanner, no barcode/number entry of any
+kind - confirmed design, not a gap), all with a "Where to Watch" button
+that opens TMDb's
 own watch page. That button only shows on an entry added through title
 search (needs a stored `tmdbId` to link to anything) - not shown at all
 for an entry typed in by hand, a graceful hide rather than a disabled
@@ -131,23 +138,34 @@ on the Roadmap) is the version of "music" that actually fits this
 project's philosophy - tracking records and CDs you physically own,
 not a streaming pointer.
 
-**Vinyl/CD's data layer is built, but `screens/VinylScreen.tsx` itself
-doesn't exist yet** - `types/models.ts`'s `VinylCD` and
-`VINYL_GENRE_FILTERS`, full CRUD in `lib/storage.ts` (including backup/
-cover wiring), and the lookup (`lib/discogsLookup.ts`, orchestrated by
-`lib/titleSearch.ts`'s `searchVinylCDByTitle()`) are all in place - the
-Home widget still shows "Coming soon" until the screen is built, same as
-every prior category at the equivalent point. Confirmed design: all
-three entry methods (scan, code-entry, title search) via Discogs, since
-- unlike Movies' old UPC approach - barcode search there is a real,
-direct match rather than a fuzzy chain. Genre and style both get stored
-together on each entry for richness, but the Filter-by-Genre menu uses a
-separate, deliberately short fixed list (`VINYL_GENRE_FILTERS`) instead
-of a dynamic "genres in your collection" list, since that would grow
-unbounded given how specific Discogs' combined data can get. Deliberately
-no "Where to Listen"-style button - the whole point of this category is
-a physical copy already owned, not a pointer to somewhere else to access
-it.
+**Vinyl/CD is fully working** - `screens/VinylScreen.tsx` (list, search,
+fixed genre filter, A-Z index, hold-to-select, full Add/Edit with all
+three entry methods) and the Home widget are both built now, on top of
+the data layer (`types/models.ts`'s `VinylCD` and `VINYL_GENRE_FILTERS`,
+full CRUD in `lib/storage.ts` including backup/cover wiring, and the
+lookup in `lib/discogsLookup.ts`, orchestrated by `lib/titleSearch.ts`'s
+`searchVinylCDByTitle()`). Confirmed design: all three entry methods
+(scan, code-entry, title search) via Discogs - unlike Movies' old UPC
+approach, barcode search there is a real, direct match rather than a
+fuzzy chain, closer in spirit to Books' ISBN lookup. No ISBN-style
+checksum/hyphen-formatting library exists for UPC/EAN codes the way
+Books has `isbn3` - the barcode field just holds raw digits, and
+Discogs' own search reports back if nothing matches rather than this
+screen pre-validating a checksum it has no library for. Selecting a
+title-search result fills everything at once (title/artist/genre/cover)
+- no async follow-up fetches the way Music needed for cover art and
+genre separately, since Discogs bundles all of it in one response.
+Genre and style both get stored together on each entry for richness,
+but the Filter-by-Genre menu uses a separate, deliberately short fixed
+list (`VINYL_GENRE_FILTERS`) instead of a dynamic "genres in your
+collection" list, since that would grow unbounded given how specific
+Discogs' combined data can get. Deliberately no "Where to Listen"-style
+button - the whole point of this category is a physical copy already
+owned, not a pointer to somewhere else to access it. The barcode scan
+path reuses `lib/movieLookup.ts`'s `looksLikeIsbn()` guard, kept there
+specifically for this reuse case - a box set can bundle a booklet with
+its own ISBN barcode right next to the disc's real UPC, and scanning the
+wrong one by mistake is a real failure mode, not a hypothetical one.
 
 ---
 
@@ -353,6 +371,52 @@ screens/
                                      through the Jikan fallback, a real
                                      and deliberate consequence of the
                                      two-source design, not a bug.
+  VinylScreen.tsx                   Vinyl/CD (widget 6 - fully working).
+                                     Mirrors BookScreen.tsx's full
+                                     three-entry-method shape (scan,
+                                     code-entry, title search) - the only
+                                     other category with all three, since
+                                     Movies/TV Shows/Anime dropped
+                                     scanning entirely and Music never
+                                     had a real barcode option. Genuinely
+                                     different from Books in three ways:
+                                     no ISBN-style checksum/hyphen-
+                                     formatting library exists for UPC/EAN
+                                     codes (Books' isbn3 dependency is
+                                     ISBN-specific) - the barcode field
+                                     just holds raw digits, and Discogs'
+                                     own search reports back if nothing
+                                     matches rather than this screen
+                                     pre-validating a checksum it has no
+                                     library for; Discogs bundles title/
+                                     artist/genre/style/cover ALL in one
+                                     search response (see
+                                     lib/discogsLookup.ts), so selecting a
+                                     result fills everything immediately
+                                     with no async follow-up fetches the
+                                     way Music needed for cover art and
+                                     genre separately; and the genre
+                                     filter is a fixed, short list
+                                     (VINYL_GENRE_FILTERS - confirmed
+                                     directly to keep it easy to
+                                     navigate) rather than a dynamic
+                                     "genres in your collection" list,
+                                     matching Movies/TV's fixed-list
+                                     approach rather than Books/Comics/
+                                     Anime's dynamic one. Deliberately no
+                                     "Where to Watch"/"Where to Listen"-
+                                     style button at all - the whole
+                                     point of this category is a physical
+                                     copy already owned, not a pointer to
+                                     somewhere else to access it. The
+                                     barcode scan path checks
+                                     lib/movieLookup.ts's looksLikeIsbn()
+                                     first - a box set can bundle a
+                                     booklet with its own ISBN barcode
+                                     right next to the disc's real UPC,
+                                     and scanning the wrong one by
+                                     mistake is a real failure mode, not
+                                     a hypothetical one.
   [category]Screen.tsx             One screen per remaining category,
                                     built in the order in the Roadmap doc
 
@@ -1974,18 +2038,19 @@ code was simply wrong.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Vinyl/CD (data layer done, screen pending - see the top overview)
-  → Tabletop Games, in that order (Books,
-  Comics/Manga, Movies, TV Shows, and Anime are all done - Movies, TV
-  Shows, and Anime all built out of the original planned sequence per
-  explicit request; Music was also built out of sequence, reached a
-  fully working state, and was later removed entirely - see the top
-  overview and Section 6 for why; Puzzles was dropped from the plan
-  before ever being built, on reflection not something worth tracking)
-- Real barcode scanning for Vinyl/CD and Tabletop Games (Books/Comics
+- Tabletop Games, the one remaining category (Books,
+  Comics/Manga, Movies, TV Shows, Anime, and Vinyl/CD are all done -
+  Movies, TV Shows, Anime, and Vinyl/CD all built out of the original
+  planned sequence per explicit request; Music was also built out of
+  sequence, reached a fully working state, and was later removed
+  entirely - see the top overview and Section 6 for why; Puzzles was
+  dropped from the plan before ever being built, on reflection not
+  something worth tracking)
+- Real barcode scanning for Tabletop Games (Books/Comics
   share `lib/isbnLookup.ts` for this - Movies originally had its own
   `lib/upcLookup.ts` too, removed after real testing confirmed it was
-  unreliable; Movies, TV Shows, and Anime are all title-search only now
+  unreliable; Movies, TV Shows, and Anime are all title-search only now,
+  and Vinyl/CD's own barcode lookup is done via Discogs
   - see the Category screen pattern section above for what each
   category actually reuses)
 - Share sheet wiring (native OS share, per item)

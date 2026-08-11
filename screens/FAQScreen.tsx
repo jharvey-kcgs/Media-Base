@@ -10,7 +10,7 @@ import { useTheme } from '../lib/theme';
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Do I have to scan a barcode to add something?',
-    a: "No - scanning is always optional on Books and Comics/Manga, and every entry form lets you type everything in by hand instead. Movies, TV Shows, and Anime don't have a scan option at all - title search is the fast path there instead.",
+    a: "No - scanning is always optional on Books, Comics/Manga, and Vinyl/CD, and every entry form lets you type everything in by hand instead. Movies, TV Shows, and Anime don't have a scan option at all - title search is the fast path there instead.",
   },
   {
     q: "Why isn't a category showing on my Home screen?",
@@ -29,8 +29,8 @@ const FAQS: { q: string; a: string }[] = [
     a: 'Yes - press and hold any entry to switch into a selection mode with that entry already checked, tap any others you want to remove, then Delete.',
   },
   {
-    q: 'Can I see everything by one author?',
-    a: "Yes - on Books and Comics/Manga, tap an author's name on any entry (shown in the accent color) to narrow the list to just their books. Tap the ✕ next to \"Sorted by...\" to clear it.",
+    q: 'Can I see everything by one author or artist?',
+    a: "Yes - on Books and Comics/Manga, tap an author's name on any entry (shown in the accent color) to narrow the list to just their books. On Vinyl/CD, tap an artist's name the same way to narrow to just their records. Tap the ✕ next to \"Sorted by...\" to clear it.",
   },
   {
     q: 'Can a Comic/Manga end up under Books, or a Book under Comics/Manga?',
@@ -43,6 +43,10 @@ const FAQS: { q: string; a: string }[] = [
   {
     q: 'How do I find out where to watch a movie, show, or anime?',
     a: 'On Movies, TV Shows, and Anime, entries matched against the main movie/show database get a "Where to Watch" button in the Edit screen - tap it for current streaming, rental, and purchase options. An entry typed in entirely by hand won\'t have this button, and on Anime specifically, a less common title matched only through the backup lookup source won\'t either - both need to know exactly which title you mean.',
+  },
+  {
+    q: "Why doesn't Vinyl/CD have a similar button for where to listen?",
+    a: "By design - Vinyl/CD is for records and CDs you already physically own, so there's no \"where can I access this\" question to answer the way there is for a movie or show you might not have seen yet. You already have the copy; just play it.",
   },
   {
     q: 'Does my photo get saved anywhere else on my phone?',
