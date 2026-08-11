@@ -811,7 +811,7 @@ export default function VinylScreen({ navigation }: any) {
                 onPress={handleScanPress}
                 style={[styles.scanButton, { borderColor: theme.colors.accentReadable }]}
               >
-                <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
+                <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan Barcode</AppText>
               </TouchableOpacity>
 
               <View style={styles.field}>
@@ -825,6 +825,8 @@ export default function VinylScreen({ navigation }: any) {
                   onBlur={handleBarcodeFieldSubmit}
                   keyboardType="number-pad"
                   returnKeyType="search"
+                  placeholder="e.g. 075678302126"
+                  placeholderTextColor={theme.colors.textMuted}
                   style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
                 />
                 {lookingUp && (

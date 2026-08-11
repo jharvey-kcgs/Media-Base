@@ -1017,7 +1017,7 @@ export default function BookScreen({ navigation }: any) {
               onPress={handleScanPress}
               style={[styles.scanButton, { borderColor: theme.colors.accentReadable }]}
             >
-              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan barcode instead</AppText>
+              <AppText style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>📷 Scan Barcode</AppText>
             </TouchableOpacity>
 
             <View style={styles.field}>
