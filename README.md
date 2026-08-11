@@ -512,6 +512,33 @@ lib/
   notifications.ts                 Schedules/cancels the daily 10am
                                      "check today's recommendations"
                                      reminder (Settings > Permissions).
+                                     Two separate call sites -
+                                     App.tsx re-runs the schedule call on
+                                     every launch (keeps the
+                                     notification's content in sync with
+                                     the current code, since a scheduled
+                                     notification doesn't retroactively
+                                     update itself), and
+                                     PermissionsSettingsScreen.tsx calls
+                                     it when the toggle is switched on.
+                                     Both do a "cancel everything, then
+                                     schedule one" sequence - confirmed
+                                     via a real, recurring report that
+                                     this can duplicate the notification
+                                     if two calls ever overlap (a
+                                     launch-effect call still in flight
+                                     when a toggle call starts, or the
+                                     app relaunched/force-quit mid-call),
+                                     since each call's own cancel can run
+                                     before the OTHER call's schedule.
+                                     Both exported functions now go
+                                     through a module-level serialize()
+                                     lock - every call waits for whatever
+                                     is already in flight to finish
+                                     first, so two cancel+schedule
+                                     sequences can never run at once
+                                     regardless of which call site (or
+                                     combination) triggers it.
   isbnLookup.ts                     Category-agnostic ISBN lookup (Open
                                      Library primary, Google Books
                                      fallback, Open Library search-index
