@@ -113,6 +113,7 @@ interface DraftState {
   artist: string;
   genresText: string;
   coverImage: string | null;
+  discogsUrl: string | null;
   listened: boolean;
   rating: number;
   review: string;
@@ -123,6 +124,7 @@ const EMPTY_DRAFT: DraftState = {
   artist: '',
   genresText: '',
   coverImage: null,
+  discogsUrl: null,
   listened: false,
   rating: 0,
   review: '',
@@ -315,6 +317,7 @@ export default function VinylScreen({ navigation }: any) {
       artist: item.artist,
       genresText: item.genres.join(', '),
       coverImage: item.coverImage ?? null,
+      discogsUrl: item.discogsUrl ?? null,
       listened: item.listened,
       rating: item.rating ?? 0,
       review: item.review,
@@ -459,12 +462,24 @@ export default function VinylScreen({ navigation }: any) {
   // Discogs bundles title/artist/genre/cover ALL in one result - no
   // async follow-up fetches needed the way Music required for cover art
   // and genre separately. Applied immediately, in full, on selection.
+  // Sets discogsUrl here too, not just the visible fields - covers both
+  // call sites (title search and barcode scan), since both resolve
+  // through this same function and both are genuinely "found via
+  // Discogs" cases needing the same attribution. Confirmed required by
+  // Discogs' own API Terms of Use: "Data provided by Discogs" displayed
+  // next to any Discogs-sourced data, hyperlinked to the specific page
+  // it came from - see lib/discogsLookup.ts's DiscogsSearchResult
+  // comment for the exact requirement. null (the default) for anything
+  // typed in entirely by hand, which never touched Discogs' data at
+  // all - same graceful-hide reasoning as Movies/TV/Anime's tmdbId-
+  // gated Where to Watch button.
   const applyDiscogsResult = (r: DiscogsSearchResult) => {
     setDraft((d) => ({
       ...d,
       title: r.title || d.title,
       artist: r.artist || d.artist,
       genresText: r.genres.length > 0 ? r.genres.join(', ') : d.genresText,
+      discogsUrl: r.discogsUrl,
     }));
     if (r.coverUrl && activeItemId) {
       const download = editingId
@@ -586,6 +601,7 @@ export default function VinylScreen({ navigation }: any) {
       artist: draft.artist.trim(),
       genres,
       coverImage: finalCoverImage,
+      discogsUrl: draft.discogsUrl,
       listened: draft.listened,
       rating: draft.listened ? draft.rating || null : null,
       review: draft.listened ? draft.review : '',
@@ -871,6 +887,22 @@ export default function VinylScreen({ navigation }: any) {
                   onChangeText={(text) => setDraft((d) => ({ ...d, genresText: text }))}
                   style={[styles.input, INPUT_FONT, { color: theme.colors.text, borderColor: theme.colors.border }]}
                 />
+                {draft.discogsUrl && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Linking.openURL(draft.discogsUrl!).catch((err) => {
+                        console.warn('Media Base: failed to open Discogs URL', err);
+                        Alert.alert("Couldn't open that", 'Something went wrong opening Discogs - please try again.');
+                      });
+                    }}
+                    style={{ marginTop: 8 }}
+                  >
+                    <AppText style={{ color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }}>
+                      Data provided by{' '}
+                      <AppText style={{ color: theme.colors.accentReadable, fontSize: 12 * theme.fontScale }}>Discogs</AppText>
+                    </AppText>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={[styles.row, { marginTop: 8 }]}>

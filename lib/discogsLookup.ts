@@ -42,6 +42,26 @@ export interface DiscogsSearchResult {
   genres: string[]; // genre + style combined, deduped - see combineGenres()
   coverUrl: string | null;
   releaseYear?: string;
+  // The human-facing Discogs page for this exact release - required by
+  // Discogs' own API Terms of Use ("Data provided by Discogs" must be
+  // displayed next to any Discogs-sourced data, hyperlinked to the
+  // specific page it came from), not an optional nice-to-have. See
+  // resolveDiscogsUri() for why this needs real handling, not a direct
+  // pass-through of the raw `uri` field.
+  discogsUrl: string | null;
+}
+
+// Confirmed via real research before writing this, not assumed: the
+// search endpoint's own `uri` field is a RELATIVE path
+// ("/Nirvana-Nevermind-Classic-Albums/release/2028757"), not a full
+// URL - that only happens on a different, full release-lookup endpoint
+// this app doesn't call. Using it directly would produce a broken link.
+// `resource_url` is a different thing entirely - the API endpoint for
+// that release, not a page a person can actually open in a browser.
+function resolveDiscogsUri(rawUri: unknown): string | null {
+  if (typeof rawUri !== 'string' || !rawUri) return null;
+  if (rawUri.startsWith('http://') || rawUri.startsWith('https://')) return rawUri;
+  return `https://www.discogs.com${rawUri.startsWith('/') ? '' : '/'}${rawUri}`;
 }
 
 // Splits Discogs' combined "Artist - Title" search-result string apart.
@@ -97,6 +117,7 @@ function mapResult(r: any): DiscogsSearchResult | null {
     genres: combineGenres(r.genre, r.style),
     coverUrl: r.cover_image || r.thumb || null,
     releaseYear: r.year ? String(r.year) : undefined,
+    discogsUrl: resolveDiscogsUri(r.uri),
   };
 }
 
@@ -119,7 +140,7 @@ async function discogsSearch(params: Record<string, string>): Promise<DiscogsSea
     const mapped = results
       .map(mapResult)
       .filter((r: DiscogsSearchResult | null): r is DiscogsSearchResult => r !== null);
-    console.warn('Media Base: Discogs search', JSON.stringify(params), '->', results.length, 'raw,', mapped.length, 'usable');
+    console.warn('Media Base: Discogs search', JSON.stringify(params), '->', results.length, 'raw,', mapped.length, 'usable, first discogsUrl:', mapped[0]?.discogsUrl ?? '(none)');
     return mapped;
   } catch (err) {
     console.warn('Media Base: Discogs search threw', safeUrlForLogging, err);

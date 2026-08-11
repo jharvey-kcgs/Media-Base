@@ -177,6 +177,20 @@ path reuses `lib/movieLookup.ts`'s `looksLikeIsbn()` guard, kept there
 specifically for this reuse case - a box set can bundle a booklet with
 its own ISBN barcode right next to the disc's real UPC, and scanning the
 wrong one by mistake is a real failure mode, not a hypothetical one.
+**A required attribution link was added after Credits' Discogs notice
+prompted a closer look at their full terms**: Discogs' API Terms of Use
+require displaying "Data provided by Discogs" next to any Discogs-
+sourced data, hyperlinked to the specific page it came from - a real,
+confirmed requirement, not the "Where to Listen"-style access feature
+this category otherwise deliberately excludes. `VinylCD.discogsUrl`
+(null for anything typed in by hand) and a small link on the Edit
+screen, shown only when it's set, cover this. Confirmed via real
+research before writing the code: Discogs' search results return the
+release page as a RELATIVE path
+(`/Nirvana-Nevermind-Classic-Albums/release/2028757`), not a full URL -
+`lib/discogsLookup.ts`'s `resolveDiscogsUri()` handles that, verified
+offline against real sample data (both relative and already-absolute
+cases) before being trusted.
 
 **Tabletop Games is fully working** - `screens/TabletopScreen.tsx`
 (list, search, fixed genre filter, A-Z index, hold-to-select, full

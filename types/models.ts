@@ -164,17 +164,27 @@ export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
 // style (e.g. "Hard Rock") - both get combined into this one field for
 // richness on the entry itself (see lib/discogsLookup.ts), matching
 // every other category's single-genre-field convention rather than
-// introducing a second concept nothing else here has. Deliberately no
-// Discogs release id or "Where to Listen"-style field either - the
-// whole point of this category is a physical copy already owned, not a
-// pointer to somewhere else to access it, the same reasoning that ruled
-// digital Music out of this app entirely.
+// introducing a second concept nothing else here has. Still
+// deliberately no "Where to Listen"-style field - the whole point of
+// this category is a physical copy already owned, not a pointer to
+// somewhere else to access it, the same reasoning that ruled digital
+// Music out of this app entirely.
+//
+// discogsUrl is a genuinely different thing from that, though, not a
+// reversal of it: Discogs' own API Terms of Use require displaying
+// "Data provided by Discogs" directly next to any Discogs-sourced data,
+// hyperlinked to the specific page that data came from - a real,
+// confirmed attribution requirement, not an access-to-content feature.
+// null for any entry typed in entirely by hand, which never touched
+// Discogs' data at all - same graceful-hide reasoning already used for
+// Movies/TV/Anime's tmdbId-gated Where to Watch button.
 export interface VinylCD {
   id: string;
   title: string;
   artist: string;
   genres: string[];
   coverImage: string | null;
+  discogsUrl: string | null;
   listened: boolean;
   rating: number | null;
   review: string;
