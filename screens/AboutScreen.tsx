@@ -18,7 +18,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Adding entries',
-    body: "Books, Comics/Manga, and Vinyl/CD all support typing everything by hand, scanning a barcode, entering the code directly, or searching by title and picking the right result. Movies, TV Shows, and Anime are title-search only - no scanning or number entry for any of them, since real testing showed a barcode-based lookup for movies was unreliable in practice, and title search was already the more reliable path. Vinyl/CD's own barcode search is a real, direct match though, closer to Books/Comics' own ISBN lookup than to what Movies tried and dropped. Whichever method you use, you get a chance to review and edit every field before saving, and the same title can't be added twice. Every category is stored completely separately, so nothing added under one can ever end up in another.",
+    body: "Books, Comics/Manga, and Vinyl/CD all support typing everything by hand, scanning a barcode, entering the code directly, or searching by title and picking the right result. Movies, TV Shows, Anime, and Tabletop Games are title-search only - no scanning or number entry for any of them. For Movies, that's because real testing showed a barcode-based lookup was unreliable in practice, and title search was already the more reliable path. Tabletop Games never had scanning to begin with - there's no barcode database for board or card games the way there is for movies or music. Vinyl/CD's own barcode search is a real, direct match though, closer to Books/Comics' own ISBN lookup than to what Movies tried and dropped. Whichever method you use, you get a chance to review and edit every field before saving, and the same title can't be added twice. Every category is stored completely separately, so nothing added under one can ever end up in another.",
   },
   {
     title: 'Cover photos',
@@ -42,7 +42,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Permissions',
-    body: "Shows whether Camera and Photo Library access are currently granted, always kept in sync with your actual Phone Settings, and links straight there to change either. Camera is only used for the optional scan shortcut on Books, Comics/Manga, and Vinyl/CD - Movies, TV Shows, and Anime don't use it at all. Photo Library is only used when you choose \"Choose from Library\" for a cover photo - taking a new photo with the camera doesn't need it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
+    body: "Shows whether Camera and Photo Library access are currently granted, always kept in sync with your actual Phone Settings, and links straight there to change either. Camera is only used for the optional scan shortcut on Books, Comics/Manga, and Vinyl/CD - Movies, TV Shows, Anime, and Tabletop Games don't use it at all. Photo Library is only used when you choose \"Choose from Library\" for a cover photo - taking a new photo with the camera doesn't need it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
   },
   {
     title: 'Credits',

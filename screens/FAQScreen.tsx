@@ -10,7 +10,7 @@ import { useTheme } from '../lib/theme';
 const FAQS: { q: string; a: string }[] = [
   {
     q: 'Do I have to scan a barcode to add something?',
-    a: "No - scanning is always optional on Books, Comics/Manga, and Vinyl/CD, and every entry form lets you type everything in by hand instead. Movies, TV Shows, and Anime don't have a scan option at all - title search is the fast path there instead.",
+    a: "No - scanning is always optional on Books, Comics/Manga, and Vinyl/CD, and every entry form lets you type everything in by hand instead. Movies, TV Shows, Anime, and Tabletop Games don't have a scan option at all - title search is the fast path there instead.",
   },
   {
     q: "Why isn't a category showing on my Home screen?",
@@ -22,7 +22,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'Can an entry have more than one genre?',
-    a: "Yes - up to 4. They're matched against a built-in list of real genre terms so results stay clean rather than picking up stray keywords. Filter by any of them from the ••• menu → Filter by genre...",
+    a: "Yes. On Books, Comics/Manga, Movies, TV Shows, and Anime, up to 4 - they're matched against a built-in list of real genre terms so auto-filled results stay clean rather than picking up stray keywords. Vinyl/CD and Tabletop Games work a bit differently: their sources already return clean genre data directly, so there's no cleanup step or 4-genre cap on the entry itself - the fixed, short list you see in Filter by genre... on those two is just the filter menu, not a limit on what an entry can actually hold. Filter by any genre from the ••• menu → Filter by genre... on any category.",
   },
   {
     q: 'Can I delete more than one entry at a time?',
@@ -45,8 +45,8 @@ const FAQS: { q: string; a: string }[] = [
     a: 'On Movies, TV Shows, and Anime, entries matched against the main movie/show database get a "Where to Watch" button in the Edit screen - tap it for current streaming, rental, and purchase options. An entry typed in entirely by hand won\'t have this button, and on Anime specifically, a less common title matched only through the backup lookup source won\'t either - both need to know exactly which title you mean.',
   },
   {
-    q: "Why doesn't Vinyl/CD have a similar button for where to listen?",
-    a: "By design - Vinyl/CD is for records and CDs you already physically own, so there's no \"where can I access this\" question to answer the way there is for a movie or show you might not have seen yet. You already have the copy; just play it.",
+    q: "Why don't Vinyl/CD or Tabletop Games have a similar button for where to listen or play?",
+    a: "By design - both are for things you already physically own, so there's no \"where can I access this\" question to answer the way there is for a movie or show you might not have seen yet. You already have the copy; just play or listen to it.",
   },
   {
     q: 'Does my photo get saved anywhere else on my phone?',

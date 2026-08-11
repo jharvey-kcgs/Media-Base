@@ -57,16 +57,15 @@ result - and every category now shows a cover photo (auto-fetched where
 one's available, or added by hand) both in its list and its Edit screen.
 Settings → Data backs up everything, covers included, to one real file
 rather than pasted text. Every other category widget shows "Coming soon"
-until its own screen is built - Movies, TV Shows, Anime, and Vinyl/CD
-were all built out of the original planned order in
-[Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request,
-so the remaining order there is just Tabletop Games now (Music,
-originally next in that order, was built and later removed entirely -
-see below; Puzzles was dropped from the plan before ever being built).
+until its own screen is built - Movies, TV Shows, Anime, Vinyl/CD, and
+Tabletop Games were all built out of the original planned order in
+[Media-Base-Roadmap.md](./Media-Base-Roadmap.md) per explicit request -
+nothing remains in that order now, every category originally planned
+for v1 (aside from Music and Puzzles, both removed - see below) is done.
 `lib/useAlphabetScroll.ts` (A-Z
 index) and `components/TitleSearchInput.tsx`/`components/SearchBar.tsx`/
 `components/CoverThumbnail.tsx`/`components/CoverPicker.tsx` (title
-search, local search, and cover photos) are shared across all six
+search, local search, and cover photos) are shared across all seven
 implemented categories; `lib/isbnLookup.ts` is Books/Comics-specific,
 since both use ISBN lookup directly - Movies, TV Shows, and Anime are
 all TMDb-backed instead (`lib/movieLookup.ts`, `lib/tvLookup.ts`, and
@@ -75,7 +74,13 @@ ISBN/barcode concept at all. Vinyl/CD sits in neither camp - its own
 `lib/discogsLookup.ts`, and unlike Movies/TV/Anime it does support a
 real barcode (a direct match via Discogs, not the ISBN checksum/
 formatting Books/Comics have via `isbn3` - no equivalent library exists
-for UPC/EAN codes, so that field just holds raw digits) - see the
+for UPC/EAN codes, so that field just holds raw digits). Tabletop Games
+is title-search-only like Movies/TV/Anime, but neither TMDb-backed nor
+barcode-capable - its own `lib/bggLookup.ts`, BoardGameGeek's XML API2
+(the only lookup here returning XML, not JSON), and a genuinely two-step
+lookup (search alone only returns id/title/year; a follow-up call gets
+genre/players/cover) rather than either TMDb's or Discogs' single-
+response shape - see the
 Category screen pattern section for what to reuse vs. rebuild per
 category.
 **Movies, TV Shows, and Anime need a one-time setup step Books/Comics
@@ -84,17 +89,18 @@ own comments for exactly what's needed and where to get it), or their
 title-search auto-fill won't return anything (manual entry always works
 regardless). **Vinyl/CD needs its own separate credential** the same
 way - a free Discogs personal token, also in `lib/config.ts`
-(`DISCOGS_USER_TOKEN`).
+(`DISCOGS_USER_TOKEN`). **Tabletop Games needs none of that** - BGG's
+basic search/thing lookups are free and keyless, no credential required
+at all.
 
-**All six implemented categories are fully working** - Books,
-Comics/Manga, Movies, TV Shows, Anime, and Vinyl/CD all have working
-list/search/genre filter/A-Z index/hold-to-select and full Add/Edit.
-Movies, TV Shows, and Anime are structural twins: all TMDb-backed (Anime
-with a Jikan/MyAnimeList fallback when TMDb has nothing), all
-title-search-only (no camera/scanner, no barcode/number entry of any
-kind - confirmed design, not a gap), all with a "Where to Watch" button
-that opens TMDb's
-own watch page. That button only shows on an entry added through title
+**All seven implemented categories are fully working** - Books,
+Comics/Manga, Movies, TV Shows, Anime, Vinyl/CD, and Tabletop Games all
+have working list/search/genre filter/A-Z index/hold-to-select and full
+Add/Edit. Movies, TV Shows, and Anime are structural twins: all
+TMDb-backed (Anime with a Jikan/MyAnimeList fallback when TMDb has
+nothing), all title-search-only (no camera/scanner, no barcode/number
+entry of any kind - confirmed design, not a gap), all with a "Where to
+Watch" button that opens TMDb's own watch page. That button only shows on an entry added through title
 search (needs a stored `tmdbId` to link to anything) - not shown at all
 for an entry typed in by hand, a graceful hide rather than a disabled
 button. Movies didn't start this way - it originally had UPC/barcode
@@ -167,31 +173,42 @@ specifically for this reuse case - a box set can bundle a booklet with
 its own ISBN barcode right next to the disc's real UPC, and scanning the
 wrong one by mistake is a real failure mode, not a hypothetical one.
 
-**Tabletop Games' data layer is built, but `screens/TabletopScreen.tsx`
-itself doesn't exist yet** - `types/models.ts`'s `TabletopGame` and
-`TABLETOP_GENRE_FILTERS`, full CRUD in `lib/storage.ts` (including
-backup/cover wiring), and the lookup (`lib/bggLookup.ts`, orchestrated
-by `lib/titleSearch.ts`'s `searchTabletopGameByTitle()`) are all in
-place - the Home widget still shows "Coming soon" until the screen is
-built, same as every prior category at the equivalent point. Covers
-both board games and card games under one category, confirmed directly -
-BGG's own database already catalogs mass-market card games (Uno, Phase
-10 both confirmed real entries there) alongside hobby board games, so no
-separate data model was needed for either half. Scan/barcode was
-confirmed dropped entirely for this category - BGG's API has no barcode
-field at all, and any UPC-to-BGG bridge would need a third-party service
-of unverified reliability, the same structural risk that already got
-Movies' original UPC approach removed once; title search only, arriving
-at that shape directly rather than building and removing a scan feature
-first. `TABLETOP_GENRE_FILTERS` is a confirmed, fixed 20-item list (the
-person's own trim of BGG's real ~60-category list) after weighing a
-dynamic "genres in your collection" alternative and choosing to keep a
-fixed list instead - punctuation matches BGG's own exact category names
-deliberately (e.g. "Murder / Mystery" with spaces around the slash).
-Manufacturer and Play Time were both confirmed dropped entirely; Players
-is a single free-text field, not separate min/max numbers, even though
-BGG's own data has them separately - simpler to type by hand, and
-`fetchBggGameDetails()` combines them into one string when auto-filling.
+**Tabletop Games is fully working** - `screens/TabletopScreen.tsx`
+(list, search, fixed genre filter, A-Z index, hold-to-select, full
+Add/Edit) and the Home widget are both built now, on top of the data
+layer (`types/models.ts`'s `TabletopGame` and `TABLETOP_GENRE_FILTERS`,
+full CRUD in `lib/storage.ts` including backup/cover wiring, and the
+lookup in `lib/bggLookup.ts`, orchestrated by `lib/titleSearch.ts`'s
+`searchTabletopGameByTitle()`). Covers both board games and card games
+under one category, confirmed directly - BGG's own database already
+catalogs mass-market card games (Uno, Phase 10 both confirmed real
+entries there) alongside hobby board games, so no separate data model
+was needed for either half. Scan/barcode was confirmed dropped entirely
+for this category - BGG's API has no barcode field at all, and any
+UPC-to-BGG bridge would need a third-party service of unverified
+reliability, the same structural risk that already got Movies' original
+UPC approach removed once; title search only, arriving at that shape
+directly rather than building and removing a scan feature first, so
+this screen has no camera/scanner code at all, unlike Books/Comics/
+Vinyl-CD. `TABLETOP_GENRE_FILTERS` is a confirmed, fixed 20-item list
+(the person's own trim of BGG's real ~60-category list) after weighing
+a dynamic "genres in your collection" alternative and choosing to keep
+a fixed list instead - punctuation matches BGG's own exact category
+names deliberately (e.g. "Murder / Mystery" with spaces around the
+slash). Manufacturer and Play Time were both confirmed dropped
+entirely; Players is a single free-text field, not separate min/max
+numbers, even though BGG's own data has them separately - simpler to
+type by hand, and `fetchBggGameDetails()` combines them into one string
+when auto-filling. No artist-equivalent field at all, so no
+tap-to-filter-by-artist the way Books/Comics/Vinyl-CD have. Selecting a
+title-search result only fills Title immediately - genre/players/cover
+all require a follow-up `fetchBggGameDetails()` call, since BGG's search
+endpoint alone only ever returns id/title/year, so this screen shows a
+transient "Looking that up..." label during that wait, same UX fix
+Music needed for its own async genre lookup. Deliberately no "Where to
+Watch"/"Where to Listen"-style button here either - same reasoning as
+Vinyl/CD, the whole point of this category is a physical copy already
+owned, not a pointer to somewhere else to access it.
 
 ---
 
@@ -443,8 +460,56 @@ screens/
                                      and scanning the wrong one by
                                      mistake is a real failure mode, not
                                      a hypothetical one.
-  [category]Screen.tsx             One screen per remaining category,
-                                    built in the order in the Roadmap doc
+  TabletopScreen.tsx                Tabletop Games (widget 7 - fully
+                                     working). Mirrors MusicScreen.tsx's
+                                     shape (title-search-only, async
+                                     follow-up fetch, transient "looking
+                                     this up" indicator) rather than
+                                     BookScreen.tsx's or
+                                     VinylScreen.tsx's three-entry-method
+                                     shape - confirmed directly: no scan/
+                                     barcode at all for this category,
+                                     since BGG's API has no barcode field,
+                                     and any UPC-to-BGG bridge would need
+                                     a third-party service of unverified
+                                     reliability, the same structural
+                                     risk that already got Movies'
+                                     original UPC approach removed once.
+                                     Two genuine differences from every
+                                     prior title-search-only screen:
+                                     selecting a search result only
+                                     fills Title immediately -
+                                     lib/bggLookup.ts's
+                                     fetchBggGameDetails() is a REQUIRED
+                                     follow-up call for genre/players/
+                                     cover, not an optional enrichment
+                                     the way Music's genre/cover fetches
+                                     were, since BGG's search endpoint
+                                     alone only ever returns id/title/
+                                     year; and there's no artist-
+                                     equivalent field at all, so no
+                                     tap-to-filter-by-artist the way
+                                     Books/Comics/Vinyl-CD have. Genre
+                                     filter is TABLETOP_GENRE_FILTERS, a
+                                     fixed 20-item list, same fixed-list
+                                     approach as Vinyl/CD, chosen
+                                     directly over a dynamic "genres in
+                                     your collection" alternative.
+                                     Deliberately no "Where to Watch"/
+                                     "Where to Listen"-style button
+                                     either, same reasoning as Vinyl/CD.
+  [category]Screen.tsx             Historical note, kept for reference:
+                                    this placeholder described every
+                                    category still left to build at an
+                                    earlier point in this project.
+                                    Books, Comics/Manga, Movies, TV
+                                    Shows, Anime, Vinyl/CD, and Tabletop
+                                    Games are all done now - every
+                                    category from the original v1 plan
+                                    except Music and Puzzles, both
+                                    removed (see the top overview). No
+                                    category is actually "remaining" in
+                                    this sense as of this writing.
 
   SettingsScreen.tsx               Settings nav list
   ProfileSettingsScreen.tsx        Toggle which categories show on Home
@@ -2132,20 +2197,10 @@ code was simply wrong.
 
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
-glance, still open:
-- Tabletop Games, the one remaining category (Books,
-  Comics/Manga, Movies, TV Shows, Anime, and Vinyl/CD are all done -
-  Movies, TV Shows, Anime, and Vinyl/CD all built out of the original
-  planned sequence per explicit request; Music was also built out of
-  sequence, reached a fully working state, and was later removed
-  entirely - see the top overview and Section 6 for why; Puzzles was
-  dropped from the plan before ever being built, on reflection not
-  something worth tracking)
-- Real barcode scanning for Tabletop Games (Books/Comics
-  share `lib/isbnLookup.ts` for this - Movies originally had its own
-  `lib/upcLookup.ts` too, removed after real testing confirmed it was
-  unreliable; Movies, TV Shows, and Anime are all title-search only now,
-  and Vinyl/CD's own barcode lookup is done via Discogs
-  - see the Category screen pattern section above for what each
-  category actually reuses)
+glance, every category from the original v1 plan is done now - Books,
+Comics/Manga, Movies, TV Shows, Anime, Vinyl/CD, and Tabletop Games -
+except Music and Puzzles, both removed entirely rather than built (see
+the top overview and Section 6 for Music's reasoning). Movies, TV
+Shows, Anime, Vinyl/CD, and Tabletop Games were all built out of the
+original planned sequence per explicit request. Still genuinely open:
 - Share sheet wiring (native OS share, per item)

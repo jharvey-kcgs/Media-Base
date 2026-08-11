@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getMovies, getTVShows, getAnime, getVinylCDs, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getTVShows, getAnime, getVinylCDs, getTabletopGames, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -21,6 +21,7 @@ const IMPLEMENTED: Partial<Record<MediaCategory, keyof RootStackParamList>> = {
   tvshows: 'TV',
   anime: 'Anime',
   vinyl: 'Vinyl',
+  tabletop: 'Tabletop',
 };
 
 // Kept local rather than imported from App.tsx to avoid a circular import -
@@ -32,6 +33,7 @@ type RootStackParamList = {
   TV: undefined;
   Anime: undefined;
   Vinyl: undefined;
+  Tabletop: undefined;
   Settings: undefined;
 };
 
@@ -105,15 +107,16 @@ export default function HomeScreen({ navigation }: any) {
 
   const load = useCallback(async () => {
     const today = toLocalDateString(new Date());
-    const [books, comics, movies, tvShows, anime, vinyl] = await Promise.all([
+    const [books, comics, movies, tvShows, anime, vinyl, tabletop] = await Promise.all([
       getBooks(),
       getComics(),
       getMovies(),
       getTVShows(),
       getAnime(),
       getVinylCDs(),
+      getTabletopGames(),
     ]);
-    const [booksData, comicsData, moviesData, tvShowsData, animeData, vinylData] = await Promise.all([
+    const [booksData, comicsData, moviesData, tvShowsData, animeData, vinylData, tabletopData] = await Promise.all([
       loadWidgetData('books', books, (b) => b.read, 'book', 'books', today),
       loadWidgetData('comics', comics, (c) => c.read, 'entry', 'entries', today),
       loadWidgetData('movies', movies, (m) => m.watched, 'movie', 'movies', today),
@@ -124,6 +127,7 @@ export default function HomeScreen({ navigation }: any) {
       // "record" covers both vinyl and CD collectively - a natural
       // enough umbrella term for the widget text either way.
       loadWidgetData('vinyl', vinyl, (v) => v.listened, 'record', 'records', today),
+      loadWidgetData('tabletop', tabletop, (g) => g.played, 'game', 'games', today),
     ]);
     setWidgetData({
       books: booksData,
@@ -132,6 +136,7 @@ export default function HomeScreen({ navigation }: any) {
       tvshows: tvShowsData,
       anime: animeData,
       vinyl: vinylData,
+      tabletop: tabletopData,
     });
   }, []);
 
@@ -197,7 +202,9 @@ export default function HomeScreen({ navigation }: any) {
                                 ? 'sparkles-outline'
                                 : cat === 'vinyl'
                                   ? 'disc-outline'
-                                  : 'book-outline'
+                                  : cat === 'tabletop'
+                                    ? 'extension-puzzle-outline'
+                                    : 'book-outline'
                         }
                       />
                       <AppText

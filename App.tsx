@@ -22,6 +22,7 @@ import MovieScreen from './screens/MovieScreen';
 import TVScreen from './screens/TVScreen';
 import AnimeScreen from './screens/AnimeScreen';
 import VinylScreen from './screens/VinylScreen';
+import TabletopScreen from './screens/TabletopScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { getSettings } from './lib/storage';
 import { scheduleDailyRecommendationNotification } from './lib/notifications';
@@ -185,6 +186,7 @@ function ThemedApp() {
           <Stack.Screen name="TV" component={TVScreen} />
           <Stack.Screen name="Anime" component={AnimeScreen} />
           <Stack.Screen name="Vinyl" component={VinylScreen} />
+          <Stack.Screen name="Tabletop" component={TabletopScreen} />
         </Stack.Navigator>
       </View>
     </NavigationContainer>
