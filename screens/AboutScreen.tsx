@@ -26,7 +26,7 @@ const SECTIONS: {
     body: "Lets you pick which media categories show up as widgets on your Home screen. Turning a category off hides its widget but keeps everything you've already added, in case you turn it back on.",
   },
   {
-    title: 'Finding entries',
+    title: 'Finding Entries',
     intro: "Every category screen has a search box (below \"Sorted by...\") to quickly find something by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. A couple of categories add one more trick on top of that:",
     bullets: [
       { label: 'Books, Comics/Manga', text: "tap an author's name (shown in the accent color) to narrow the list to just their books." },
@@ -36,7 +36,7 @@ const SECTIONS: {
     outro: 'Tap the ✕ next to "Sorted by..." to clear an author/artist filter once it\'s set.',
   },
   {
-    title: 'Adding entries',
+    title: 'Adding Entries',
     intro: 'Whichever method a category supports, you get a chance to review and edit every field before saving, and the same title can\'t be added twice.',
     bullets: [
       { label: 'Books, Comics/Manga', text: 'type everything by hand, scan a barcode, enter the code directly, or search by title and pick the right result.' },
@@ -48,19 +48,23 @@ const SECTIONS: {
     outro: 'Every category is stored completely separately, so nothing added under one can ever end up in another.',
   },
   {
-    title: 'Cover photos',
+    title: 'The ••• Menu',
+    body: 'Top right of each category screen - has Add entry / Filter by... / Filter by genre....',
+  },
+  {
+    title: 'Deleting Entries',
+    body: 'Press and hold any entry to remove one or many at once - that switches the screen into a selection mode with the entry you held already checked, tap any others you want to remove, then Delete.',
+  },
+  {
+    title: 'Cover Photos',
     body: "Cover photos fill in automatically wherever one's available, whichever way you add an entry. Tap an item's cover in Add/Edit to take a new photo, choose one from your library, or remove it - your own photo is never added to your device's Photos app, it stays inside Media Base only.",
   },
   {
     title: 'Where to Watch',
-    body: "On Movies, TV Shows, and Anime, entries added through title search get a \"Where to Watch\" button in Edit - tap it to open a page showing which streaming services currently carry that title, plus rental/purchase pricing where available. This only shows up for entries matched against the main movie/show database - an entry typed in entirely by hand won't have this button, and on Anime specifically, a less common title matched only through the backup lookup source (used only when the main one has no match) won't either.",
+    body: 'On Movies, TV Shows, and Anime, a "Where to Watch" button in Edit opens a page showing current streaming, rental, and purchase options for that title. Only shows up on entries matched against the main movie/show database - a typed-in-by-hand entry won\'t have it, and on Anime, a title found only through the backup lookup source won\'t either.',
   },
   {
-    title: 'The ••• menu & deleting entries',
-    body: 'The ••• menu (top right of each category screen) has Add entry / Filter by... / Filter by genre.... To remove one or many entries at once, press and hold any entry - that switches the screen into a selection mode with the entry you held already checked, tap any others you want to remove, then Delete.',
-  },
-  {
-    title: 'Tracking progress',
+    title: 'Tracking Progress',
     body: "Marking an item as not-yet-read/watched/listened/played/completed is what makes it eligible to show up as today's random suggestion on Home. Marking it done opens a place to rate and review it, and it stops appearing as a suggestion.",
   },
   {
@@ -78,7 +82,7 @@ const SECTIONS: {
   },
   {
     title: 'Credits',
-    body: 'This product uses the TMDb API but is not endorsed or certified by TMDb.',
+    body: "This product uses the TMDb API but is not endorsed or certified by TMDb. This application uses Discogs' API but is not affiliated with, sponsored or endorsed by Discogs. 'Discogs' is a trademark of Zink Media, LLC. Board and card game data provided by BoardGameGeek.",
   },
 ];
 
