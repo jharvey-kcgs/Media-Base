@@ -22,3 +22,20 @@
 // a confusing network failure - manual entry (typing in title/genre by
 // hand) always works regardless.
 export const TMDB_READ_ACCESS_TOKEN = '';
+
+// Vinyl/CD's title-search and barcode lookup both need a Discogs
+// personal token - unlike Books/Comics' ISBN lookup, there's no keyless
+// source for real vinyl/CD release metadata.
+//
+// Get one at https://www.discogs.com/settings/developers - create an
+// application first (Application Name/Description required, Homepage
+// URL optional, leave Callback URL blank - that field's for a full
+// OAuth 1.0a login flow other users would go through, which this app
+// doesn't need), then generate a personal token from that same
+// Developer settings page. That personal token is what goes below - not
+// the Consumer Key/Secret the application itself gets, which is for a
+// different auth flow this app isn't using. Until this is filled in,
+// searching or scanning a barcode for Vinyl/CD will show a clear error
+// explaining why instead of a confusing network failure - manual entry
+// always works regardless.
+export const DISCOGS_USER_TOKEN = '';
