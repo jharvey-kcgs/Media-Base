@@ -37,6 +37,7 @@ import { normalizeGenres } from './isbnLookup';
 import { tmdbSearchMovies, MovieLookupResult } from './movieLookup';
 import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 import { searchJikanAnime } from './jikanLookup';
+import { searchDiscogsByTitle, DiscogsSearchResult } from './discogsLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -233,4 +234,12 @@ export async function searchAnimeByTitle(query: string, maxResults = 8): Promise
     coverUrl: r.coverUrl,
     // no tmdbId - see the interface comment above
   }));
+}
+
+/** Searches Discogs for a Vinyl/CD release by title - thin wrapper
+ * around lib/discogsLookup.ts's searchDiscogsByTitle(), which itself
+ * handles splitting an "Artist - Title" pattern into separate query
+ * params for a more precise match on a common title. */
+export async function searchVinylCDByTitle(query: string): Promise<DiscogsSearchResult[]> {
+  return searchDiscogsByTitle(query);
 }

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system/legacy';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime, VinylCD } from '../types/models';
 import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
@@ -14,6 +14,7 @@ const KEYS = {
   movies: 'mediabase:movies',
   tvShows: 'mediabase:tvShows',
   anime: 'mediabase:anime',
+  vinyl: 'mediabase:vinyl',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -251,6 +252,44 @@ export async function deleteAnimeEntries(ids: string[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteCover('anime', id)));
 }
 
+// --- Vinyl/CD ---
+
+export async function getVinylCDs(): Promise<VinylCD[]> {
+  return getAll<VinylCD>(KEYS.vinyl);
+}
+
+export async function addVinylCD(input: Omit<VinylCD, 'id' | 'createdAt'>, id?: string): Promise<VinylCD> {
+  const records = await getVinylCDs();
+  const entry: VinylCD = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.vinyl, [...records, entry]);
+  return entry;
+}
+
+export async function updateVinylCD(id: string, updates: Partial<VinylCD>): Promise<void> {
+  const records = await getVinylCDs();
+  const next = records.map((r) => (r.id === id ? { ...r, ...updates } : r));
+  await saveAll(KEYS.vinyl, next);
+}
+
+export async function deleteVinylCD(id: string): Promise<void> {
+  const records = await getVinylCDs();
+  await saveAll(
+    KEYS.vinyl,
+    records.filter((r) => r.id !== id),
+  );
+  await deleteCover('vinyl', id);
+}
+
+export async function deleteVinylCDs(ids: string[]): Promise<void> {
+  const records = await getVinylCDs();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.vinyl,
+    records.filter((r) => !idSet.has(r.id)),
+  );
+  await Promise.all(ids.map((id) => deleteCover('vinyl', id)));
+}
+
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar
@@ -316,6 +355,7 @@ const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
   { category: 'movies', key: KEYS.movies },
   { category: 'tvshows', key: KEYS.tvShows },
   { category: 'anime', key: KEYS.anime },
+  { category: 'vinyl', key: KEYS.vinyl },
 ];
 
 /** Builds a full backup - every stored key's data, plus every item's

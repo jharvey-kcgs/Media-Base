@@ -131,6 +131,24 @@ on the Roadmap) is the version of "music" that actually fits this
 project's philosophy - tracking records and CDs you physically own,
 not a streaming pointer.
 
+**Vinyl/CD's data layer is built, but `screens/VinylScreen.tsx` itself
+doesn't exist yet** - `types/models.ts`'s `VinylCD` and
+`VINYL_GENRE_FILTERS`, full CRUD in `lib/storage.ts` (including backup/
+cover wiring), and the lookup (`lib/discogsLookup.ts`, orchestrated by
+`lib/titleSearch.ts`'s `searchVinylCDByTitle()`) are all in place - the
+Home widget still shows "Coming soon" until the screen is built, same as
+every prior category at the equivalent point. Confirmed design: all
+three entry methods (scan, code-entry, title search) via Discogs, since
+- unlike Movies' old UPC approach - barcode search there is a real,
+direct match rather than a fuzzy chain. Genre and style both get stored
+together on each entry for richness, but the Filter-by-Genre menu uses a
+separate, deliberately short fixed list (`VINYL_GENRE_FILTERS`) instead
+of a dynamic "genres in your collection" list, since that would grow
+unbounded given how specific Discogs' combined data can get. Deliberately
+no "Where to Listen"-style button - the whole point of this category is
+a physical copy already owned, not a pointer to somewhere else to access
+it.
+
 ---
 
 ## 1. Prerequisites
@@ -703,6 +721,68 @@ lib/
                                      data but no Where to Watch button, a
                                      real and deliberate consequence of
                                      this design, not an oversight.
+  discogsLookup.ts                  Vinyl/CD's barcode and title-search
+                                     lookup - Discogs' database API.
+                                     Needs a personal user-token
+                                     (lib/config.ts's
+                                     DISCOGS_USER_TOKEN, not the
+                                     app-level Consumer Key/Secret Discogs
+                                     also issues - that's for a full
+                                     OAuth 1.0a login flow other users
+                                     would go through, which this
+                                     personal-use app doesn't need). Rate
+                                     limit is 60 requests/minute
+                                     authenticated - real, but far more
+                                     workable than MusicBrainz's ~1/second
+                                     ever was for the since-removed Music
+                                     category, especially for a personal
+                                     app adding entries one at a time.
+                                     Confirmed via real research before
+                                     writing this, not guessed: search
+                                     results return a COMBINED
+                                     "Artist - Title" string in the title
+                                     field (splitDiscogsTitle()), not
+                                     separate fields the way TMDb/
+                                     MusicBrainz results are - every
+                                     result needs splitting apart. Genre
+                                     and style are both arrays (Discogs'
+                                     own hierarchy - genre is the broad
+                                     grouping, style the specific
+                                     sub-genre) and get combined into this
+                                     app's single genre field
+                                     (combineGenres()), matching every
+                                     other category's one-genre-field
+                                     convention - see
+                                     types/models.ts's VinylCD comment for
+                                     why there's no separate style field.
+                                     Cover art comes bundled directly in
+                                     the search response - no separate
+                                     cover-art service needed, unlike
+                                     Music's whole Cover Art Archive saga
+                                     (wrong image format, missing
+                                     headers, flaky 500s). The barcode
+                                     param is a real, direct search
+                                     filter, not a fuzzy multi-hop chain
+                                     the way Movies' old UPC approach
+                                     turned out to be - closer in spirit
+                                     to Books' ISBN lookup than to Board
+                                     Games' still-planned "UPC then fuzzy
+                                     name match" approach. Exports
+                                     searchDiscogsByBarcode() (the
+                                     scan/code-entry path - caller is
+                                     responsible for checking
+                                     looksLikeIsbn() first, exported from
+                                     lib/movieLookup.ts specifically for
+                                     this reuse, since a Vinyl/CD box set
+                                     can bundle a booklet with its own
+                                     ISBN barcode right next to the
+                                     disc's real UPC) and
+                                     searchDiscogsByTitle() (splits an
+                                     "Artist - Title" pattern typed into
+                                     the search box into separate query
+                                     params for a more precise match on a
+                                     common title, same trick already
+                                     proven for Music's search).
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap
@@ -1894,7 +1974,8 @@ code was simply wrong.
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
 category-by-category build order and entry-method decisions. At a
 glance, still open:
-- Vinyl/CD → Tabletop Games, in that order (Books,
+- Vinyl/CD (data layer done, screen pending - see the top overview)
+  → Tabletop Games, in that order (Books,
   Comics/Manga, Movies, TV Shows, and Anime are all done - Movies, TV
   Shows, and Anime all built out of the original planned sequence per
   explicit request; Music was also built out of sequence, reached a

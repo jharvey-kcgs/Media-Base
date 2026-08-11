@@ -159,6 +159,58 @@ export interface Anime {
 
 export type AnimeSortField = 'title' | 'genre' | 'watched' | 'rating';
 
+// Confirmed design: no separate "style" field, even though Discogs
+// itself distinguishes broad genre (e.g. "Rock") from a more specific
+// style (e.g. "Hard Rock") - both get combined into this one field for
+// richness on the entry itself (see lib/discogsLookup.ts), matching
+// every other category's single-genre-field convention rather than
+// introducing a second concept nothing else here has. Deliberately no
+// Discogs release id or "Where to Listen"-style field either - the
+// whole point of this category is a physical copy already owned, not a
+// pointer to somewhere else to access it, the same reasoning that ruled
+// digital Music out of this app entirely.
+export interface VinylCD {
+  id: string;
+  title: string;
+  artist: string;
+  genres: string[];
+  coverImage: string | null;
+  listened: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type VinylCDSortField = 'title' | 'artist' | 'genre' | 'listened' | 'rating';
+
+// Fixed, deliberately short Filter-by-Genre menu - confirmed directly:
+// kept intentionally small and easy to navigate, not a "genres actually
+// in your collection" dynamic list the way Books/Comics/Anime use,
+// which would grow unbounded as the collection grows (especially since
+// Discogs' own genre+style data on VinylCD.genres above can get quite
+// specific). This is the person's own trimmed list, not Discogs'
+// complete ~15-item official top-level genre list - "Brass & Military"
+// and "Non-Music" dropped as too niche for a personal collection,
+// "Folk, World, & Country" simplified down to just "Folk". An entry
+// matches a filter here if this term appears anywhere in its own
+// (richer) VinylCD.genres text - same simple substring approach every
+// other category's genre filter already uses.
+export const VINYL_GENRE_FILTERS = [
+  'Rock',
+  'Electronic',
+  'Pop',
+  'Funk/Soul',
+  'Folk',
+  'Jazz',
+  'Classical',
+  'Hip Hop',
+  'Stage & Screen',
+  'Reggae',
+  'Latin',
+  'Blues',
+  "Children's",
+];
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home
