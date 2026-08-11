@@ -167,6 +167,32 @@ specifically for this reuse case - a box set can bundle a booklet with
 its own ISBN barcode right next to the disc's real UPC, and scanning the
 wrong one by mistake is a real failure mode, not a hypothetical one.
 
+**Tabletop Games' data layer is built, but `screens/TabletopScreen.tsx`
+itself doesn't exist yet** - `types/models.ts`'s `TabletopGame` and
+`TABLETOP_GENRE_FILTERS`, full CRUD in `lib/storage.ts` (including
+backup/cover wiring), and the lookup (`lib/bggLookup.ts`, orchestrated
+by `lib/titleSearch.ts`'s `searchTabletopGameByTitle()`) are all in
+place - the Home widget still shows "Coming soon" until the screen is
+built, same as every prior category at the equivalent point. Covers
+both board games and card games under one category, confirmed directly -
+BGG's own database already catalogs mass-market card games (Uno, Phase
+10 both confirmed real entries there) alongside hobby board games, so no
+separate data model was needed for either half. Scan/barcode was
+confirmed dropped entirely for this category - BGG's API has no barcode
+field at all, and any UPC-to-BGG bridge would need a third-party service
+of unverified reliability, the same structural risk that already got
+Movies' original UPC approach removed once; title search only, arriving
+at that shape directly rather than building and removing a scan feature
+first. `TABLETOP_GENRE_FILTERS` is a confirmed, fixed 20-item list (the
+person's own trim of BGG's real ~60-category list) after weighing a
+dynamic "genres in your collection" alternative and choosing to keep a
+fixed list instead - punctuation matches BGG's own exact category names
+deliberately (e.g. "Murder / Mystery" with spaces around the slash).
+Manufacturer and Play Time were both confirmed dropped entirely; Players
+is a single free-text field, not separate min/max numbers, even though
+BGG's own data has them separately - simpler to type by hand, and
+`fetchBggGameDetails()` combines them into one string when auto-filling.
+
 ---
 
 ## 1. Prerequisites
@@ -847,6 +873,75 @@ lib/
                                      params for a more precise match on a
                                      common title, same trick already
                                      proven for Music's search).
+  bggLookup.ts                      Tabletop Games' title-search lookup -
+                                     BoardGameGeek's XML API2. Free and
+                                     keyless for basic search/thing
+                                     lookups (no personal token needed
+                                     the way Discogs required). Two
+                                     genuine differences from every other
+                                     lookup in this app, both confirmed
+                                     via real research before writing
+                                     this: it's a two-step lookup, not a
+                                     single bundled response like
+                                     Discogs - BGG's search endpoint only
+                                     returns id/title/year, so
+                                     searchBggByTitle() alone isn't
+                                     enough; selecting a result needs a
+                                     follow-up fetchBggGameDetails() call
+                                     for genre/players/cover, same shape
+                                     as Music's async fetch-after-
+                                     selection, not Vinyl/CD's instant
+                                     everything-at-once fill. And BGG's
+                                     API returns XML, not JSON - the
+                                     first lookup in this app that isn't.
+                                     Most fields live in a `value`
+                                     attribute on a self-closing tag
+                                     (`<name value="..."/>`,
+                                     `<minplayers value="..."/>`) except
+                                     the cover image, which is plain text
+                                     inside its own tag (`<image>...
+                                     </image>`) - a real inconsistency,
+                                     confirmed via a verified real
+                                     response sample before writing any
+                                     parsing logic, not assumed. Uses
+                                     hand-rolled regex extraction
+                                     (extractValueAttrs()/
+                                     extractLinkValuesByType()/
+                                     extractTagText()/splitItems()),
+                                     narrowly scoped to that exact
+                                     verified shape, rather than a real
+                                     XML parser library or general-
+                                     purpose parsing - this sandbox's npm
+                                     registry access was down when this
+                                     was written (confirmed via a direct,
+                                     isolated request failing with the
+                                     same error, not just a full-install
+                                     issue), so a new dependency
+                                     (fast-xml-parser was the plan)
+                                     couldn't be installed and verified
+                                     working in this environment. The
+                                     extraction logic itself was tested
+                                     offline against the real, verified
+                                     sample shape before being trusted -
+                                     genre links correctly isolated from
+                                     mechanics/designers/publishers
+                                     (boardgamecategory only), multiple
+                                     search results correctly split
+                                     without bleeding into each other's
+                                     fields, image vs thumbnail handled
+                                     correctly - but still not
+                                     network-tested against BGG's actual
+                                     live API from this sandbox. Genre
+                                     extraction is boardgamecategory
+                                     links only, not mechanics/designers/
+                                     publishers, which BGG's <link> tag
+                                     also carries under different type
+                                     values. fetchBggGameDetails() also
+                                     combines minplayers/maxplayers into
+                                     one "2-6"-style string rather than
+                                     storing them separately, matching
+                                     the single free-text Players field
+                                     confirmed for this category.
   titleSearch.ts                     The third entry method (alongside
                                      scan and number-entry): type a
                                      title, get real candidates back, tap

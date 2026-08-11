@@ -56,7 +56,7 @@ All barcode/link-based entries go through a **confirm/edit screen before saving*
 | TV Shows | Enter or search by title ✅ done | Title, genre, watched switch | Title search only (TMDb, free credential required) - confirmed design from the start, no scan/number-entry ever planned |
 | Anime | Enter or search by title ✅ done | Title, genre, watched switch | Title search, TMDb primary + Jikan (MyAnimeList, free/keyless) fallback - same multi-source resilience pattern as Books/Comics |
 | Vinyl/CD | Enter, scan, or search by title ✅ done | Title, genre, artist, listened switch, rating | Discogs API — has a real, direct barcode search parameter, not a fuzzy multi-hop chain; confirmed via real research before building. Genre filter uses a short, fixed 13-item list (the user's own trimmed-down version of Discogs' official genre list), not a dynamic "genres in your collection" list, kept deliberately small and easy to navigate |
-| Tabletop Games | Enter or scan (UPC barcode) | Title, manufacturer, genre, players, play time, played switch | UPC lookup → name match against BoardGameGeek — weakest match of the barcode categories, expect frequent manual correction. Covers card games too (Uno, Phase 10, etc.), not just board games, per explicit request - same fields fit both, and BGG's catalog already includes mass-market card games alongside hobby board games. BGG's community leans more toward the hobby side though, so expect that same manual-correction risk to be a bit more pronounced for pure mass-market card titles specifically. |
+| Tabletop Games | Enter or search by title (data layer done, screen pending) | Title, genre, players, played switch, rating | BoardGameGeek XML API2, free/keyless. Covers card games too (Uno, Phase 10, etc.), not just board games, per explicit request - confirmed both are real, catalogued BGG entries, not just a hopeful assumption. Scan/barcode confirmed dropped entirely - BGG's API has no barcode field at all, and any UPC-to-BGG bridge would need a third-party service of unverified reliability, the same structural risk that already got Movies' original UPC approach removed once. Genre filter uses a fixed 20-item list (the user's own trim of BGG's real ~60-category list), not a dynamic "genres in your collection" list, after weighing both approaches directly. Manufacturer and Play Time both confirmed dropped; Players is a single free-text field, not separate min/max numbers |
 
 Every entry screen has a manual-entry path as the default; scanning/link-pasting is always an optional shortcut, never required. The camera icon only requests OS camera permission when tapped (lazy, not on screen load), matching Home Base's lazy notification-permission pattern. Regardless of entry method, all required fields for that category must be filled before saving.
 
@@ -65,7 +65,7 @@ Every entry screen has a manual-entry path as the default; scanning/link-pasting
 ## "Where to Watch"
 Not part of the core entry flow, layered on top once basic entries exist for each category:
 - **Movies, TV Shows & Anime** ✅ done — each entry added through title search gets a "Where to Watch" button. Built simpler than originally planned here: rather than a custom in-app popup listing providers (which would need ongoing JustWatch attribution everywhere it's shown, not just once in Credits), the button opens TMDb's own watch page directly (`tmdbMovieWatchUrl()` / `tmdbWatchUrl()`) - that page already has correct JustWatch branding built in, so nothing needed to be built or maintained for it. Region-aware but not yet configurable (defaults to US). Only shows on an entry with a stored `tmdbId` (came from title search) - a graceful hide, not a disabled button, for anything typed in by hand. Anime reuses this exact approach (its title search is TMDb-primary, same `tmdbId`), but with one real added case: an entry found only through Anime's Jikan fallback (MyAnimeList doesn't cross-reference TMDb) also won't have this button - same graceful hide, just triggered by which source actually found it.
-- **Vinyl/CD deliberately has no equivalent** - the whole point of this category is a physical copy already owned, not a pointer to somewhere else to access it. Adding a "Where to Listen" button back in would quietly reintroduce the exact category mismatch that got the since-removed digital Music category pulled entirely.
+- **Vinyl/CD and Tabletop Games both deliberately have no equivalent** - the whole point of these categories is a physical copy already owned, not a pointer to somewhere else to access it. Adding a "Where to Listen"/"Where to Play" button back in would quietly reintroduce the exact category mismatch that got the since-removed digital Music category pulled entirely.
 
 ## Recommendation & rating logic
 - Switch = **No** (not read/watched/listened/played) → that category's widget shows one random not-done item as "try this today," refreshed daily, one per widget (not one global pick).
@@ -79,7 +79,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 - Books: Title / Genre / Author / Read / Rating
 - Comics/Manga: Title / Genre / Author / Read / Rating
 - Vinyl/CD: Title / Genre / Artist / Listened / Rating
-- Tabletop Games: Genre / Play Time / Manufacturer / Title / Played
+- Tabletop Games: Title / Genre / Players / Played / Rating
 
 ## Build order
 1. **Books** — most reliable lookup, simplest way to prove the entry → confirm → rate → recommend pattern end to end ✅ done
@@ -87,7 +87,8 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 3. **Movies** ✅ done, built out of the original planned order per explicit request - originally had its own UPC/barcode scanning too (lib/upcLookup.ts), removed later after real testing confirmed that lookup chain was unreliable in practice. Now title-search only, via lib/movieLookup.ts. Needs a free TMDb credential added to lib/config.ts before title-search auto-fill will work; manual entry works regardless.
 4. **TV Shows** ✅ done, also built out of the original planned order per explicit request - title-search only from the start (lib/tvLookup.ts, its own genre taxonomy genuinely different from Movies'). Structural twin of Movies now that Movies dropped its own scan/UPC entry - both share the same "Where to Watch" approach (see above).
 5. **Anime** ✅ done - title search, TMDb primary + Jikan fallback, same shape as Movies/TV Shows
-6. **Vinyl/CD** ✅ done - title search/barcode via Discogs, a real direct match unlike the UPC-fuzzy-match family this was originally grouped with → Tabletop Games next
+6. **Vinyl/CD** ✅ done - title search/barcode via Discogs, a real direct match unlike the UPC-fuzzy-match family this was originally grouped with
+7. **Tabletop Games** - data layer done (title search only via BGG, scan confirmed dropped entirely - see the table row above for why), screens/TabletopScreen.tsx itself still pending
 
 ## Open items not yet decided
 - Exact API/developer accounts to register (OMDb/TMDb, Discogs, Spotify developer keys) — Movies and TV Shows both already need a free TMDb credential in lib/config.ts for their title-search auto-fill to work. The rest can still be done incrementally per widget as you build it.

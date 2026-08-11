@@ -38,6 +38,7 @@ import { tmdbSearchMovies, MovieLookupResult } from './movieLookup';
 import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 import { searchJikanAnime } from './jikanLookup';
 import { searchDiscogsByTitle, DiscogsSearchResult } from './discogsLookup';
+import { searchBggByTitle, BggSearchResult } from './bggLookup';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -242,4 +243,14 @@ export async function searchAnimeByTitle(query: string, maxResults = 8): Promise
  * params for a more precise match on a common title. */
 export async function searchVinylCDByTitle(query: string): Promise<DiscogsSearchResult[]> {
   return searchDiscogsByTitle(query);
+}
+
+/** Searches BoardGameGeek for a Tabletop Game by title - thin wrapper
+ * around lib/bggLookup.ts's searchBggByTitle(). Unlike every other
+ * search wrapper here, selecting a result from this one isn't the end
+ * of the lookup - the caller still needs a follow-up
+ * fetchBggGameDetails() call to get genre/players/cover, since BGG's
+ * search endpoint alone only returns id/title/year. */
+export async function searchTabletopGameByTitle(query: string): Promise<BggSearchResult[]> {
+  return searchBggByTitle(query);
 }

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 import * as FileSystem from 'expo-file-system/legacy';
-import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime, VinylCD } from '../types/models';
+import { AppSettings, DEFAULT_SETTINGS, Book, Comic, Movie, TVShow, Anime, VinylCD, TabletopGame } from '../types/models';
 import { deleteCover, deleteAllCovers, getCoverUri, ensureCoverDirExists } from './coverStorage';
 
 const KEYS = {
@@ -15,6 +15,7 @@ const KEYS = {
   tvShows: 'mediabase:tvShows',
   anime: 'mediabase:anime',
   vinyl: 'mediabase:vinyl',
+  tabletop: 'mediabase:tabletop',
   dailyPicks: 'mediabase:dailyPicks',
 };
 
@@ -290,6 +291,44 @@ export async function deleteVinylCDs(ids: string[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteCover('vinyl', id)));
 }
 
+// --- Tabletop Games ---
+
+export async function getTabletopGames(): Promise<TabletopGame[]> {
+  return getAll<TabletopGame>(KEYS.tabletop);
+}
+
+export async function addTabletopGame(input: Omit<TabletopGame, 'id' | 'createdAt'>, id?: string): Promise<TabletopGame> {
+  const games = await getTabletopGames();
+  const entry: TabletopGame = { ...input, id: id ?? newId(), createdAt: new Date().toISOString() };
+  await saveAll(KEYS.tabletop, [...games, entry]);
+  return entry;
+}
+
+export async function updateTabletopGame(id: string, updates: Partial<TabletopGame>): Promise<void> {
+  const games = await getTabletopGames();
+  const next = games.map((g) => (g.id === id ? { ...g, ...updates } : g));
+  await saveAll(KEYS.tabletop, next);
+}
+
+export async function deleteTabletopGame(id: string): Promise<void> {
+  const games = await getTabletopGames();
+  await saveAll(
+    KEYS.tabletop,
+    games.filter((g) => g.id !== id),
+  );
+  await deleteCover('tabletop', id);
+}
+
+export async function deleteTabletopGames(ids: string[]): Promise<void> {
+  const games = await getTabletopGames();
+  const idSet = new Set(ids);
+  await saveAll(
+    KEYS.tabletop,
+    games.filter((g) => !idSet.has(g.id)),
+  );
+  await Promise.all(ids.map((id) => deleteCover('tabletop', id)));
+}
+
 // --- Daily recommendation ("try this today" on Home) ---
 //
 // One category's own random pick should stay fixed for the whole calendar
@@ -356,6 +395,7 @@ const COVER_CATEGORY_KEYS: { category: string; key: string }[] = [
   { category: 'tvshows', key: KEYS.tvShows },
   { category: 'anime', key: KEYS.anime },
   { category: 'vinyl', key: KEYS.vinyl },
+  { category: 'tabletop', key: KEYS.tabletop },
 ];
 
 /** Builds a full backup - every stored key's data, plus every item's

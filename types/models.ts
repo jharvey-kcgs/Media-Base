@@ -211,6 +211,65 @@ export const VINYL_GENRE_FILTERS = [
   "Children's",
 ];
 
+// Covers both board games and card games under one category, confirmed
+// directly - both want identical fields (Title, genre, players, played
+// switch), and BGG's own database already catalogs mass-market card
+// games (Uno, Phase 10 both confirmed real entries there) alongside
+// hobby board games, so no separate data model or lookup source is
+// needed for either half. Players is a single free-text field
+// ("2-6 players"), not separate min/max numbers the way BGG's own data
+// has them - confirmed simpler to type by hand than two number inputs,
+// and BGG's minplayers/maxplayers get combined into this one field when
+// auto-filled from a search result. Manufacturer and Play Time were
+// both confirmed dropped entirely - not something the person wanted
+// tracked here.
+export interface TabletopGame {
+  id: string;
+  title: string;
+  genres: string[];
+  players: string;
+  coverImage: string | null;
+  played: boolean;
+  rating: number | null;
+  review: string;
+  createdAt: string;
+}
+
+export type TabletopGameSortField = 'title' | 'genre' | 'played' | 'rating';
+
+// Fixed, confirmed 20-item list - the person's own trim of BGG's real
+// ~60-category list (see the "Board Game Categories" reference at
+// boardgamegeek.com), after going back and forth on a dynamic
+// "genres in your collection" alternative and choosing to stick with a
+// fixed list instead. Punctuation matches BGG's own exact category
+// names deliberately (e.g. "Murder / Mystery" with spaces around the
+// slash, not "Murder/Mystery") - getting this wrong would mean an
+// auto-filled entry's genre text never actually matches this filter
+// menu, same class of bug as the "Metalcore vs Metal Core" spacing
+// mismatch from Music's genre allowlist.
+export const TABLETOP_GENRE_FILTERS = [
+  'Card Game',
+  'Party Game',
+  "Children's Game",
+  'Trivia',
+  'Word Game',
+  'Puzzle',
+  'Science Fiction',
+  'Fantasy',
+  'Horror',
+  'Humor',
+  'Wargame',
+  'Deduction',
+  'Dice',
+  'Bluffing',
+  'Mature / Adult',
+  'Economic',
+  'Educational',
+  'Murder / Mystery',
+  'Action / Dexterity',
+  'Memory',
+];
+
 export interface AppSettings {
   onboarded: boolean;
   categories: MediaCategory[]; // which widgets show on Home
