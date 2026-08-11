@@ -7,18 +7,45 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
 
-const SECTIONS: { title: string; body: string }[] = [
+// `body` alone renders as a single plain paragraph (unchanged from
+// before) - `intro` + `bullets` renders a short lead-in sentence
+// followed by a labeled list, for any card whose content is genuinely
+// per-category or per-permission rather than one continuous idea.
+// Confirmed directly: several cards had grown into dense paragraphs
+// that were hard to scan on a phone screen, especially where the same
+// paragraph covered several different categories at once.
+const SECTIONS: {
+  title: string;
+  body?: string;
+  intro?: string;
+  bullets?: { label: string; text: string }[];
+  outro?: string;
+}[] = [
   {
     title: 'Profile',
     body: "Lets you pick which media categories show up as widgets on your Home screen. Turning a category off hides its widget but keeps everything you've already added, in case you turn it back on.",
   },
   {
     title: 'Finding entries',
-    body: "Each category screen lists what you've added, with a search box (below \"Sorted by...\") to quickly find one by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. On Books and Comics/Manga, tapping an author's name (shown in the accent color) narrows the list to just their books; on Vinyl/CD, tapping an artist's name does the same for their records. Tap the ✕ next to \"Sorted by...\" to clear it.",
+    intro: "Every category screen has a search box (below \"Sorted by...\") to quickly find something by name, a dedicated genre filter, and an A-Z index for jumping around a longer list. A couple of categories add one more trick on top of that:",
+    bullets: [
+      { label: 'Books, Comics/Manga', text: "tap an author's name (shown in the accent color) to narrow the list to just their books." },
+      { label: 'Vinyl/CD', text: "tap an artist's name the same way to narrow to just their records." },
+      { label: 'Movies, TV Shows, Anime, Tabletop Games', text: 'search, genre filter, and A-Z all work the same as everywhere else - no author/artist tap here, since none of these track that kind of field.' },
+    ],
+    outro: 'Tap the ✕ next to "Sorted by..." to clear an author/artist filter once it\'s set.',
   },
   {
     title: 'Adding entries',
-    body: "Books, Comics/Manga, and Vinyl/CD all support typing everything by hand, scanning a barcode, entering the code directly, or searching by title and picking the right result. Movies, TV Shows, Anime, and Tabletop Games are title-search only - no scanning or number entry for any of them. For Movies, that's because real testing showed a barcode-based lookup was unreliable in practice, and title search was already the more reliable path. Tabletop Games never had scanning to begin with - there's no barcode database for board or card games the way there is for movies or music. Vinyl/CD's own barcode search is a real, direct match though, closer to Books/Comics' own ISBN lookup than to what Movies tried and dropped. Whichever method you use, you get a chance to review and edit every field before saving, and the same title can't be added twice. Every category is stored completely separately, so nothing added under one can ever end up in another.",
+    intro: 'Whichever method a category supports, you get a chance to review and edit every field before saving, and the same title can\'t be added twice.',
+    bullets: [
+      { label: 'Books, Comics/Manga', text: 'type everything by hand, scan a barcode, enter the code directly, or search by title and pick the right result.' },
+      { label: 'Vinyl/CD', text: 'the same four methods as Books/Comics - its own barcode search is a real, direct match, closer to Books/Comics\' own ISBN lookup than to what Movies tried and dropped.' },
+      { label: 'Movies', text: 'title search only - real testing showed a barcode-based lookup was unreliable in practice, and title search was already the more reliable path.' },
+      { label: 'TV Shows, Anime', text: 'title search only, by design from the start.' },
+      { label: 'Tabletop Games', text: "title search only - there's no barcode database for board or card games the way there is for movies or music." },
+    ],
+    outro: 'Every category is stored completely separately, so nothing added under one can ever end up in another.',
   },
   {
     title: 'Cover photos',
@@ -42,7 +69,12 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'Permissions',
-    body: "Shows whether Camera and Photo Library access are currently granted, always kept in sync with your actual Phone Settings, and links straight there to change either. Camera is only used for the optional scan shortcut on Books, Comics/Manga, and Vinyl/CD - Movies, TV Shows, Anime, and Tabletop Games don't use it at all. Photo Library is only used when you choose \"Choose from Library\" for a cover photo - taking a new photo with the camera doesn't need it. Also has a Daily reminder toggle: one notification at 10:00 AM nudging you to check today's recommendations, with no specific pick named.",
+    intro: 'Shows whether each of these is currently granted, always kept in sync with your actual Phone Settings, and links straight there to change any of them.',
+    bullets: [
+      { label: 'Camera', text: "used only for the optional scan shortcut on Books, Comics/Manga, and Vinyl/CD - Movies, TV Shows, Anime, and Tabletop Games don't use it at all." },
+      { label: 'Photo Library', text: 'used only when you choose "Choose from Library" for a cover photo - taking a new photo with the camera doesn\'t need it.' },
+      { label: 'Daily Reminder', text: 'one notification at 10:00 AM nudging you to check today\'s recommendations, with no specific pick named.' },
+    ],
   },
   {
     title: 'Credits',
@@ -70,9 +102,31 @@ export default function AboutScreen({ navigation }: any) {
             <AppText variant="header" style={{ color: theme.colors.accentReadable, fontSize: 16 * theme.fontScale, marginBottom: 6 }}>
               {section.title}
             </AppText>
-            <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21 }}>
-              {section.body}
-            </AppText>
+            {section.body && (
+              <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21 }}>
+                {section.body}
+              </AppText>
+            )}
+            {section.intro && (
+              <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21, marginBottom: 10 }}>
+                {section.intro}
+              </AppText>
+            )}
+            {section.bullets?.map((bullet, bi) => (
+              <View key={bullet.label} style={[styles.bulletRow, bi === section.bullets!.length - 1 && !section.outro && { marginBottom: 0 }]}>
+                <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21 }}>
+                  {'\u2022  '}
+                  <AppText style={{ color: theme.colors.text, fontSize: 14 * theme.fontScale }}>{bullet.label}</AppText>
+                  {' — '}
+                  {bullet.text}
+                </AppText>
+              </View>
+            ))}
+            {section.outro && (
+              <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21, marginTop: 10 }}>
+                {section.outro}
+              </AppText>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -88,5 +142,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 14,
+  },
+  bulletRow: {
+    marginBottom: 8,
   },
 });
