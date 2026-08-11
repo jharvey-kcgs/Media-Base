@@ -82,7 +82,11 @@ const SECTIONS: {
   },
   {
     title: 'Credits',
-    body: "This product uses the TMDb API but is not endorsed or certified by TMDb. This application uses Discogs' API but is not affiliated with, sponsored or endorsed by Discogs. 'Discogs' is a trademark of Zink Media, LLC. Board and card game data provided by BoardGameGeek.",
+    bullets: [
+      { label: 'TMDb', text: 'this product uses the TMDb API but is not endorsed or certified by TMDb.' },
+      { label: 'Discogs', text: "this application uses Discogs' API but is not affiliated with, sponsored or endorsed by Discogs. 'Discogs' is a trademark of Zink Media, LLC." },
+      { label: 'BoardGameGeek', text: 'board and card game data provided by BoardGameGeek.' },
+    ],
   },
 ];
 
