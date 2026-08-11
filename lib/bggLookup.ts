@@ -1,10 +1,22 @@
 // lib/bggLookup.ts
 //
-// Tabletop Games' title-search lookup - BoardGameGeek's XML API2. Free
-// and keyless for basic search/thing lookups (no personal token needed
-// the way Discogs required) - "Application Tokens" mentioned in BGG's
-// own docs are for a different, higher-volume use case this app isn't
-// in. Rate limit is unofficial (BGG doesn't document one directly) but
+// Tabletop Games' title-search lookup - BoardGameGeek's XML API2.
+//
+// CORRECTION: originally written assuming this was free and keyless for
+// basic search/thing lookups - that was wrong, confirmed via BGG's own
+// registration guide (https://boardgamegeek.com/using_the_xml_api) after
+// a direct request: "Registration and authorization is required for use
+// of the XML API" for essentially any real use case, not an edge case.
+// Needs a BGG_APPLICATION_TOKEN (lib/config.ts) sent as
+// `Authorization: Bearer <token>` on every request - without it, BGG's
+// own docs say the API simply won't work at all, not just rate-limited.
+// Getting a token is a genuinely slower process than TMDb/Discogs ever
+// were: register an application at boardgamegeek.com/applications,
+// choose "Non-commercial", then wait for approval - BGG's own docs say
+// this can take a week or more, not the instant self-service tokens
+// those other two services gave.
+//
+// Rate limit is unofficial (BGG doesn't document one directly) but
 // commonly cited as ~2 requests/second - real, but the search-then-fetch
 // flow below only ever needs 2 requests per selection, well under that.
 //
@@ -39,9 +51,19 @@
 // the exact, verified shape above rather than general-purpose XML
 // parsing, to keep that risk contained.
 //
-// NOTE: not network-tested from the sandbox this was written in.
+// NOTE: not network-tested from the sandbox this was written in - and
+// now genuinely can't be until a real BGG_APPLICATION_TOKEN exists.
+
+import { BGG_APPLICATION_TOKEN } from './config';
 
 const USER_AGENT = 'MediaBase/1.0 +https://github.com/JHarvey/Media-Base';
+
+function authHeaders(): Record<string, string> {
+  return {
+    'User-Agent': USER_AGENT,
+    ...(BGG_APPLICATION_TOKEN ? { Authorization: `Bearer ${BGG_APPLICATION_TOKEN}` } : {}),
+  };
+}
 
 export interface BggSearchResult {
   key: string; // BGG's numeric item id, as a string
@@ -131,11 +153,15 @@ function splitItems(xml: string): { id: number; chunk: string }[] {
 export async function searchBggByTitle(query: string): Promise<BggSearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
+  if (!BGG_APPLICATION_TOKEN) {
+    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set in lib/config.ts - Tabletop Games lookup is unavailable until it is (registration + approval required, see the file header)');
+    return [];
+  }
   const url = `https://boardgamegeek.com/xmlapi2/search?query=${encodeURIComponent(trimmed)}&type=boardgame`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) {
-      console.warn('Media Base: BGG search returned', res.status, url);
+      console.warn('Media Base: BGG search returned', res.status, url, res.status === 401 || res.status === 403 ? '(check BGG_APPLICATION_TOKEN is valid and approved)' : '');
       return [];
     }
     const xml = await res.text();
@@ -164,11 +190,15 @@ export async function searchBggByTitle(query: string): Promise<BggSearchResult[]
  * selected - genre (boardgamecategory links only), players
  * (min-max combined into one string), and cover art. */
 export async function fetchBggGameDetails(bggId: number): Promise<BggGameDetails> {
+  if (!BGG_APPLICATION_TOKEN) {
+    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set in lib/config.ts - Tabletop Games lookup is unavailable until it is');
+    return { genres: [], players: '', coverUrl: null };
+  }
   const url = `https://boardgamegeek.com/xmlapi2/thing?id=${bggId}`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const res = await fetch(url, { headers: authHeaders() });
     if (!res.ok) {
-      console.warn('Media Base: BGG thing lookup returned', res.status, url);
+      console.warn('Media Base: BGG thing lookup returned', res.status, url, res.status === 401 || res.status === 403 ? '(check BGG_APPLICATION_TOKEN is valid and approved)' : '');
       return { genres: [], players: '', coverUrl: null };
     }
     const xml = await res.text();

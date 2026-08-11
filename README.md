@@ -89,9 +89,14 @@ own comments for exactly what's needed and where to get it), or their
 title-search auto-fill won't return anything (manual entry always works
 regardless). **Vinyl/CD needs its own separate credential** the same
 way - a free Discogs personal token, also in `lib/config.ts`
-(`DISCOGS_USER_TOKEN`). **Tabletop Games needs none of that** - BGG's
-basic search/thing lookups are free and keyless, no credential required
-at all.
+(`DISCOGS_USER_TOKEN`). **Tabletop Games needs a credential too, and a
+genuinely slower one to get** - originally assumed free and keyless,
+which was wrong; confirmed via BGG's own registration guide that an
+Authorization token (`BGG_APPLICATION_TOKEN`) is required for
+essentially any real use. Unlike TMDb/Discogs' instant self-service
+tokens, this one needs registering an application at
+boardgamegeek.com/applications and waiting for approval - BGG's own
+docs say that can take a week or more.
 
 **All seven implemented categories are fully working** - Books,
 Comics/Manga, Movies, TV Shows, Anime, Vinyl/CD, and Tabletop Games all
@@ -208,7 +213,13 @@ transient "Looking that up..." label during that wait, same UX fix
 Music needed for its own async genre lookup. Deliberately no "Where to
 Watch"/"Where to Listen"-style button here either - same reasoning as
 Vinyl/CD, the whole point of this category is a physical copy already
-owned, not a pointer to somewhere else to access it.
+owned, not a pointer to somewhere else to access it. **Needs a
+`BGG_APPLICATION_TOKEN` credential to actually work** - originally
+assumed free and keyless, which was wrong; see `lib/bggLookup.ts`'s
+file header for the correction, and `lib/config.example.ts` for setup
+(a genuinely slower process than TMDb/Discogs, since it needs approval
+from BGG that can take a week or more, not an instant self-service
+token).
 
 ---
 
@@ -939,15 +950,31 @@ lib/
                                      common title, same trick already
                                      proven for Music's search).
   bggLookup.ts                      Tabletop Games' title-search lookup -
-                                     BoardGameGeek's XML API2. Free and
-                                     keyless for basic search/thing
-                                     lookups (no personal token needed
-                                     the way Discogs required). Two
-                                     genuine differences from every other
-                                     lookup in this app, both confirmed
-                                     via real research before writing
-                                     this: it's a two-step lookup, not a
-                                     single bundled response like
+                                     BoardGameGeek's XML API2. Originally
+                                     assumed free and keyless for basic
+                                     search/thing lookups - that was
+                                     wrong, corrected after a direct
+                                     request to check: BGG's own
+                                     registration guide confirms
+                                     "Registration and authorization is
+                                     required for use of the XML API" for
+                                     essentially any real use case.
+                                     Needs a `BGG_APPLICATION_TOKEN`
+                                     (lib/config.ts), sent as
+                                     `Authorization: Bearer <token>` via
+                                     authHeaders() on every request - a
+                                     genuinely slower credential to get
+                                     than TMDb/Discogs' instant
+                                     self-service tokens, since it needs
+                                     registering an application at
+                                     boardgamegeek.com/applications and
+                                     waiting for approval, which BGG's own
+                                     docs say can take a week or more.
+                                     Two genuine differences from every
+                                     other lookup in this app, both
+                                     confirmed via real research before
+                                     writing this: it's a two-step lookup,
+                                     not a single bundled response like
                                      Discogs - BGG's search endpoint only
                                      returns id/title/year, so
                                      searchBggByTitle() alone isn't

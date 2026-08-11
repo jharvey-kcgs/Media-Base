@@ -39,3 +39,22 @@ export const TMDB_READ_ACCESS_TOKEN = '';
 // explaining why instead of a confusing network failure - manual entry
 // always works regardless.
 export const DISCOGS_USER_TOKEN = '';
+
+// Tabletop Games' title-search lookup needs a BoardGameGeek
+// Authorization token - confirmed via BGG's own docs that this is
+// required for essentially all real use of their XML API.
+//
+// Get one at https://boardgamegeek.com/applications:
+// 1. Register an application (choose "Non-commercial" for a personal
+//    app like this).
+// 2. Wait for approval - BGG's own docs say this can take a week or
+//    more, genuinely slower than TMDb/Discogs' instant self-service
+//    tokens, so register this well before you actually need it working.
+// 3. Once approved, go back to that same page and click "Tokens" on
+//    your application to generate one.
+// Sent as `Authorization: Bearer <token>` on every request - without
+// it, BGG's own docs say the API simply won't work at all, not just
+// rate-limited. Until this is filled in, searching for a tabletop game
+// by title will show a clear error explaining why instead of a
+// confusing network failure - manual entry always works regardless.
+export const BGG_APPLICATION_TOKEN = '';
