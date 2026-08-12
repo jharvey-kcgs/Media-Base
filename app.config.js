@@ -36,6 +36,11 @@ module.exports = {
   expo: {
     name: IS_STORE ? 'Media Base' : 'Media Base (UAT)',
     slug: 'media-base',
+    // Declares which Expo account this project belongs to explicitly,
+    // rather than relying on EAS to resolve that unambiguously on its
+    // own the way it apparently did for Home Base/League Base without
+    // this being set.
+    owner: 'jharvey.expo',
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
@@ -123,7 +128,7 @@ module.exports = {
     ],
     extra: {
       eas: {
-        projectId: '',
+        projectId: 'b39ac76a-1399-4fa2-b0b1-9ecda9de112e',
       },
     },
   },
