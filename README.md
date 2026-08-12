@@ -16,7 +16,7 @@ alongside the in-app About/FAQ screens as more categories get built.*
 7. [Color accessibility](#7-color-accessibility)
 8. [Known setup gotchas](#8-known-setup-gotchas)
 9. [Status](#9-status)
-10. [Roadmap (genuinely open, not yet built)](#10-roadmap-genuinely-open-not-yet-built)
+10. [Roadmap (v1 feature-complete)](#10-roadmap-v1-feature-complete)
 
 Media Base is a personal media collection & tracker — a Home screen made
 of widgets, one per media category the user opts into during Onboarding
@@ -2229,8 +2229,9 @@ code was simply wrong.
   (theme, dark mode, text size) didn't visibly take effect until
   refreshSettings() was added to both. Export/Import rebuilt since as a
   real backup file including cover photos (`expo-sharing` +
-  `expo-document-picker`, see Section 6) - not yet device-tested in that
-  new form specifically.
+  `expo-document-picker`, see Section 6) - confirmed working end-to-end
+  on-device: create backup, delete all data, refresh the app, restore
+  from that backup, all as expected.
 - **Permissions**: camera status + Phone Settings link implemented.
   Real barcode scanning is wired up for Books/Comics/Manga only (EAN-13,
   Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) - see
@@ -2261,14 +2262,25 @@ code was simply wrong.
 
 ---
 
-## 10. Roadmap (genuinely open, not yet built)
+## 10. Roadmap (v1 feature-complete)
 
 See [Media-Base-Roadmap.md](./Media-Base-Roadmap.md) for the full
-category-by-category build order and entry-method decisions. At a
-glance, every category from the original v1 plan is done now - Books,
-Comics/Manga, Movies, TV Shows, Anime, Vinyl/CD, and Tabletop Games -
-except Music and Puzzles, both removed entirely rather than built (see
-the top overview and Section 6 for Music's reasoning). Movies, TV
-Shows, Anime, Vinyl/CD, and Tabletop Games were all built out of the
-original planned sequence per explicit request. Still genuinely open:
-- Share sheet wiring (native OS share, per item)
+category-by-category build order and entry-method decisions. Every
+category from the original v1 plan is done now - Books, Comics/Manga,
+Movies, TV Shows, Anime, Vinyl/CD, and Tabletop Games - except Music and
+Puzzles, both removed entirely rather than built (see the top overview
+and Section 6 for Music's reasoning). Movies, TV Shows, Anime, Vinyl/CD,
+and Tabletop Games were all built out of the original planned sequence
+per explicit request.
+
+Confirmed at this point: all 7 categories working end-to-end (search/
+scan/manual entry, cover photos, genre filtering, ratings, hold-to-
+select, A-Z index), all required third-party attribution accurate and
+complete (TMDb/Discogs/BoardGameGeek), the daily reminder notification
+and its badge both confirmed working, and the real backup file (create/
+restore/delete-all) confirmed working on-device. Share sheet wiring
+(sharing a rating/review via the native OS share sheet) was on this list
+for a long time, dating back to the earliest planning notes - reconsidered
+directly and no longer wanted, removed rather than left as a stale open
+item. Nothing else remains genuinely open from the original v1 plan as
+of this writing.

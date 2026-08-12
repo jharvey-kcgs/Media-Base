@@ -70,7 +70,7 @@ Not part of the core entry flow, layered on top once basic entries exist for eac
 ## Recommendation & rating logic
 - Switch = **No** (not read/watched/listened/played) → that category's widget shows one random not-done item as "try this today," refreshed daily, one per widget (not one global pick).
 - Switch = **Yes** → opens rating (1–5 stars) + text review; item drops off the Home widget once rated.
-- **Share** button opens the native OS share sheet (Mail, Messages, Snapchat, Copy Link, whatever's installed) — no custom per-platform integration needed.
+- ~~Share button opens the native OS share sheet~~ — on this list since the earliest planning notes; reconsidered directly and no longer wanted, removed rather than left as a stale open item.
 
 ## Filters per category screen
 - Movies: Title / Genre / Watched / Rating
