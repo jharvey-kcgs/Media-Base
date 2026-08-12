@@ -464,24 +464,69 @@ export async function importAllData(fileUri: string): Promise<void> {
     throw new Error("That doesn't look like a Media Base backup.");
   }
 
-  const validKeys = new Set(Object.values(KEYS));
-  const entries = Object.entries(parsed.data).filter(([key]) => validKeys.has(key));
-  await AsyncStorage.multiSet(entries as [string, string][]);
-
-  // Version 1 backups (the old pasted-text format) predate cover photos
-  // entirely - parsed.covers is simply undefined for those, which is
-  // fine, not an error; everything else still restores correctly.
+  // Real, confirmed bug: cover photo URIs are absolute paths rooted at
+  // FileSystem.documentDirectory, which is a device/install-specific
+  // root - completely different between, say, Expo Go's own sandbox and
+  // a real compiled app's own separate container, even though
+  // getCoverUri()'s category/id-based subpath is itself deterministic.
+  // Restoring a backup on the SAME install it was exported from happened
+  // to work by pure coincidence (same root both times) - restoring it on
+  // a genuinely different install (confirmed directly: a backup made in
+  // one environment, restored on a real UAT build) left every entry's
+  // own coverImage field pointing at the OLD install's now-nonexistent
+  // path, even though the actual cover files were being correctly
+  // written to the NEW install's own valid path the whole time. Fixed by
+  // restoring cover files first, tracking exactly which category/id
+  // pairs actually succeeded, then rewriting each entry's own
+  // coverImage field to the fresh, current-device path (or null, if no
+  // cover exists for it) before the data itself gets written - never
+  // carrying the old device's stale path through unmodified.
   const covers: Record<string, string> = parsed.covers ?? {};
+  const restoredCoverKeys = new Set<string>();
   for (const [coverKey, base64] of Object.entries(covers)) {
     const [category, id] = coverKey.split('/');
     if (!category || !id) continue;
     await ensureCoverDirExists(category);
-    await FileSystem.writeAsStringAsync(getCoverUri(category, id), base64 as string, {
+    const ok = await FileSystem.writeAsStringAsync(getCoverUri(category, id), base64 as string, {
       encoding: FileSystem.EncodingType.Base64,
-    }).catch((err) => {
-      console.warn('Media Base: failed to restore cover', coverKey, err);
-    });
+    })
+      .then(() => true)
+      .catch((err) => {
+        console.warn('Media Base: failed to restore cover', coverKey, err);
+        return false;
+      });
+    if (ok) restoredCoverKeys.add(coverKey);
   }
+
+  const validKeys = new Set(Object.values(KEYS));
+  const entries: [string, string][] = [];
+  for (const [key, rawValue] of Object.entries(parsed.data)) {
+    if (!validKeys.has(key)) continue;
+    const categoryEntry = COVER_CATEGORY_KEYS.find((c) => c.key === key);
+    if (!categoryEntry) {
+      // Not a category with cover photos at all (e.g. app settings) -
+      // restore as-is, nothing to rewrite.
+      entries.push([key, rawValue as string]);
+      continue;
+    }
+    let items: { id: string; coverImage?: string | null; [k: string]: any }[];
+    try {
+      items = JSON.parse(rawValue as string);
+    } catch {
+      entries.push([key, rawValue as string]);
+      continue;
+    }
+    const rewritten = items.map((item) => {
+      if (!item.coverImage) return item;
+      const coverKey = `${categoryEntry.category}/${item.id}`;
+      return {
+        ...item,
+        coverImage: restoredCoverKeys.has(coverKey) ? getCoverUri(categoryEntry.category, item.id) : null,
+      };
+    });
+    entries.push([key, JSON.stringify(rewritten)]);
+  }
+  await AsyncStorage.multiSet(entries);
 }
 
 /** All-or-nothing wipe, per the confirmed Settings > Data > Delete Data design. */

@@ -2133,6 +2133,33 @@ Neither new dependency needs `app.config.js` plugin configuration - neither
 requires a custom Info.plist permission string, unlike Camera/Photo
 Library/Notifications.
 
+**Real, confirmed bug found via cross-device testing, now fixed**:
+restoring a backup on the exact same app install it was exported from
+always showed cover photos correctly - restoring that same file on a
+genuinely different install (confirmed directly: a backup made in one
+environment, restored on a real UAT build) showed zero cover photos,
+even though every other field restored correctly. Root cause: cover
+photo URIs are absolute paths rooted at `FileSystem.documentDirectory`,
+which is a device/install-specific root - completely different between,
+say, Expo Go's own sandbox and a real compiled app's own separate
+container, even though `getCoverUri()`'s category/id-based subpath
+underneath that root is itself deterministic. `importAllData()` was
+correctly writing each restored cover file to the new install's own
+valid path via `getCoverUri()` - but was restoring each entry's own
+`coverImage` field by copying the raw JSON from the backup unmodified,
+still carrying the *old* install's now-nonexistent path. Same-install
+restores only ever looked correct by coincidence (old and new root
+happened to be the identical string). Fixed by restoring cover files
+first, tracking exactly which ones actually succeeded, then rewriting
+each entry's own `coverImage` field to the fresh, current-install path
+(or `null`, if no cover was actually restored for it - covers a
+version-2 backup where the original export's own file-read failed, so
+no cover data exists for that entry at all) before the data itself gets
+written, rather than ever carrying a stale path through unexamined.
+Verified offline against three cases (successful cross-device restore,
+an entry with no cover at all, and a cover that failed to restore)
+before trusting the fix.
+
 **Permissions**: picking a photo from the library needs its own OS
 permission, separate from Camera (already in this app for barcode
 scanning) - not yet its own visible toggle on the Permissions settings
@@ -2294,9 +2321,14 @@ code was simply wrong.
   (theme, dark mode, text size) didn't visibly take effect until
   refreshSettings() was added to both. Export/Import rebuilt since as a
   real backup file including cover photos (`expo-sharing` +
-  `expo-document-picker`, see Section 6) - confirmed working end-to-end
-  on-device: create backup, delete all data, refresh the app, restore
-  from that backup, all as expected.
+  `expo-document-picker`, see Section 6) - same-install testing (create
+  backup, delete all data, refresh the app, restore from that backup)
+  looked fully correct, but that turned out to be coincidental, not a
+  real confirmation: restoring the same file on a genuinely different
+  install (confirmed directly via a real UAT build) showed zero cover
+  photos. Found and fixed - see Section 6 for the real root cause and
+  fix - and now genuinely confirmed working across installs, not just
+  within one.
 - **Permissions**: camera status + Phone Settings link implemented.
   Real barcode scanning is wired up for Books/Comics/Manga only (EAN-13,
   Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) - see
