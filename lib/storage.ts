@@ -529,6 +529,49 @@ export async function importAllData(fileUri: string): Promise<void> {
   await AsyncStorage.multiSet(entries);
 }
 
+/** One-time repair, not a recovery - clears any entry's coverImage
+ * field if the file it points to genuinely no longer exists on disk.
+ * Confirmed real need for this directly: entries added/restored before
+ * importAllData()'s cross-device fix can carry a coverImage pointing at
+ * a file that's actually gone (lost during an earlier, pre-fix restore
+ * cycle), and no export/import round-trip can bring back a photo file
+ * that isn't there anymore - exportAllData() would just keep silently
+ * failing to read it and leaving it out, same as before. This clears
+ * the stale reference itself, so the entry shows its category's normal
+ * missing-cover placeholder instead of a permanently broken reference,
+ * and so a fresh export afterward doesn't keep tripping over the same
+ * dead paths. Returns how many entries were actually cleared, per
+ * category, so the person triggering this gets a real, specific
+ * result rather than a generic "done." */
+export async function repairBrokenCoverReferences(): Promise<Record<string, number>> {
+  const cleared: Record<string, number> = {};
+  for (const { category, key } of COVER_CATEGORY_KEYS) {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) continue;
+    let items: { id: string; coverImage?: string | null; [k: string]: any }[];
+    try {
+      items = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    let count = 0;
+    const repaired = await Promise.all(
+      items.map(async (item) => {
+        if (!item.coverImage) return item;
+        const info = await FileSystem.getInfoAsync(item.coverImage).catch(() => ({ exists: false }));
+        if (info.exists) return item;
+        count += 1;
+        return { ...item, coverImage: null };
+      }),
+    );
+    if (count > 0) {
+      await AsyncStorage.setItem(key, JSON.stringify(repaired));
+      cleared[category] = count;
+    }
+  }
+  return cleared;
+}
+
 /** All-or-nothing wipe, per the confirmed Settings > Data > Delete Data design. */
 export async function deleteAllData(): Promise<void> {
   await AsyncStorage.multiRemove(Object.values(KEYS));

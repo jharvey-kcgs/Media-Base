@@ -2160,6 +2160,26 @@ Verified offline against three cases (successful cross-device restore,
 an entry with no cover at all, and a cover that failed to restore)
 before trusting the fix.
 
+**One real gap the fix doesn't cover, confirmed directly afterward**:
+entries whose `coverImage` already carried a stale, dead path from
+*before* this fix existed (from earlier pre-fix restore cycles during
+testing) stay broken regardless - no export/import round-trip can bring
+back a photo file that's actually gone from disk, and `exportAllData()`
+just keeps silently failing to read it and leaving it out, same as
+before. Confirmed via a clean, cache-free test (force-quitting the app
+entirely, no restore involved) that this was independent of any backup
+file - the underlying stored data itself already had the broken
+reference. `repairBrokenCoverReferences()` (`lib/storage.ts`) added as
+a one-time cleanup pass, exposed as "Fix Broken Cover Photos" in
+Settings → Data: checks every entry's `coverImage` against
+`FileSystem.getInfoAsync()` and clears the field to `null` if the file
+genuinely doesn't exist, so the entry shows its normal missing-cover
+placeholder instead of a permanently broken reference, and a fresh
+export afterward stops tripping over the same dead paths. Explicitly
+framed as cleanup, not recovery, in its own confirmation text - it
+cannot bring back a photo that's actually gone; re-adding a cover for
+anything affected is still a manual, per-entry step afterward.
+
 **Permissions**: picking a photo from the library needs its own OS
 permission, separate from Camera (already in this app for barcode
 scanning) - not yet its own visible toggle on the Permissions settings

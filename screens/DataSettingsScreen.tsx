@@ -18,7 +18,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
-import { exportAllData, importAllData, deleteAllData } from '../lib/storage';
+import { exportAllData, importAllData, deleteAllData, repairBrokenCoverReferences } from '../lib/storage';
+import { CATEGORY_LABELS } from '../types/models';
 
 export default function DataSettingsScreen({ navigation }: any) {
   const { theme, refreshSettings } = useTheme();
@@ -64,6 +65,42 @@ export default function DataSettingsScreen({ navigation }: any) {
     } catch (err: any) {
       Alert.alert('Import failed', err.message ?? 'Something went wrong.');
     }
+  };
+
+  // Confirmed real need for this directly: entries added/restored before
+  // importAllData()'s cross-device fix can carry a coverImage pointing
+  // at a photo file that's genuinely gone - lost during an earlier,
+  // pre-fix restore cycle, not something this can bring back. This is
+  // cleanup (clearing the stale reference so the entry shows its normal
+  // missing-cover placeholder, and so a fresh export stops tripping over
+  // the same dead paths), explicitly not recovery - the confirmation
+  // text says so plainly rather than implying photos will return.
+  const handleRepair = () => {
+    Alert.alert(
+      'Fix broken cover photos?',
+      "If any entry's cover photo file is missing (this can happen after restoring an older backup on a different device), this clears just that reference so the entry shows its normal empty-cover look instead of staying broken. This does not bring back a missing photo - you'd still need to re-add one by hand for anything you want a cover on again. Nothing else about your data changes.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Check and fix',
+          onPress: async () => {
+            try {
+              const cleared = await repairBrokenCoverReferences();
+              const categories = Object.keys(cleared);
+              if (categories.length === 0) {
+                Alert.alert('All clear', 'No broken cover photo references were found.');
+                return;
+              }
+              const summary = categories.map((c) => `${CATEGORY_LABELS[c as keyof typeof CATEGORY_LABELS] ?? c}: ${cleared[c]}`).join('\n');
+              Alert.alert('Fixed', `Cleared broken cover references:\n\n${summary}`);
+            } catch (err: any) {
+              console.warn('Media Base: repair failed', err);
+              Alert.alert('Something went wrong', err.message ?? 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleDelete = () => {
@@ -126,6 +163,17 @@ export default function DataSettingsScreen({ navigation }: any) {
         </TouchableOpacity>
         <AppText style={[styles.hint, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }]}>
           Restores a Media Base backup file - overwrites anything currently in the app with what's in that file.
+        </AppText>
+
+        <TouchableOpacity
+          onPress={handleRepair}
+          style={[styles.button, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface, marginTop: 24 }]}
+        >
+          <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Fix Broken Cover Photos</AppText>
+        </TouchableOpacity>
+        <AppText style={[styles.hint, { color: theme.colors.textMuted, fontSize: 12 * theme.fontScale }]}>
+          Checks every entry for a cover photo file that's gone missing and clears just that reference. Doesn't
+          bring back a missing photo - you'd still add one by hand for anything you want a cover on again.
         </AppText>
 
         <TouchableOpacity
