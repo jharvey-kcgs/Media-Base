@@ -41,6 +41,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -429,6 +431,13 @@ export default function TabletopScreen({ navigation }: any) {
     ]);
   };
 
+  const handleOpenBgg = () => {
+    Linking.openURL('https://boardgamegeek.com').catch((err) => {
+      console.warn('Media Base: failed to open BoardGameGeek URL', err);
+      Alert.alert("Couldn't open that", 'Something went wrong opening BoardGameGeek - please try again.');
+    });
+  };
+
   const handleSave = async () => {
     const genres = draft.genresText
       .split(',')
@@ -621,6 +630,17 @@ export default function TabletopScreen({ navigation }: any) {
         )}
       </View>
 
+      {/* BGG's own terms require crediting them "in all uses of the BGG
+          XML API" and displaying this logo "in public-facing uses" -
+          read as a screen-level requirement (this whole category uses
+          their API), not gated to whichever specific entries happened
+          to come from a BGG search the way the Discogs link on
+          Vinyl/CD's Edit screen is. Always shown here, regardless of
+          how any individual entry was added. */}
+      <TouchableOpacity onPress={handleOpenBgg} style={styles.bggFooter} accessibilityLabel="Powered by BGG - opens BoardGameGeek">
+        <Image source={require('../assets/powered-by-bgg.png')} style={styles.bggLogo} resizeMode="contain" />
+      </TouchableOpacity>
+
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
           <ScreenHeader
@@ -797,4 +817,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   starRow: { flexDirection: 'row', gap: 8 },
   deleteButton: { borderWidth: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginTop: 28 },
+  bggFooter: { alignItems: 'center', paddingVertical: 10 },
+  // Matches the source image's real 368x108 aspect ratio (≈3.41:1),
+  // scaled down while staying legible per BGG's own sizing guidance.
+  bggLogo: { width: 140, height: 41 },
 });

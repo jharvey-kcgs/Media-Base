@@ -523,6 +523,24 @@ screens/
                                      Deliberately no "Where to Watch"/
                                      "Where to Listen"-style button
                                      either, same reasoning as Vinyl/CD.
+                                     Shows a "Powered by BGG" logo
+                                     (assets/powered-by-bgg.png) as an
+                                     always-visible footer on the main
+                                     list screen - required by BGG's own
+                                     API Terms of Use ("in all uses of
+                                     the BGG XML API... in public-facing
+                                     uses"), read as a screen-level
+                                     requirement rather than gated to
+                                     specific entries the way the
+                                     Discogs attribution link on
+                                     VinylScreen.tsx's Edit screen is -
+                                     BGG's wording is broader ("as the
+                                     source of the data" for the whole
+                                     API use), not tied to individual
+                                     data points the way Discogs'
+                                     "directly next to any data" wording
+                                     is. A judgment call on genuinely
+                                     ambiguous wording, not a certainty.
   [category]Screen.tsx             Historical note, kept for reference:
                                     this placeholder described every
                                     category still left to build at an

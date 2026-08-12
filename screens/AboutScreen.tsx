@@ -1,7 +1,7 @@
 // screens/AboutScreen.tsx
 
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { View, ScrollView, StyleSheet, Image, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
@@ -13,13 +13,17 @@ import { useTheme } from '../lib/theme';
 // per-category or per-permission rather than one continuous idea.
 // Confirmed directly: several cards had grown into dense paragraphs
 // that were hard to scan on a phone screen, especially where the same
-// paragraph covered several different categories at once.
+// paragraph covered several different categories at once. `image`
+// (currently only used by BGG's required "Powered by BGG" logo, see
+// Credits below) renders as its own tappable row, real dimensions
+// matching that specific asset's own aspect ratio.
 const SECTIONS: {
   title: string;
   body?: string;
   intro?: string;
   bullets?: { label: string; text: string }[];
   outro?: string;
+  image?: { source: any; width: number; height: number; url: string; accessibilityLabel: string };
 }[] = [
   {
     title: 'Profile',
@@ -87,6 +91,13 @@ const SECTIONS: {
       { label: 'Discogs', text: "this application uses Discogs' API but is not affiliated with, sponsored or endorsed by Discogs. 'Discogs' is a trademark of Zink Media, LLC." },
       { label: 'BoardGameGeek', text: 'board and card game data provided by BoardGameGeek.' },
     ],
+    image: {
+      source: require('../assets/powered-by-bgg.png'),
+      width: 140,
+      height: 41,
+      url: 'https://boardgamegeek.com',
+      accessibilityLabel: 'Powered by BGG - opens BoardGameGeek',
+    },
   },
 ];
 
@@ -134,6 +145,24 @@ export default function AboutScreen({ navigation }: any) {
               <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 21, marginTop: 10 }}>
                 {section.outro}
               </AppText>
+            )}
+            {section.image && (
+              <TouchableOpacity
+                onPress={() => {
+                  Linking.openURL(section.image!.url).catch((err) => {
+                    console.warn('Media Base: failed to open URL', err);
+                    Alert.alert("Couldn't open that", 'Something went wrong opening the link - please try again.');
+                  });
+                }}
+                accessibilityLabel={section.image.accessibilityLabel}
+                style={{ marginTop: 10 }}
+              >
+                <Image
+                  source={section.image.source}
+                  style={{ width: section.image.width, height: section.image.height }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
             )}
           </View>
         ))}
