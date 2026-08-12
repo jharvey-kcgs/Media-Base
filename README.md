@@ -233,7 +233,16 @@ assumed free and keyless, which was wrong; see `lib/bggLookup.ts`'s
 file header for the correction, and `lib/config.example.ts` for setup
 (a genuinely slower process than TMDb/Discogs, since it needs approval
 from BGG that can take a week or more, not an instant self-service
-token).
+token). **Two real bugs found once real testing actually started**,
+both fixed: `decodeXmlEntities()` didn't handle numeric character
+references, which BGG's own data actually uses for an apostrophe -
+"Children&#039;s Game" was showing up literally undecoded in the Edit
+form. And a short, common title like "Uno" or "Clue" returned hundreds
+of loosely-related results instead of the well-known game itself, since
+BGG's search matches a term anywhere in a title/description/alternate
+name with no exact-match ranking - `searchBggByTitle()` now tries BGG's
+own documented `exact` parameter first, falling back to the broad
+search only when that finds nothing.
 
 ---
 

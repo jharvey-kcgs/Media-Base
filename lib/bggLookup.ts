@@ -51,8 +51,17 @@
 // the exact, verified shape above rather than general-purpose XML
 // parsing, to keep that risk contained.
 //
-// NOTE: not network-tested from the sandbox this was written in - and
-// now genuinely can't be until a real BGG_APPLICATION_TOKEN exists.
+// UPDATE: now confirmed network-tested against BGG's live API, once a
+// real BGG_APPLICATION_TOKEN was approved and added. That testing found
+// two real bugs, both fixed: decodeXmlEntities() didn't handle numeric
+// character references (BGG's own data uses one for an apostrophe -
+// "Children&#039;s Game" was showing up literally, undecoded, in the
+// Edit form), and a short, common title like "Uno" or "Clue" returned
+// hundreds of loosely-related results rather than the well-known game
+// itself, since BGG's plain query search matches a term anywhere in a
+// title/description/alternate name with no exact-match ranking -
+// searchBggByTitle() now tries BGG's own documented `exact` parameter
+// first, falling back to the broad search only when that finds nothing.
 
 import { BGG_APPLICATION_TOKEN } from './config';
 
@@ -121,13 +130,21 @@ function extractTagText(xml: string, tagName: string): string | null {
 // name (an ampersand in "Sports & ...", a stray quote in a game's own
 // title) - decoded so stored text reads naturally rather than showing
 // literal &amp;/&quot; to the person using the app.
+// Confirmed real bug via testing: this only handled named entities
+// (&amp;, &apos;, etc.) - BGG's actual data uses NUMERIC character
+// references for at least an apostrophe ("Children&#039;s Game" -
+// decimal code 39, not the named &apos;), which passed through
+// undecoded before this fix. Handles both decimal (&#39;) and hex
+// (&#x27;) forms, since XML permits either.
 function decodeXmlEntities(text: string): string {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_match, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match, code) => String.fromCharCode(parseInt(code, 16)));
 }
 
 /** Splits BGG's <items>...<item type="..." id="...">...</item>...
@@ -150,6 +167,43 @@ function splitItems(xml: string): { id: number; chunk: string }[] {
 /** Title search - BGG's search endpoint, id/title/year only. Selecting
  * a result needs a follow-up fetchBggGameDetails() call for genre/
  * cover/players - see the file header for why. */
+// Confirmed real bug via testing: searching a short, common title like
+// "Uno" or "Clue" returned hundreds of loosely-related results (BGG's
+// own logs showed 211 for one such search) rather than the well-known
+// game itself - BGG's plain query search matches the term anywhere in a
+// title, description, or alternate name, with no ranking that favors an
+// exact title match. BGG's own search endpoint supports a real, documented
+// `exact` parameter for exactly this case (confirmed via several
+// independent third-party API clients, not guessed) - this tries that
+// first, and only falls back to the broad, unrestricted search if the
+// exact match finds nothing, same "try precise first, fall back
+// broader" shape already proven for Music's "Artist - Title" parsing
+// and Anime's TMDb-then-Jikan fallback.
+async function fetchBggSearchResults(query: string, exact: boolean): Promise<BggSearchResult[]> {
+  const url = `https://boardgamegeek.com/xmlapi2/search?query=${encodeURIComponent(query)}&type=boardgame${exact ? '&exact=1' : ''}`;
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) {
+    console.warn('Media Base: BGG search returned', res.status, url, res.status === 401 || res.status === 403 ? '(check BGG_APPLICATION_TOKEN is valid and approved)' : '');
+    return [];
+  }
+  const xml = await res.text();
+  const items = splitItems(xml);
+  const results: BggSearchResult[] = [];
+  for (const { id, chunk } of items) {
+    const nameValues = extractValueAttrs(chunk, 'name');
+    if (nameValues.length === 0) continue;
+    const yearValues = extractValueAttrs(chunk, 'yearpublished');
+    results.push({
+      key: String(id),
+      bggId: id,
+      title: decodeXmlEntities(nameValues[0]),
+      releaseYear: yearValues[0] || undefined,
+    });
+  }
+  console.warn('Media Base: BGG search', `"${query}"`, exact ? '(exact)' : '(broad)', '->', items.length, 'raw,', results.length, 'usable');
+  return results;
+}
+
 export async function searchBggByTitle(query: string): Promise<BggSearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
@@ -157,29 +211,11 @@ export async function searchBggByTitle(query: string): Promise<BggSearchResult[]
     console.warn('Media Base: BGG_APPLICATION_TOKEN is not set in lib/config.ts - Tabletop Games lookup is unavailable until it is (registration + approval required, see the file header)');
     return [];
   }
-  const url = `https://boardgamegeek.com/xmlapi2/search?query=${encodeURIComponent(trimmed)}&type=boardgame`;
   try {
-    const res = await fetch(url, { headers: authHeaders() });
-    if (!res.ok) {
-      console.warn('Media Base: BGG search returned', res.status, url, res.status === 401 || res.status === 403 ? '(check BGG_APPLICATION_TOKEN is valid and approved)' : '');
-      return [];
-    }
-    const xml = await res.text();
-    const items = splitItems(xml);
-    const results: BggSearchResult[] = [];
-    for (const { id, chunk } of items) {
-      const nameValues = extractValueAttrs(chunk, 'name');
-      if (nameValues.length === 0) continue;
-      const yearValues = extractValueAttrs(chunk, 'yearpublished');
-      results.push({
-        key: String(id),
-        bggId: id,
-        title: decodeXmlEntities(nameValues[0]),
-        releaseYear: yearValues[0] || undefined,
-      });
-    }
-    console.warn('Media Base: BGG search', `"${trimmed}"`, '->', items.length, 'raw,', results.length, 'usable');
-    return results.slice(0, 8);
+    const exactResults = await fetchBggSearchResults(trimmed, true);
+    if (exactResults.length > 0) return exactResults.slice(0, 8);
+    const broadResults = await fetchBggSearchResults(trimmed, false);
+    return broadResults.slice(0, 8);
   } catch (err) {
     console.warn('Media Base: BGG search threw', err);
     return [];
