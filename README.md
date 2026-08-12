@@ -2068,7 +2068,7 @@ instead of pasting text). `BackupPayload` bumped to `version: 2` with
 the new `covers` field; `importAllData()` checks for that field rather
 than assuming it, so an old version-1 (pasted-text, no photos) backup
 still restores everything it actually has rather than failing outright.
-Neither new dependency needs `app.json` plugin configuration - neither
+Neither new dependency needs `app.config.js` plugin configuration - neither
 requires a custom Info.plist permission string, unlike Camera/Photo
 Library/Notifications.
 
@@ -2212,8 +2212,12 @@ code was simply wrong.
 
 ## 9. Status
 
-- **Bundle identifier**: set (`com.JHarvey.MediaBase`, both iOS and
-  Android, in `app.json`).
+- **Bundle identifier**: set (`com.JHarvey.MediaBase` for UAT/TestFlight
+  builds, `com.JHarvey.MediaBaseStore` for real App Store submissions,
+  both iOS and Android, in `app.config.js` - replaced the earlier static
+  `app.json`, same UAT/Store variant pattern already used by Home Base/
+  League Base, switched by the `APP_VARIANT` env var `eas.json`'s
+  "store" build profile sets).
 - **App icon**: added (`assets/icon.png`, 1024x1024) - also used as the
   Android adaptive icon foreground and the splash screen image, both on a
   black background matching the logo's own background.
