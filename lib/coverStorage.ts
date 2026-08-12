@@ -159,7 +159,7 @@ function extensionFromUrl(url: string): string {
 // individual files on their end. Not guaranteed to fix it - a 500 can
 // still just be a real, transient server-side issue - but a real,
 // low-cost thing to try given the pattern.
-const DOWNLOAD_USER_AGENT = 'MediaBase/1.0 ( https://github.com/JHarvey/Media-Base )';
+const DOWNLOAD_USER_AGENT = 'MediaBase/1.0 ( https://github.com/jharvey-kcgs/Media-Base )';
 
 // Confirmed via further real testing that the User-Agent header above
 // wasn't enough on its own - a 500 still happened on this exact

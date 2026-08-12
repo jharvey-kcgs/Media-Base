@@ -4,7 +4,11 @@ node_modules
 *.log
 npm-debug.*
 
-# Holds the real TMDB_API_KEY - this repo is public, so the real key
-# stays local-only. See lib/config.example.ts for the tracked template/
-# setup instructions.
-lib/config.ts
+# Holds the real token values as environment variables - this repo is
+# public, so the real values stay local-only here. lib/config.ts itself
+# is committed and contains no secrets now (it just reads these same
+# variable names via process.env) - see .env.example for the tracked
+# template/setup instructions, and lib/config.ts's own file header for
+# why this changed from a git-ignored lib/config.ts to this.
+.env
+.env.local

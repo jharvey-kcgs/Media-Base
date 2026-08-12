@@ -59,7 +59,7 @@ export interface TVShowLookupResult {
 export async function tmdbSearchTVShows(query: string, maxResults: number): Promise<TVShowLookupResult[]> {
   if (!TMDB_READ_ACCESS_TOKEN) {
     console.warn(
-      'Media Base: TMDB_READ_ACCESS_TOKEN is not set in lib/config.ts - get a free one from themoviedb.org to enable TV Shows auto-fill.',
+      'Media Base: TMDB_READ_ACCESS_TOKEN is not set - get a free one from themoviedb.org, then add it as EXPO_PUBLIC_TMDB_READ_ACCESS_TOKEN in .env (local) and as an EAS environment variable (cloud builds) to enable TV Shows auto-fill.',
     );
     return [];
   }

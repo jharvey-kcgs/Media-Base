@@ -84,15 +84,16 @@ response shape - see the
 Category screen pattern section for what to reuse vs. rebuild per
 category.
 **Movies, TV Shows, and Anime need a one-time setup step Books/Comics
-never did**: a free TMDb credential in `lib/config.ts` (see that file's
-own comments for exactly what's needed and where to get it), or their
+never did**: a free TMDb credential, added to `.env` (see
+`.env.example` for exactly what's needed and where to get it; read at
+runtime by `lib/config.ts`, which holds no secrets itself), or their
 title-search auto-fill won't return anything (manual entry always works
 regardless). **Vinyl/CD needs its own separate credential** the same
-way - a free Discogs personal token, also in `lib/config.ts`
-(`DISCOGS_USER_TOKEN`). **Tabletop Games needs a credential too, and a
+way - a free Discogs personal token, also in `.env`
+(`EXPO_PUBLIC_DISCOGS_USER_TOKEN`). **Tabletop Games needs a credential too, and a
 genuinely slower one to get** - originally assumed free and keyless,
 which was wrong; confirmed via BGG's own registration guide that an
-Authorization token (`BGG_APPLICATION_TOKEN`) is required for
+Authorization token (`EXPO_PUBLIC_BGG_APPLICATION_TOKEN`) is required for
 essentially any real use. Unlike TMDb/Discogs' instant self-service
 tokens, this one needs registering an application at
 boardgamegeek.com/applications and waiting for approval - BGG's own
@@ -230,7 +231,7 @@ Vinyl/CD, the whole point of this category is a physical copy already
 owned, not a pointer to somewhere else to access it. **Needs a
 `BGG_APPLICATION_TOKEN` credential to actually work** - originally
 assumed free and keyless, which was wrong; see `lib/bggLookup.ts`'s
-file header for the correction, and `lib/config.example.ts` for setup
+file header for the correction, and `.env.example` for setup
 (a genuinely slower process than TMDb/Discogs, since it needs approval
 from BGG that can take a week or more, not an instant self-service
 token). **Two real bugs found once real testing actually started**,
@@ -255,8 +256,12 @@ search only when that finds nothing.
 - [VS Code](https://code.visualstudio.com) (or any editor)
 - The **Expo Go** app on an iPhone, from the App Store — lets you preview
   the app live during development with no build step.
-- An **Apple Developer account** ($99/year) once past local testing and
-  moving toward TestFlight — not started yet for this app.
+- An **Apple Developer account** ($99/year) for TestFlight and App Store
+  builds - set up and in progress: bundle identifiers registered
+  (`com.JHarvey.MediaBase` for UAT/TestFlight, `com.JHarvey.MediaBaseStore`
+  for the real App Store, see `app.config.js`), EAS project configured
+  with a real `owner`/`projectId`, and `PRIVACY.md` added (required for
+  both TestFlight external testing and App Store submission).
 
 Confirm your Node version with:
 
@@ -787,16 +792,58 @@ lib/
                                      resort) - fed straight into
                                      coverStorage.ts's downloadRemoteCover(),
                                      no extra lookup call needed.
-  config.ts                         Git-ignored (this repo is public) -
-                                     holds the real TMDB_READ_ACCESS_TOKEN.
+  config.ts                         Committed - contains no secrets at
+                                     all now. Real bug, found via an
+                                     actual EAS cloud build failure
+                                     ("Unable to resolve module ./config
+                                     from .../lib/tvLookup.ts"): this used
+                                     to be git-ignored, holding the real
+                                     token values directly - worked fine
+                                     locally, but EAS Build clones the
+                                     repo from GitHub to build on its own
+                                     remote servers, and a git-ignored
+                                     file that was never committed simply
+                                     doesn't exist there. Rewritten to
+                                     read three tokens
+                                     (TMDB_READ_ACCESS_TOKEN,
+                                     DISCOGS_USER_TOKEN,
+                                     BGG_APPLICATION_TOKEN) from
+                                     environment variables instead
+                                     (`process.env.EXPO_PUBLIC_*`), each
+                                     falling back to an empty string -
+                                     the real values now live in two
+                                     places outside git history: a local
+                                     `.env` file (git-ignored, read by
+                                     Metro during `npx expo start`) and
+                                     EAS environment variables
+                                     (`eas env:create`, or the expo.dev
+                                     dashboard, read during cloud
+                                     builds). Confirmed via Expo's own
+                                     documentation before writing this:
+                                     `EXPO_PUBLIC_`-prefixed variables
+                                     are inlined into the client bundle
+                                     from whichever source is active,
+                                     and the actual token value ends up
+                                     in the compiled app either way, same
+                                     as the previous approach - the goal
+                                     here was never hiding this from
+                                     someone who decompiles the compiled
+                                     app (not achievable for a client app
+                                     calling these APIs directly,
+                                     confirmed via Expo's own docs:
+                                     "Secrets do not provide any
+                                     additional security for values that
+                                     you end up embedding in your
+                                     application itself"), it was
+                                     keeping it out of the public repo's
+                                     own source code history, which this
+                                     still achieves the same way the
+                                     git-ignored file did before.
                                      Movies' and TV Shows' title-search
-                                     auto-fill both need this free
-                                     credential from themoviedb.org, since
-                                     unlike Open Library/Google Books
-                                     there's no keyless source for real
-                                     movie/TV metadata. Specifically the
-                                     "API Read Access Token" (v4 auth, a
-                                     long JWT-style string, used via a
+                                     auto-fill both need the TMDb token -
+                                     specifically the "API Read Access
+                                     Token" (v4 auth, a long JWT-style
+                                     string, used via a
                                      `Authorization: Bearer` header) -
                                      not the shorter "API Key" (v3 auth,
                                      used via `?api_key=`) shown on the
@@ -811,15 +858,23 @@ lib/
                                      Access Token validates successfully
                                      before the API Key does, during the
                                      same account-side propagation
-                                     window. movieLookup.ts/tvLookup.ts
-                                     both log a clear
-                                     console warning (not a silent
-                                     failure) if a lookup is attempted
-                                     before this is filled in.
-  config.example.ts                 The tracked template - what actually
-                                     stays in the public repo. Copy this
-                                     to config.ts and paste your own
-                                     token in for a fresh clone.
+                                     window. movieLookup.ts/tvLookup.ts/
+                                     discogsLookup.ts/bggLookup.ts all
+                                     log a clear console warning (not a
+                                     silent failure) if a lookup is
+                                     attempted before the relevant
+                                     variable is set.
+  .env.example                      The tracked template - what actually
+                                     stays in the public repo, alongside
+                                     config.ts itself now. Copy this to
+                                     `.env` and paste your own token
+                                     values in for a fresh clone - `.env`
+                                     itself is git-ignored, same reason
+                                     config.ts used to be. Also needs
+                                     setting the same three values as EAS
+                                     environment variables for a cloud
+                                     build to have them - `.env` alone
+                                     only covers local development.
   movieLookup.ts                    Movies' TMDb integration - renamed
                                      from upcLookup.ts after Movies
                                      dropped barcode/UPC scanning
@@ -931,8 +986,11 @@ lib/
   discogsLookup.ts                  Vinyl/CD's barcode and title-search
                                      lookup - Discogs' database API.
                                      Needs a personal user-token
-                                     (lib/config.ts's
-                                     DISCOGS_USER_TOKEN, not the
+                                     (DISCOGS_USER_TOKEN, exported by
+                                     lib/config.ts but set via `.env`/
+                                     an EAS environment variable - see
+                                     that file's own header for why),
+                                     not the
                                      app-level Consumer Key/Secret Discogs
                                      also issues - that's for a full
                                      OAuth 1.0a login flow other users
@@ -1001,7 +1059,9 @@ lib/
                                      required for use of the XML API" for
                                      essentially any real use case.
                                      Needs a `BGG_APPLICATION_TOKEN`
-                                     (lib/config.ts), sent as
+                                     (exported by lib/config.ts but set
+                                     via `.env`/an EAS environment
+                                     variable), sent as
                                      `Authorization: Bearer <token>` via
                                      authHeaders() on every request - a
                                      genuinely slower credential to get
@@ -1440,7 +1500,8 @@ done, showing genuinely different degrees of reuse:
 - **Movies and TV Shows** share `lib/useAlphabetScroll.ts` but don't
   share `lib/isbnLookup.ts` at all - both are TMDb-backed
   (`lib/movieLookup.ts`, `lib/tvLookup.ts`) rather than ISBN-catalogued,
-  and TMDb needs a free Read Access Token (`lib/config.ts`) that the
+  and TMDb needs a free Read Access Token (set via `.env`/an EAS
+  environment variable, exported by `lib/config.ts`) that the
   ISBN path never did. Neither has an author/director field (not part of
   the requested spec for either), and both genre filters show TMDb's own
   full fixed genre list directly rather than only genres currently in

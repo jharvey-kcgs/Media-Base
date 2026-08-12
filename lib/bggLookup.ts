@@ -7,7 +7,9 @@
 // registration guide (https://boardgamegeek.com/using_the_xml_api) after
 // a direct request: "Registration and authorization is required for use
 // of the XML API" for essentially any real use case, not an edge case.
-// Needs a BGG_APPLICATION_TOKEN (lib/config.ts) sent as
+// Needs a BGG_APPLICATION_TOKEN (see lib/config.ts's own file header
+// for how this now gets set - a .env file locally, an EAS environment
+// variable for cloud builds) sent as
 // `Authorization: Bearer <token>` on every request - without it, BGG's
 // own docs say the API simply won't work at all, not just rate-limited.
 // Getting a token is a genuinely slower process than TMDb/Discogs ever
@@ -65,7 +67,7 @@
 
 import { BGG_APPLICATION_TOKEN } from './config';
 
-const USER_AGENT = 'MediaBase/1.0 +https://github.com/JHarvey/Media-Base';
+const USER_AGENT = 'MediaBase/1.0 +https://github.com/jharvey-kcgs/Media-Base';
 
 function authHeaders(): Record<string, string> {
   return {
@@ -208,7 +210,7 @@ export async function searchBggByTitle(query: string): Promise<BggSearchResult[]
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
   if (!BGG_APPLICATION_TOKEN) {
-    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set in lib/config.ts - Tabletop Games lookup is unavailable until it is (registration + approval required, see the file header)');
+    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set - add it as EXPO_PUBLIC_BGG_APPLICATION_TOKEN in .env (local) and as an EAS environment variable (cloud builds) - Tabletop Games lookup is unavailable until it is (registration + approval required, see the file header)');
     return [];
   }
   try {
@@ -227,7 +229,7 @@ export async function searchBggByTitle(query: string): Promise<BggSearchResult[]
  * (min-max combined into one string), and cover art. */
 export async function fetchBggGameDetails(bggId: number): Promise<BggGameDetails> {
   if (!BGG_APPLICATION_TOKEN) {
-    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set in lib/config.ts - Tabletop Games lookup is unavailable until it is');
+    console.warn('Media Base: BGG_APPLICATION_TOKEN is not set - add it as EXPO_PUBLIC_BGG_APPLICATION_TOKEN in .env (local) and as an EAS environment variable (cloud builds) - Tabletop Games lookup is unavailable until it is');
     return { genres: [], players: '', coverUrl: null };
   }
   const url = `https://boardgamegeek.com/xmlapi2/thing?id=${bggId}`;

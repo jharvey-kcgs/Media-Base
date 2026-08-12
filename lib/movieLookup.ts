@@ -72,7 +72,7 @@ export function looksLikeIsbn(digits: string): boolean {
 export async function tmdbSearchMovies(query: string, maxResults: number): Promise<MovieLookupResult[]> {
   if (!TMDB_READ_ACCESS_TOKEN) {
     console.warn(
-      'Media Base: TMDB_READ_ACCESS_TOKEN is not set in lib/config.ts - get a free one from themoviedb.org to enable Movies auto-fill.',
+      'Media Base: TMDB_READ_ACCESS_TOKEN is not set - get a free one from themoviedb.org, then add it as EXPO_PUBLIC_TMDB_READ_ACCESS_TOKEN in .env (local) and as an EAS environment variable (cloud builds) to enable Movies auto-fill.',
     );
     return [];
   }

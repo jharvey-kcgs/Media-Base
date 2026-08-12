@@ -1,7 +1,9 @@
 // lib/discogsLookup.ts
 //
 // Vinyl/CD's barcode and title-search lookup - Discogs' database API.
-// Needs a personal user-token (lib/config.ts's DISCOGS_USER_TOKEN) -
+// Needs a personal user-token (DISCOGS_USER_TOKEN, see lib/config.ts's
+// own file header for how this now gets set - a .env file locally, an
+// EAS environment variable for cloud builds) -
 // unlike Books/Comics' ISBN lookup, there's no keyless source for real
 // vinyl/CD release metadata. Rate limit is 60 requests/minute
 // authenticated - real, but far more workable day-to-day than
@@ -32,7 +34,7 @@
 
 import { DISCOGS_USER_TOKEN } from './config';
 
-const USER_AGENT = 'MediaBase/1.0 +https://github.com/JHarvey/Media-Base';
+const USER_AGENT = 'MediaBase/1.0 +https://github.com/jharvey-kcgs/Media-Base';
 
 export interface DiscogsSearchResult {
   key: string; // Discogs release id, as a string - stable, unique
@@ -123,7 +125,7 @@ function mapResult(r: any): DiscogsSearchResult | null {
 
 async function discogsSearch(params: Record<string, string>): Promise<DiscogsSearchResult[]> {
   if (!DISCOGS_USER_TOKEN) {
-    console.warn('Media Base: DISCOGS_USER_TOKEN is not set in lib/config.ts - Vinyl/CD lookup is unavailable until it is');
+    console.warn('Media Base: DISCOGS_USER_TOKEN is not set - add it as EXPO_PUBLIC_DISCOGS_USER_TOKEN in .env (local) and as an EAS environment variable (cloud builds) - Vinyl/CD lookup is unavailable until it is');
     return [];
   }
   const query = new URLSearchParams({ ...params, type: 'release', per_page: '8', token: DISCOGS_USER_TOKEN });
