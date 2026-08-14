@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import CoverThumbnail from '../components/CoverThumbnail';
 import { useTheme } from '../lib/theme';
-import { getBooks, getComics, getMovies, getTVShows, getAnime, getVinylCDs, getTabletopGames, getDailyPick, saveDailyPick, toLocalDateString } from '../lib/storage';
+import { getBooks, getComics, getMovies, getTVShows, getAnime, getVinylCDs, getTabletopGames, getOrAssignDailyPick, toLocalDateString } from '../lib/storage';
 import { CATEGORY_LABELS, MediaCategory } from '../types/models';
 
 // Categories with a working screen so far. Everything else selected during
@@ -61,19 +61,15 @@ function capitalize(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-function pickRandomUnread<T extends TrackedItem>(items: T[], isDone: (item: T) => boolean): T | null {
-  const unread = items.filter((i) => !isDone(i));
-  if (unread.length === 0) return null;
-  return unread[Math.floor(Math.random() * unread.length)];
-}
-
 // One implemented category's full widget data: count, plus today's "try
-// this" suggestion, which stays fixed for the whole calendar day (even
-// across manual refreshes/app reopens) unless the day changes or the
-// previous pick got marked done/deleted since it was chosen. Generic over
-// any category whose items look like { id, title, coverImage } - isDone is
-// passed in separately since the "done" field's actual name differs per
-// category (Books/Comics: read, Movies: watched).
+// this" suggestion. Assignment/stability is fully handled by
+// lib/storage.ts's getOrAssignDailyPick() now, not here - see that
+// function's own comment for why the logic used to live split across
+// this file and lib/storage.ts, and why that split was itself the bug.
+// Generic over any category whose items look like { id, title,
+// coverImage } - isDone is passed in separately since the "done"
+// field's actual name differs per category (Books/Comics: read,
+// Movies: watched).
 async function loadWidgetData<T extends TrackedItem>(
   category: string,
   items: T[],
@@ -82,16 +78,7 @@ async function loadWidgetData<T extends TrackedItem>(
   unitPlural: string,
   today: string,
 ): Promise<WidgetData> {
-  const stored = await getDailyPick(category);
-  let pick: T | null = null;
-  if (stored && stored.date === today) {
-    const stillValid = items.find((i) => i.id === stored.itemId && !isDone(i));
-    if (stillValid) pick = stillValid;
-  }
-  if (!pick) {
-    pick = pickRandomUnread(items, isDone);
-    if (pick) await saveDailyPick(category, pick.id);
-  }
+  const pick = await getOrAssignDailyPick(category, items, isDone, today);
   return {
     count: items.length,
     suggestion: pick?.title ?? null,

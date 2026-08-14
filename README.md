@@ -1863,14 +1863,40 @@ Android.
 
 The "Try today" suggestion on each widget is meant to stay fixed for the
 whole calendar day, not re-roll on every refresh/app reopen - handled by
-`getDailyPick`/`saveDailyPick` in `lib/storage.ts` (generic, keyed by
+`getOrAssignDailyPick()` in `lib/storage.ts` (generic, keyed by
 category, so future categories can reuse it rather than each rolling
 their own version) plus `toLocalDateString()`, which is a plain local
 Y-M-D string rather than `toISOString()` - the same UTC-rollover bug
-documented in Home Base's README applies here too. `HomeScreen.tsx`'s
-`load()` reuses today's stored pick if it's still valid (same date,
-book still exists and still unread), and only rolls a new one if the day
-has changed or the previous pick got marked read/deleted since.
+documented in Home Base's README applies here too. Reuses today's
+stored pick if it's still valid (same date, item still exists and still
+unread/unwatched/etc.), and only rolls a new one if the day has changed
+or the previous pick got marked done/deleted since.
+
+**Real bug found and fixed, reported directly**: repeatedly tapping
+Home's refresh button (e.g. after not opening the app for a few days)
+could cycle through several different daily picks in one sitting,
+instead of staying fixed. Root cause was a race condition, not a flaw
+in the "stays fixed for today" check itself - the read-decide-write
+sequence used to be split across three independently-awaited steps
+(`getDailyPick()`, a conditional check, `saveDailyPick()`), formerly
+living partly in `HomeScreen.tsx` and partly in `lib/storage.ts`. If
+refresh fired again before an in-flight assignment had settled, two
+overlapping checks could both see "no valid pick yet" and each pick
+their own random item, with whichever write landed last silently
+winning - worse, since every category's pick lives together in one
+shared `AsyncStorage` blob (`KEYS.dailyPicks`), an overlapping write for
+a *different* category could also silently clobber this category's pick
+entirely, not just cause visible flicker. Fixed the same way
+`lib/notifications.ts`'s cancel+schedule race was fixed: a
+`serializeDailyPick()` lock, so the whole read-decide-write sequence for
+a category now runs as one atomic unit inside `lib/storage.ts` -
+`getOrAssignDailyPick()` is the only way to touch a daily pick now, and
+it's structurally atomic, not just convention; `HomeScreen.tsx` no
+longer has any way to split the sequence apart and reintroduce the race.
+Verified via a real simulated concurrency test (8 overlapping calls,
+same category, same day, no awaiting between them - the exact scenario
+that broke before) before trusting the fix: all 8 returned the identical
+pick.
 
 ### Where to make common changes
 

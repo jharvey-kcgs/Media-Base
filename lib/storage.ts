@@ -362,15 +362,77 @@ async function getDailyPicks(): Promise<Record<string, DailyPick>> {
   }
 }
 
-export async function getDailyPick(category: string): Promise<DailyPick | null> {
-  const picks = await getDailyPicks();
-  return picks[category] ?? null;
+// Real bug, confirmed directly: tapping Home's refresh button repeatedly
+// (e.g. after not opening the app for a few days) could cycle through
+// several different daily picks in one sitting, instead of staying fixed
+// for the whole day the way it was designed to. Root cause was a race
+// condition, not a logic error in the "stays fixed for today" check
+// itself - HomeScreen.tsx used to read the stored pick, decide whether
+// to reassign, and separately write a new one as three disconnected
+// steps, each awaited independently. If refresh fired again (or a second
+// category's own check ran) before an in-flight write had settled, two
+// overlapping checks could both see "no valid pick yet" and each pick
+// its own random item, with whichever write landed last silently
+// winning - worse, since every category's pick lives together in one
+// shared AsyncStorage blob (KEYS.dailyPicks), an overlapping write for
+// a DIFFERENT category could also silently clobber this category's
+// pick entirely, not just cause visible flicker.
+//
+// Fixed the same way lib/notifications.ts's cancel+schedule race was
+// fixed: a serialize() lock, so the entire read-decide-write sequence
+// for a category runs as one atomic unit, and any overlapping call
+// waits for what's already in flight rather than racing it. Moved
+// pickRandomUnread() here from HomeScreen.tsx (a pure function with no
+// UI dependency) so the whole sequence can live inside this one locked
+// function - getDailyPick/saveDailyPick as two separate exported steps
+// were exactly what let HomeScreen.tsx's own code split them apart and
+// reintroduce the race; getOrAssignDailyPick() below is the only way to
+// touch a daily pick now, and it's structurally atomic, not just
+// convention.
+let dailyPickLock: Promise<void> = Promise.resolve();
+
+function serializeDailyPick<T>(fn: () => Promise<T>): Promise<T> {
+  const run = dailyPickLock.then(fn);
+  dailyPickLock = run.then(
+    () => {},
+    () => {},
+  );
+  return run;
 }
 
-export async function saveDailyPick(category: string, itemId: string): Promise<void> {
-  const picks = await getDailyPicks();
-  picks[category] = { date: toLocalDateString(new Date()), itemId };
-  await AsyncStorage.setItem(KEYS.dailyPicks, JSON.stringify(picks));
+function pickRandomUnread<T extends { id: string }>(items: T[], isDone: (item: T) => boolean): T | null {
+  const unread = items.filter((i) => !isDone(i));
+  if (unread.length === 0) return null;
+  return unread[Math.floor(Math.random() * unread.length)];
+}
+
+/** The one entry point for a category's "try this today" suggestion -
+ * stays fixed for the whole calendar day (even across manual refreshes
+ * or app reopens) unless the day changes or the previous pick got
+ * marked done/deleted since it was chosen, in which case a new one is
+ * assigned. The entire check-and-possibly-assign sequence is atomic via
+ * serializeDailyPick() above - see that comment for why this replaced
+ * the previous getDailyPick/saveDailyPick split. */
+export async function getOrAssignDailyPick<T extends { id: string }>(
+  category: string,
+  items: T[],
+  isDone: (item: T) => boolean,
+  today: string,
+): Promise<T | null> {
+  return serializeDailyPick(async () => {
+    const picks = await getDailyPicks();
+    const stored = picks[category];
+    if (stored && stored.date === today) {
+      const stillValid = items.find((i) => i.id === stored.itemId && !isDone(i));
+      if (stillValid) return stillValid;
+    }
+    const pick = pickRandomUnread(items, isDone);
+    if (pick) {
+      picks[category] = { date: today, itemId: pick.id };
+      await AsyncStorage.setItem(KEYS.dailyPicks, JSON.stringify(picks));
+    }
+    return pick;
+  });
 }
 
 // --- Data (Settings > Data) ---
