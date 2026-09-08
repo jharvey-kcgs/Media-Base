@@ -66,14 +66,13 @@ module.exports = {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
-      // Explicit rather than relying solely on eas.json's autoIncrement,
-      // matching Home Base's own pattern - App Store Connect tracks
-      // build numbers independently per bundle ID, so UAT and Store
-      // never actually conflict with each other. Both start at '1'
-      // here, unlike Home Base's Store variant (which needed '2' from
-      // an earlier failed submission attempt) - Media Base's Store app
-      // hasn't been registered or submitted yet at all.
-      buildNumber: '1',
+      // Explicit rather than relying solely on eas.json's autoIncrement -
+      // App Store Connect tracks build numbers independently per bundle
+      // ID (UAT and Store never actually conflict with each other), but
+      // this Store app's own history already has a build 1 in it from
+      // an earlier attempt, so this submission needs to start higher -
+      // same situation Home Base's own Store variant hit.
+      buildNumber: IS_STORE ? '2' : '1',
       bundleIdentifier: IS_STORE ? 'com.JHarvey.MediaBaseStore' : 'com.JHarvey.MediaBase',
     },
     android: {
