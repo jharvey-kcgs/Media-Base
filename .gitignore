@@ -12,3 +12,5 @@ npm-debug.*
 # why this changed from a git-ignored lib/config.ts to this.
 .env
 .env.local
+Media-Base-Store-Info.md
+Media-Base-Roadmap.md

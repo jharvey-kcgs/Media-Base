@@ -17,12 +17,9 @@
 //
 // APP_VARIANT=production (only ever set by `eas build --profile store`):
 // Store.
-//   name: "Media Base" - a placeholder, not a verified-available public
-//     name the way Home Base's "Home Base: Plans & Habits" was (that
-//     name came from a real check against existing App Store apps,
-//     since plain "Home Base" and "My Home Base" were both already
-//     taken - this hasn't gone through that same check yet, so confirm
-//     "Media Base" is actually available before a real submission).
+//   name: "Media Base: Collection Tracker" (the real public App Store
+//     name - plain "Media Base" turned out to be taken, same situation
+//     Home Base hit with its own name)
 //   bundleIdentifier / package: com.JHarvey.MediaBaseStore (new —
 //     register fresh, only ever used for real App Store submissions)
 //
@@ -34,7 +31,7 @@ const IS_STORE = process.env.APP_VARIANT === 'production';
 
 module.exports = {
   expo: {
-    name: IS_STORE ? 'Media Base' : 'Media Base (UAT)',
+    name: IS_STORE ? 'Media Base: Collection Tracker' : 'Media Base (UAT)',
     slug: 'media-base',
     // Declares which Expo account this project belongs to explicitly,
     // rather than relying on EAS to resolve that unambiguously on its
@@ -69,6 +66,14 @@ module.exports = {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
+      // Explicit rather than relying solely on eas.json's autoIncrement,
+      // matching Home Base's own pattern - App Store Connect tracks
+      // build numbers independently per bundle ID, so UAT and Store
+      // never actually conflict with each other. Both start at '1'
+      // here, unlike Home Base's Store variant (which needed '2' from
+      // an earlier failed submission attempt) - Media Base's Store app
+      // hasn't been registered or submitted yet at all.
+      buildNumber: '1',
       bundleIdentifier: IS_STORE ? 'com.JHarvey.MediaBaseStore' : 'com.JHarvey.MediaBase',
     },
     android: {
