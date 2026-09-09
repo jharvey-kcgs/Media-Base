@@ -117,6 +117,7 @@ module.exports = {
         },
       ],
       'expo-font',
+      'expo-sharing',
       [
         'expo-splash-screen',
         {
