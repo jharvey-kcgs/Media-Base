@@ -138,12 +138,12 @@ export default function HomeScreen({ navigation }: any) {
       <ScreenHeader
         title="Media Base"
         left={
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Settings">
             <Ionicons name="settings-outline" size={24} color={theme.colors.accentReadable} />
           </TouchableOpacity>
         }
         right={
-          <TouchableOpacity onPress={load} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity onPress={load} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Refresh">
             <Ionicons name="play" size={24} color={theme.colors.accentReadable} />
           </TouchableOpacity>
         }

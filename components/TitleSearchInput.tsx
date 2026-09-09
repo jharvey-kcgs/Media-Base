@@ -18,6 +18,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import AppText, { FONT_FAMILY } from './AppText';
 import { useTheme } from '../lib/theme';
+import { NetworkUnavailableError } from '../lib/networkError';
 
 const DEFAULT_DEBOUNCE_MS = 400;
 const MIN_QUERY_LENGTH = 2;
@@ -54,6 +55,7 @@ export default function TitleSearchInput<T>({
   const { theme } = useTheme();
   const [results, setResults] = useState<T[]>([]);
   const [searching, setSearching] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards against a slow earlier search overwriting a faster later one -
@@ -75,20 +77,30 @@ export default function TitleSearchInput<T>({
     if (trimmed.length < MIN_QUERY_LENGTH) {
       setResults([]);
       setSearching(false);
+      setNetworkError(false);
       return;
     }
 
     debounceRef.current = setTimeout(async () => {
       latestQueryRef.current = trimmed;
       setSearching(true);
+      setNetworkError(false);
       try {
         const found = await search(trimmed);
         if (latestQueryRef.current === trimmed) {
           setResults(found);
         }
       } catch (err) {
-        console.warn('Media Base: title search failed', err);
-        if (latestQueryRef.current === trimmed) setResults([]);
+        if (err instanceof NetworkUnavailableError) {
+          console.warn('Media Base: title search - network unavailable', err);
+          if (latestQueryRef.current === trimmed) {
+            setResults([]);
+            setNetworkError(true);
+          }
+        } else {
+          console.warn('Media Base: title search failed', err);
+          if (latestQueryRef.current === trimmed) setResults([]);
+        }
       } finally {
         if (latestQueryRef.current === trimmed) setSearching(false);
       }
@@ -126,7 +138,12 @@ export default function TitleSearchInput<T>({
               Searching...
             </AppText>
           )}
-          {!searching && results.length === 0 && (
+          {!searching && networkError && (
+            <AppText style={{ color: theme.colors.textMuted, fontSize: 13 * theme.fontScale, padding: 12 }}>
+              Couldn't reach the network - check your connection and try again.
+            </AppText>
+          )}
+          {!searching && !networkError && results.length === 0 && (
             <AppText style={{ color: theme.colors.textMuted, fontSize: 13 * theme.fontScale, padding: 12 }}>
               No matches for that title yet
             </AppText>

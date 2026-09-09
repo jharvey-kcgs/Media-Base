@@ -66,6 +66,7 @@
 // first, falling back to the broad search only when that finds nothing.
 
 import { BGG_APPLICATION_TOKEN } from './config';
+import { isNetworkError, NetworkUnavailableError } from './networkError';
 
 const USER_AGENT = 'MediaBase/1.0 +https://github.com/jharvey-kcgs/Media-Base';
 
@@ -220,6 +221,7 @@ export async function searchBggByTitle(query: string): Promise<BggSearchResult[]
     return broadResults.slice(0, 8);
   } catch (err) {
     console.warn('Media Base: BGG search threw', err);
+    if (isNetworkError(err)) throw new NetworkUnavailableError();
     return [];
   }
 }

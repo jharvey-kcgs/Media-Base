@@ -33,6 +33,7 @@
 // NOTE: not network-tested from the sandbox this was written in.
 
 import { DISCOGS_USER_TOKEN } from './config';
+import { isNetworkError, NetworkUnavailableError } from './networkError';
 
 const USER_AGENT = 'MediaBase/1.0 +https://github.com/jharvey-kcgs/Media-Base';
 
@@ -146,6 +147,7 @@ async function discogsSearch(params: Record<string, string>): Promise<DiscogsSea
     return mapped;
   } catch (err) {
     console.warn('Media Base: Discogs search threw', safeUrlForLogging, err);
+    if (isNetworkError(err)) throw new NetworkUnavailableError();
     return [];
   }
 }

@@ -16,6 +16,8 @@
 // whether it's an API error/block versus neither database actually having
 // that specific edition indexed.
 
+import { isNetworkError, NetworkUnavailableError } from './networkError';
+
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
 export interface LookupResult {
@@ -142,18 +144,28 @@ function detectsComicSignal(categories: string[] | undefined): boolean {
  * nothing at all - callers decide what message to show for that case vs.
  * "found it, but no usable fields" (both are real, distinct situations). */
 export async function runIsbnLookup(digits: string, genreAllowlist: string[]): Promise<IsbnLookupResult | null> {
+  let sawNetworkError = false;
   const [olInfo, gInfo] = await Promise.all([
     lookupOpenLibrary(digits).catch((err) => {
       console.warn('Media Base: Open Library lookup threw', err);
+      if (isNetworkError(err)) sawNetworkError = true;
       return null;
     }),
     lookupGoogleBooks(digits).catch((err) => {
       console.warn('Media Base: Google Books lookup threw', err);
+      if (isNetworkError(err)) sawNetworkError = true;
       return null;
     }),
   ]);
 
-  if (!olInfo && !gInfo) return null;
+  // Both sources came back empty specifically because neither could be
+  // reached at all, not because this barcode genuinely has no match -
+  // worth telling the person that distinction rather than "couldn't
+  // find that barcode" for what's actually a connectivity problem.
+  if (!olInfo && !gInfo) {
+    if (sawNetworkError) throw new NetworkUnavailableError();
+    return null;
+  }
 
   const title = olInfo?.title || gInfo?.title;
   const author = (olInfo?.authors && olInfo.authors[0]) || (gInfo?.authors && gInfo.authors[0]);

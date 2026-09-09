@@ -39,6 +39,7 @@ import { tmdbSearchTVShows, TVShowLookupResult } from './tvLookup';
 import { searchJikanAnime } from './jikanLookup';
 import { searchDiscogsByTitle, DiscogsSearchResult } from './discogsLookup';
 import { searchBggByTitle, BggSearchResult } from './bggLookup';
+import { isNetworkError, NetworkUnavailableError } from './networkError';
 
 const OPEN_LIBRARY_USER_AGENT = 'MediaBase/1.0 (contact: JHarvey.appdeveloper@gmail.com)';
 
@@ -149,16 +150,25 @@ export async function searchBooksByTitle(
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
+  let sawNetworkError = false;
   const googleResults = await searchGoogleBooksByTitle(trimmed, genreAllowlist, maxResults).catch((err) => {
     console.warn('Media Base: Google Books title search threw', err);
+    if (isNetworkError(err)) sawNetworkError = true;
     return [];
   });
   if (googleResults.length > 0) return googleResults;
 
-  return searchOpenLibraryByTitle(trimmed, genreAllowlist, maxResults).catch((err) => {
+  const openLibraryResults = await searchOpenLibraryByTitle(trimmed, genreAllowlist, maxResults).catch((err) => {
     console.warn('Media Base: Open Library title search threw', err);
+    if (isNetworkError(err)) sawNetworkError = true;
     return [];
   });
+  // Both sources came back empty specifically because neither could be
+  // reached at all, not because the title genuinely has no matches -
+  // worth telling the person that distinction rather than showing "no
+  // matches" for what's actually a connectivity problem.
+  if (openLibraryResults.length === 0 && sawNetworkError) throw new NetworkUnavailableError();
+  return openLibraryResults;
 }
 
 /** Searches TMDb by movie title - thin wrapper around
@@ -208,8 +218,10 @@ export async function searchAnimeByTitle(query: string, maxResults = 8): Promise
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
+  let sawNetworkError = false;
   const tmdbResults = await tmdbSearchTVShows(trimmed, maxResults).catch((err) => {
     console.warn('Media Base: TMDb anime search threw', err);
+    if (isNetworkError(err)) sawNetworkError = true;
     return [];
   });
   if (tmdbResults.length > 0) {
@@ -225,8 +237,10 @@ export async function searchAnimeByTitle(query: string, maxResults = 8): Promise
 
   const jikanResults = await searchJikanAnime(trimmed, maxResults).catch((err) => {
     console.warn('Media Base: Jikan anime search threw', err);
+    if (isNetworkError(err)) sawNetworkError = true;
     return [];
   });
+  if (jikanResults.length === 0 && sawNetworkError) throw new NetworkUnavailableError();
   return jikanResults.map((r) => ({
     key: r.key,
     title: r.title,

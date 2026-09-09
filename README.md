@@ -2376,14 +2376,14 @@ code was simply wrong.
   fix - and now genuinely confirmed working across installs, not just
   within one.
 - **Permissions**: camera status + Phone Settings link implemented.
-  Real barcode scanning is wired up for Books/Comics/Manga only (EAN-13,
-  Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) - see
-  the Category screen pattern section above. Movies originally had its
-  own UPC/barcode scanning too, removed after real testing confirmed it
-  was unreliable; TV Shows never had it at all (confirmed design from
-  the start). Both are title-search only now. Vinyl/CD and Tabletop
-  Games still need their own barcode-type/lookup wiring since their
-  data sources differ again.
+  Real barcode scanning is wired up for Books/Comics/Manga (EAN-13,
+  Bookland-prefix ISBN barcodes, shared via `lib/isbnLookup.ts`) and
+  Vinyl/CD (via Discogs' own direct barcode search) - see the Category
+  screen pattern section above. Movies originally had its own UPC/
+  barcode scanning too, removed after real testing confirmed it was
+  unreliable; TV Shows never had it at all (confirmed design from the
+  start); Tabletop Games deliberately has no scan option either - BGG's
+  API has no barcode field at all. All three are title-search only now.
 - **Notifications**: daily 10am reminder confirmed working on-device,
   including the badge (fixed - the scheduled notification wasn't
   setting one at all).
@@ -2393,15 +2393,21 @@ code was simply wrong.
   Movies: `watched`), so this takes an `isDone` accessor function rather
   than assuming a field name, unlike the first version of this
   generalization.
-- **TypeScript**: can't be run directly from this sandbox (no network
-  access to install dependencies), but real errors have been caught via
-  VS Code's own checking and fixed as they came up - an `Alert.alert`
-  button-array typing issue, and a `SectionList` generic-parameter issue
-  affecting both `BookScreen`/`ComicScreen`. Worth an occasional
-  `npx tsc --noEmit` locally to catch anything that slips through
-  between VS Code sessions.
-- **Apple Developer Program enrollment**: in progress, tracked
-  separately.
+- **TypeScript**: confirmed clean via a real, full `npx tsc --noEmit`
+  run - zero errors across the entire project. This is the first time
+  this could actually be verified directly rather than relying only on
+  VS Code's own per-file checking, which had previously caught and
+  fixed real issues (an `Alert.alert` button-array typing issue, and a
+  `SectionList` generic-parameter issue affecting both `BookScreen`/
+  `ComicScreen`) without ever confirming the whole project compiled
+  clean end-to-end. Worth rerunning after any future dependency or SDK
+  change, since this is now confirmed possible to do directly - no
+  ESLint config exists for this project, which is fine for its current
+  scope, but worth knowing if code style consistency ever becomes a
+  concern.
+- **Apple Developer Program enrollment**: complete - bundle
+  identifiers, EAS project, and both the UAT and Store App Store
+  Connect apps are all registered and confirmed working.
 
 ---
 

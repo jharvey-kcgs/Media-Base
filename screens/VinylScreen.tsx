@@ -65,6 +65,7 @@ import {
 } from '../lib/coverStorage';
 import { looksLikeIsbn } from '../lib/movieLookup';
 import { searchDiscogsByBarcode, DiscogsSearchResult } from '../lib/discogsLookup';
+import { NetworkUnavailableError } from '../lib/networkError';
 import { searchVinylCDByTitle } from '../lib/titleSearch';
 import TitleSearchInput from '../components/TitleSearchInput';
 import { useAlphabetScroll } from '../lib/useAlphabetScroll';
@@ -538,8 +539,13 @@ export default function VinylScreen({ navigation }: any) {
       }
       applyDiscogsResult(results[0]);
     } catch (err) {
-      console.warn('Media Base: barcode lookup threw', err);
-      Alert.alert('Something went wrong', 'Please try again, or fill in the fields by hand.');
+      if (err instanceof NetworkUnavailableError) {
+        console.warn('Media Base: barcode lookup - network unavailable', err);
+        Alert.alert('Lookup failed', 'Could not reach Discogs - check your connection, or fill in the fields by hand.');
+      } else {
+        console.warn('Media Base: barcode lookup threw', err);
+        Alert.alert('Something went wrong', 'Please try again, or fill in the fields by hand.');
+      }
     } finally {
       setLookingUp(false);
     }
@@ -705,7 +711,7 @@ export default function VinylScreen({ navigation }: any) {
               </AppText>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="More options">
               <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.accentReadable} />
             </TouchableOpacity>
           )

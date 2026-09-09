@@ -551,7 +551,7 @@ export default function TVScreen({ navigation }: any) {
               </AppText>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <TouchableOpacity onPress={openMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="More options">
               <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.accentReadable} />
             </TouchableOpacity>
           )
