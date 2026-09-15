@@ -7,3 +7,4 @@ npm-debug.*
 .env.local
 *-Store-Info.md
 *-Roadmap.md
+*-Play-Info.md
