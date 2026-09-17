@@ -1,7 +1,7 @@
 // screens/PermissionsSettingsScreen.tsx
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert, AppState } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Switch, Linking, Alert, AppState, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCameraPermissions } from 'expo-camera';
@@ -189,9 +189,17 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         );
         return;
       }
-      await scheduleDailyRecommendationNotification();
+      await scheduleDailyRecommendationNotification().catch((err: any) => {
+        console.warn('Media Base: scheduleDailyRecommendationNotification threw', err);
+        Alert.alert('Something went wrong', "Couldn't turn on the daily reminder - please try again.");
+        throw err;
+      });
     } else {
-      await cancelDailyRecommendationNotification();
+      await cancelDailyRecommendationNotification().catch((err: any) => {
+        console.warn('Media Base: cancelDailyRecommendationNotification threw', err);
+        Alert.alert('Something went wrong', "Couldn't turn off the daily reminder - please try again.");
+        throw err;
+      });
     }
     const current = await getSettings();
     await saveSettings({ ...current, notificationsEnabled: wantsOn });
@@ -202,7 +210,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader title="Permissions" onBack={() => navigation.goBack()} backLabel="Settings" />
 
-      <View style={styles.content}>
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
         <View style={[styles.row, { borderColor: theme.colors.border }]}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Camera access</AppText>
@@ -252,7 +260,7 @@ export default function PermissionsSettingsScreen({ navigation }: any) {
         >
           <AppText style={{ color: theme.colors.text, fontSize: 16 * theme.fontScale }}>Open Phone Settings</AppText>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

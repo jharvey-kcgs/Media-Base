@@ -5,15 +5,43 @@
 // named), since Home's "Try today" picks are already category-specific
 // and this is just a nudge to go look, not a preview of what's there.
 //
-// Not device-tested from the sandbox this was written in - expo-notifications'
-// exact trigger-object shape has changed across SDK versions, so if this
-// doesn't fire as expected, that API surface (SchedulableTriggerInputTypes,
-// the shape of the trigger object) is the first thing worth double-checking
-// against whatever version actually installed.
+// UPDATE: now confirmed real-device tested on Android, via a real
+// tester report - found and fixed a genuine bug, not a hypothetical
+// one: the Daily reminder toggle in PermissionsSettingsScreen.tsx
+// "blipped as if clicked but would not toggle on", with notifications
+// already enabled at the OS level and real data present to recommend.
+// Root cause: this project had zero Android notification channel setup
+// anywhere - confirmed via research this is the single most common
+// cause of Android notification failures with expo-notifications.
+// ensureAndroidChannel() below is the fix. The trigger-object shape
+// itself (SchedulableTriggerInputTypes) is already confirmed working
+// correctly on a real device - not something still uncertain.
 
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 const DAILY_NOTIFICATION_ID = 'media-base-daily-recommendation';
+const ANDROID_CHANNEL_ID = 'media-base-daily-reminder';
+
+// Android-only, no-op on iOS (expo-notifications' own channel functions
+// resolve to null on platforms that don't support channels, rather than
+// throwing) - confirmed via research this project never had, and that
+// this is the single most common cause of Android notification issues
+// with expo-notifications: "Android 8.0+ silently drops notifications
+// without a channel - no error, no log, nothing." A real, reported
+// symptom matches exactly what a missing channel would cause: the
+// Daily reminder toggle in PermissionsSettingsScreen.tsx "blipped as if
+// clicked but would not toggle on" - cheap and idempotent to call
+// before every schedule attempt, so it's called here rather than once
+// somewhere else that could be missed.
+async function ensureAndroidChannel(): Promise<void> {
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: 'Daily reminder',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  }).catch((err) => {
+    console.warn('Media Base: setNotificationChannelAsync threw (expected no-op on iOS, worth checking on Android)', err);
+  });
+}
 
 // This module has two separate call sites - App.tsx re-runs the schedule
 // call on every launch (to keep the notification's content in sync with
@@ -50,6 +78,7 @@ function serialize(fn: () => Promise<void>): Promise<void> {
 
 export function scheduleDailyRecommendationNotification(): Promise<void> {
   return serialize(async () => {
+    await ensureAndroidChannel();
     // Cancel EVERYTHING scheduled first, not just our own identifier -
     // this app only ever schedules this one notification type, so
     // clearing everything is completely safe and far more thorough than
@@ -66,6 +95,12 @@ export function scheduleDailyRecommendationNotification(): Promise<void> {
         // notifications on iOS can't reliably accumulate a real count
         // across multiple pending notifications anyway.
         badge: 1,
+        // Android-only field, ignored on iOS - confirmed necessary, not
+        // just belt-and-suspenders: a notification with no explicit
+        // channelId can fall into a default "Miscellaneous" category on
+        // Android that ignores whatever channel was actually created via
+        // setNotificationChannelAsync.
+        ...(Platform.OS === 'android' ? { channelId: ANDROID_CHANNEL_ID } : {}),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.CALENDAR,

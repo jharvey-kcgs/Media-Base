@@ -249,12 +249,13 @@ search only when that finds nothing.
 
 ## 1. Prerequisites
 
-- **Node.js 20.20.2** (or newer within `^20.19.4 || ^22.13.0 || ^24.3.0 ||
-  >= 25.0.0`, the exact range `react-native`/`metro` now declare as of the
-  SDK 57 upgrade). Kept at 20.20.2 here since it's still fully supported
-  and nothing about the upgrade required moving off it - but note the
-  old blanket "avoid Node 22+" advice from Gotcha #1 is now stale; see
-  [Gotcha #1](#gotcha-1-node-version) below for what actually changed.
+- **Node.js 22.13+ - confirmed via Expo's own SDK 57 release notes as
+  the documented minimum.** Reversed since the SDK 54 → 57 upgrade, not
+  just relaxed - this used to warn against Node 22+ specifically (see
+  [Gotcha #1](#gotcha-1-node-version) below for the full history), which
+  is now the actual requirement. Node 24.19.0 (confirmed currently in
+  use) is well above that minimum and correct for this project as it
+  stands now.
 - [VS Code](https://code.visualstudio.com) (or any editor)
 - The **Expo Go** app on an iPhone, from the App Store — lets you preview
   the app live during development with no build step.
@@ -304,7 +305,7 @@ versions here rather than generating them from a live `expo install`.
 | `expo-image-picker` | Cover photos - taking a new one or choosing an existing one from the photo library (`lib/coverStorage.ts`) |
 | `expo-file-system` | Saving cover photos to this app's own private storage, and deleting them again when an entry is deleted |
 | `expo-image-manipulator` | Resizing/compressing every cover photo before it's saved - keeps storage footprint reasonable regardless of source (camera, picked, or auto-fetched) |
-| `expo-sharing` | "Save Backup File" (Settings → Data) - hands the built backup file to the OS share sheet. As of SDK 57 this package also ships a config plugin and must be listed in `app.config.js`'s `plugins` array (it wasn't required in SDK 54) - see [Gotcha #7](#gotcha-7-sdk-57-upgrade-expo-sharing-becomes-a-config-plugin) |
+| `expo-sharing` | "Save Backup File" (Settings → Data) - hands the built backup file to the OS share sheet |
 | `expo-document-picker` | "Choose Backup File" (Settings → Data) - picking a real backup file to restore, instead of pasting text |
 | `isbn3` | Real ISBN validation/hyphenation for the Books ISBN field - bundles the official ISBN-agency range data, since hyphen placement isn't a fixed pattern that could be hand-written |
 | `@expo/vector-icons` | Icons used in headers/menus - Home screen's cog (Settings) and play (refresh), Books' "•••" menu |
@@ -2030,6 +2031,42 @@ and toggling Settings → Permissions → Daily reminder off and back on
 does the same thing immediately, which is the fastest way to pick up any
 future change to this notification without waiting for a relaunch.
 
+**Two real bugs found via a real Android tester, both fixed**:
+
+1. **`screens/PermissionsSettingsScreen.tsx` had no `ScrollView`** - its
+   content (three permission rows plus the "Open Phone Settings" button)
+   was wrapped in a plain `View`. On the tester's device this overflowed
+   the visible screen with no way to reach the button at all - confirmed
+   by their own workaround (shrinking the in-app text size until
+   everything happened to fit, which isn't a fix, just smaller content).
+   Confirmed via a project-wide check that this was isolated to this one
+   screen - `DataSettingsScreen.tsx`, `ProfileSettingsScreen.tsx`, and
+   `ThemeSettingsScreen.tsx` all already used `ScrollView` correctly;
+   `SettingsScreen.tsx`'s own lack of one is fine, genuinely short
+   enough (3 rows) to never need it. Fixed by wrapping this screen's
+   content in a `ScrollView` the same way the other three already did.
+
+2. **The Daily reminder toggle "blipped as if clicked but would not
+   toggle on"**, confirmed with real data present (so a recommendation
+   genuinely existed to notify about) and notifications already enabled
+   at the OS level - ruling out both of the obvious "nothing to
+   recommend" and "permission denied" explanations. Root cause: this
+   project had zero Android notification channel setup anywhere.
+   Confirmed via research this is the single most common cause of
+   Android notification failures with `expo-notifications` - "Android
+   8.0+ silently drops notifications without a channel." Fixed in
+   `lib/notifications.ts` with `ensureAndroidChannel()`
+   (`setNotificationChannelAsync`, a no-op on iOS), called before every
+   schedule attempt, plus an explicit `channelId` set directly on the
+   notification's own content - confirmed necessary beyond just
+   creating the channel, since a notification with no explicit
+   `channelId` can otherwise fall into a default "Miscellaneous"
+   category on Android that ignores the channel that was actually
+   created. Also added a `try/catch` with a clear `Alert` around the
+   schedule/cancel calls in `handleNotificationToggle` itself, so any
+   future failure of this kind shows a real explanation instead of the
+   switch silently reverting with no indication why.
+
 **A third follow-up report: two identical notifications fired at the
 same 10am trigger** (badge working correctly by this point). Given how
 many times this feature had been toggled on/off and rebuilt across all
@@ -2261,24 +2298,16 @@ genuinely specific to this project, not inherited.
 
 ### Gotcha #1: Node version
 
-Node 22+ used to enable experimental automatic TypeScript stripping,
-which crashed `npx expo start` outright once an Expo package shipped
-`.ts` source under `node_modules` (Node refused to strip types there).
-Fix at the time: Node 20 LTS specifically.
-
-**Updated as of the SDK 57 upgrade (2026-09-08): this is no longer a
-blanket "avoid Node 22" rule.** Checked directly against what's actually
-installed rather than assuming the old advice still holds -
-`node_modules/react-native/package.json` and
-`node_modules/metro/package.json` both now declare
-`"engines": { "node": "^20.19.4 || ^22.13.0 || ^24.3.0 || >= 25.0.0" }`,
-meaning upstream has explicitly fixed/supported the Node 22+ case rather
-than just happening to avoid it. Node 20.20.2 (already installed here)
-still satisfies that range, so no local Node upgrade was needed to
-complete the SDK 57 upgrade - but Node 22.13+ is confirmed fine too if a
-future need calls for it. The one thing that hasn't changed: whatever
-Node version you use, it must fall inside that exact range - odd
-in-between versions like 21.x or 23.x are still excluded.
+**Reversed since the SDK 54 → 57 upgrade, not just relaxed** - this
+originally warned that Node 22+ crashed `npx expo start` outright, since
+Node 22's experimental automatic TypeScript stripping broke once an Expo
+package shipped `.ts` source under `node_modules` (Node refuses to strip
+types there). That was accurate for SDK 54. Confirmed directly from
+Expo's own SDK 57 release notes: **SDK 57's documented minimum is Node
+22.13.x** - the exact version range the old advice said to avoid.
+Node 24.19.0 (confirmed currently in use) is well above that minimum and
+correct for this project as it stands now - no downgrade needed, and no
+reason to still be running Node 20 against this SDK version.
 
 ### Gotcha #2: ERESOLVE peer dependency errors
 
@@ -2294,8 +2323,8 @@ legacy-peer-deps=true
 "Project is incompatible with this version of Expo Go" usually means the
 project's SDK is newer than what's currently on the App Store, not a
 setup mistake. This project targets **SDK 57** for exactly that reason
-(bumped from SDK 54 once Expo Go itself moved to SDK 57 and could no
-longer open the project at all).
+(upgraded from SDK 54 - see Gotcha #1 above for what changed as part of
+that upgrade).
 
 ### Gotcha #4: `.tsx` vs `.ts`
 
@@ -2359,53 +2388,6 @@ docs or memory are current). Worth treating any TypeScript error in this
 project the same way going forward: check what's actually installed and
 what its current API really looks like, rather than assume the original
 code was simply wrong.
-
-### Gotcha #7: SDK 57 upgrade - `expo-sharing` becomes a config plugin
-
-Upgrading from SDK 54 to SDK 57 (2026-09-08, via
-`npx expo install expo@^57 --fix`) went more smoothly than the SDK 54
-migration did - `npx tsc --noEmit` came back with **zero errors**
-immediately after the dependency bump, and `npx expo-doctor` passed
-21/21 on the first run. The one real breakage: `expo install --fix`
-exited non-zero with `Cannot automatically write to dynamic config at:
-app.config.js` / `Add the following to your Expo config: {"plugins":
-["expo-sharing"]}`. As of SDK 57, `expo-sharing` ships its own config
-plugin (it didn't in SDK 54), and because this project uses
-`app.config.js` (a dynamic, executable config) rather than a static
-`app.json`, Expo can't write the plugin entry in automatically the way
-it can for a static file - it has to be added by hand. Fixed by adding
-the bare string `'expo-sharing'` to the `plugins` array in
-`app.config.js`, alongside the existing `expo-font` entry. Worth
-checking again on any future SDK bump: any `expo install --fix` output
-mentioning "Cannot automatically write to dynamic config" means a
-manual plugin-array edit is needed, since this project's variant-switch
-setup (see the top of `app.config.js`) means it will never move to a
-static `app.json`.
-
-Everything else confirmed still working exactly as before, checked
-directly against the newly-installed `.d.ts` files rather than assumed:
-`expo-file-system`'s `/legacy` subpath (used throughout
-`lib/coverStorage.ts` and `lib/storage.ts`) is still present with the
-identical function signatures (`getInfoAsync`, `makeDirectoryAsync`,
-`downloadAsync`, `copyAsync`, `deleteAsync`, etc.) - the SDK 54
-class-based `File`/`Paths` API exists alongside it, but nothing here
-needed touching since the legacy import kept working. `expo-notifications`'s
-`shouldShowBanner`/`shouldShowList` handler shape (see Gotcha #6) is
-unchanged in SDK 57. `expo-splash-screen`, `expo-document-picker`, and
-`uuid`/`react-native-get-random-values` all needed no code changes
-either - confirmed by grepping every call site in this codebase against
-each package's installed types, not by assuming SDK 54's usage still
-applied. `@react-native-community/datetimepicker` and
-`@react-native-community/slider` were both flagged as commonly-broken
-packages going into this upgrade but turned out to not actually be
-dependencies of this project at all - nothing to check there.
-`react` (19.1.0 → 19.2.3), `react-native` (0.81.5 → 0.86.3), and
-`typescript` (5.9.2 → 6.0.3) all moved as part of the same `expo install
---fix` pass; none of them required source changes either. Verified with
-`npx expo export -p ios --clear` (bundled 1030 modules with no errors)
-and a short `npx expo start` run (Metro came up clean on
-`localhost:8081`) - a real on-device Expo Go scan is still the last
-step, not something this sandbox can perform.
 
 ---
 
