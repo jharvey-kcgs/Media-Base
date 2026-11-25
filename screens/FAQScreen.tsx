@@ -1,7 +1,7 @@
 // screens/FAQScreen.tsx
 
-import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
@@ -60,29 +60,46 @@ const FAQS: { q: string; a: string }[] = [
 
 export default function FAQScreen({ navigation }: any) {
   const { theme } = useTheme();
+  // Only one answer is open at a time; tapping the open one closes it.
+  const [open, setOpen] = useState<number | null>(null);
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
       <ScreenHeader title="FAQ" onBack={() => navigation.goBack()} backLabel="Settings" />
 
       <ScrollView contentContainerStyle={styles.content}>
-        {FAQS.map((item, i) => (
-          <View
-            key={item.q}
-            style={[
-              styles.card,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-              i === FAQS.length - 1 && { marginBottom: 0 },
-            ]}
-          >
-            <AppText variant="header" style={{ color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale, marginBottom: 6 }}>
-              {item.q}
-            </AppText>
-            <AppText style={{ color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale, lineHeight: 20 }}>
-              {item.a}
-            </AppText>
-          </View>
-        ))}
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          {FAQS.map((item, i) => {
+            const expanded = open === i;
+            return (
+              <View
+                key={item.q}
+                style={i > 0 && { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth }}
+              >
+                <Pressable
+                  onPress={() => setOpen(expanded ? null : i)}
+                  style={styles.questionRow}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded }}
+                  accessibilityLabel={item.q}
+                  accessibilityHint={expanded ? 'Collapses the answer' : 'Expands the answer'}
+                >
+                  <AppText variant="header" style={{ flex: 1, paddingRight: 12, color: theme.colors.accentReadable, fontSize: 15 * theme.fontScale }}>
+                    {item.q}
+                  </AppText>
+                  <AppText style={{ color: theme.colors.textMuted, fontSize: 22 * theme.fontScale }}>
+                    {expanded ? '\u2212' : '+'}
+                  </AppText>
+                </Pressable>
+                {expanded ? (
+                  <AppText style={[styles.answer, { color: theme.colors.textSecondary, fontSize: 14 * theme.fontScale }]}>
+                    {item.a}
+                  </AppText>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -94,7 +111,8 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
+    overflow: 'hidden',
   },
+  questionRow: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  answer: { lineHeight: 20, paddingHorizontal: 16, paddingBottom: 16 },
 });

@@ -638,8 +638,15 @@ screens/
                                      commercial key is only required once
                                      an app generates revenue, not merely
                                      for being distributed on the App
-                                     Store.
-  FAQScreen.tsx                    Common questions, split out from About
+                                     Store. Ends with an app-info card:
+                                     Version (from version.json via
+                                     app.config.js), Build (UAT vs
+                                     Release, told apart by the "(UAT)"
+                                     in the app name), and Storage.
+  FAQScreen.tsx                    Common questions, split out from About.
+                                     Collapsible: one card, tap a
+                                     question to expand (+/−), one open
+                                     at a time
 
 lib/
   storage.ts                       Every piece of data logic - one

@@ -3,6 +3,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, Image, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 import AppText from '../components/AppText';
 import ScreenHeader from '../components/ScreenHeader';
 import { useTheme } from '../lib/theme';
@@ -103,6 +104,16 @@ const SECTIONS: {
 
 export default function AboutScreen({ navigation }: any) {
   const { theme } = useTheme();
+  // Version comes from app.config.js (itself read from version.json, bumped
+  // by `npm run bump`). The UAT build's name carries "(UAT)" - the Store
+  // build's doesn't - so that's what tells the two apart at runtime.
+  const version = Constants.expoConfig?.version ?? 'unknown';
+  const isUat = (Constants.expoConfig?.name ?? '').includes('UAT');
+  const infoRows: Array<[string, string]> = [
+    ['Version', version],
+    ['Build', isUat ? 'UAT (testing)' : 'Release'],
+    ['Storage', 'On this device only'],
+  ];
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.colors.background }]} edges={['left', 'right', 'bottom']}>
@@ -115,7 +126,6 @@ export default function AboutScreen({ navigation }: any) {
             style={[
               styles.card,
               { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-              i === SECTIONS.length - 1 && { marginBottom: 0 },
             ]}
           >
             <AppText variant="header" style={{ color: theme.colors.accentReadable, fontSize: 16 * theme.fontScale, marginBottom: 6 }}>
@@ -166,6 +176,21 @@ export default function AboutScreen({ navigation }: any) {
             )}
           </View>
         ))}
+
+        <View style={[styles.infoCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          {infoRows.map(([label, value], i) => (
+            <View
+              key={label}
+              style={[
+                styles.infoRow,
+                i > 0 && { borderTopColor: theme.colors.border, borderTopWidth: StyleSheet.hairlineWidth },
+              ]}
+            >
+              <AppText style={{ color: theme.colors.text, fontSize: 15 * theme.fontScale }}>{label}</AppText>
+              <AppText style={{ color: theme.colors.textMuted, fontSize: 15 * theme.fontScale }}>{value}</AppText>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -182,5 +207,15 @@ const styles = StyleSheet.create({
   },
   bulletRow: {
     marginBottom: 8,
+  },
+  infoCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
   },
 });
