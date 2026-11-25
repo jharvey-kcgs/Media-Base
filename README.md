@@ -331,6 +331,32 @@ up in about a second.
 
 ---
 
+### Versioning and build commands
+
+The user-facing version (the `1.0.3` people see) lives in one place:
+**`version.json`**. `app.config.js` reads it, and
+`scripts/bump-version.js` keeps `package.json`'s `version` matching so
+nothing drifts. EAS's `autoIncrement` only bumps the *build number* - this
+handles the version itself.
+
+| Command | What it does |
+|---|---|
+| `npm run bump` / `npm run bump:patch` | `1.0.0` → `1.0.1` - fixes |
+| `npm run bump:minor` | `1.0.4` → `1.1.0` - new features |
+| `npm run bump:major` | `1.4.2` → `2.0.0` - big releases |
+| `node scripts/bump-version.js 2.0.0` | Set an exact version |
+| `npm run build:uat` | Patch bump, then iOS UAT/TestFlight build (`eas build --platform ios`) |
+| `npm run build:uat:android` | Patch bump, then Android UAT build |
+| `npm run build:store` | Patch bump, then iOS Store build (`--profile store`) |
+| `npm run build:store:android` | Patch bump, then Android Store build |
+
+Every `build:*` command bumps the patch version first, so each build gets
+its own version. For a bigger bump, run `npm run bump:minor` (or `major`)
+**first**, then run the build with `eas build` directly (or accept one extra
+patch on top) - otherwise `build:*` would patch-bump on top of it.
+
+---
+
 ## 4. What's here — project structure
 
 ```

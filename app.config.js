@@ -27,6 +27,11 @@
 // one codebase — one EAS project (one projectId below) can produce builds
 // for either bundle identifier; it's not tied permanently to one.
 
+// version.json is the single source of truth for the user-facing version -
+// bumped by `npm run bump:patch|minor|major` (scripts/bump-version.js), and
+// automatically on every `npm run build:*`.
+const { version: APP_VERSION } = require('./version.json');
+
 const IS_STORE = process.env.APP_VARIANT === 'production';
 
 module.exports = {
@@ -38,7 +43,7 @@ module.exports = {
     // own the way it apparently did for Home Base/League Base without
     // this being set.
     owner: 'jharvey.expo',
-    version: '1.0.0',
+    version: APP_VERSION,
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
