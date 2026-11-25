@@ -249,13 +249,14 @@ search only when that finds nothing.
 
 ## 1. Prerequisites
 
-- **Node.js 22.13+ - confirmed via Expo's own SDK 57 release notes as
-  the documented minimum.** Reversed since the SDK 54 → 57 upgrade, not
-  just relaxed - this used to warn against Node 22+ specifically (see
-  [Gotcha #1](#gotcha-1-node-version) below for the full history), which
-  is now the actual requirement. Node 24.19.0 (confirmed currently in
-  use) is well above that minimum and correct for this project as it
-  stands now.
+- **Node.js 22.13+ (on the 22 line) or 24.3+ (on the 24 line) - confirmed
+  via Expo's own SDK 58 release notes as the documented minimum.**
+  Odd-numbered Node releases (23, 25) aren't supported. Reversed since
+  the SDK 54 era, not just relaxed - this used to warn against Node 22+
+  specifically (see [Gotcha #1](#gotcha-1-node-version) below for the
+  full history), which is now the actual requirement. Node 24.19.0
+  (confirmed currently in use) is above both minimums and correct for
+  this project as it stands now.
 - [VS Code](https://code.visualstudio.com) (or any editor)
 - The **Expo Go** app on an iPhone, from the App Store — lets you preview
   the app live during development with no build step.
@@ -285,7 +286,7 @@ npx expo install --fix
 `package.json` lists every dependency this project currently needs, so a
 plain `npm install` pulls all of them in one shot. Running
 `npx expo install --fix` afterward reconciles exact versions against
-SDK 57 — worth doing every time, since I hand-wrote the dependency
+SDK 58 — worth doing every time, since I hand-wrote the dependency
 versions here rather than generating them from a live `expo install`.
 **If `npm install` throws `ERESOLVE` errors**, see
 [Gotcha #2](#gotcha-2-eresolve-peer-dependency-errors) below.
@@ -2298,14 +2299,16 @@ genuinely specific to this project, not inherited.
 
 ### Gotcha #1: Node version
 
-**Reversed since the SDK 54 → 57 upgrade, not just relaxed** - this
+**Reversed since the SDK 54 → 57 → 58 upgrades, not just relaxed** - this
 originally warned that Node 22+ crashed `npx expo start` outright, since
 Node 22's experimental automatic TypeScript stripping broke once an Expo
 package shipped `.ts` source under `node_modules` (Node refuses to strip
 types there). That was accurate for SDK 54. Confirmed directly from
-Expo's own SDK 57 release notes: **SDK 57's documented minimum is Node
-22.13.x** - the exact version range the old advice said to avoid.
-Node 24.19.0 (confirmed currently in use) is well above that minimum and
+Expo's own release notes: **SDK 57's documented minimum was Node
+22.13.x, and SDK 58's is Node 22.13+ on the 22 line or 24.3+ on the 24
+line** (Node 26+ also supported; odd-numbered releases like 23 and 25
+are not) - the exact version range the old advice said to avoid.
+Node 24.19.0 (confirmed currently in use) is above both minimums and
 correct for this project as it stands now - no downgrade needed, and no
 reason to still be running Node 20 against this SDK version.
 
@@ -2322,9 +2325,40 @@ legacy-peer-deps=true
 
 "Project is incompatible with this version of Expo Go" usually means the
 project's SDK is newer than what's currently on the App Store, not a
-setup mistake. This project targets **SDK 57** for exactly that reason
-(upgraded from SDK 54 - see Gotcha #1 above for what changed as part of
-that upgrade).
+setup mistake. This project targets **SDK 58** for exactly that reason
+(upgraded from SDK 54 → 57 → 58 - see Gotcha #1 above for what changed
+as part of those upgrades). Note the new Expo Go supports **only SDK 58**,
+so an older Expo Go install will refuse this project until it's updated.
+
+#### SDK 57 → 58 upgrade notes
+
+Upgrade command (then verify with the doctor):
+
+```powershell
+npx expo install expo@^58.0.0 --fix
+npx expo-doctor@latest
+```
+
+What in the SDK 58 release notes actually touches this app (managed
+workflow, no committed `ios/` or `android/` folders, so the iOS
+scene-lifecycle prebuild change is handled automatically on the next EAS
+build):
+
+- **`expo-notifications`: foreground notifications now show by default.**
+  The daily 10am reminder (`lib/notifications.ts`) may now visibly appear
+  if it fires while the app is open - worth confirming on a real device.
+- **Android: R8 is on by default in release builds.** Libraries that use
+  reflection can break under it; only a real Android release build
+  (`eas build --platform android`) proves it's fine, not Expo Go.
+- **React Native 0.88: strict TypeScript API is the default.** Rerun
+  `npx tsc --noEmit` after upgrading and fix anything it newly reports.
+- **`expo-file-system`: `File.write()` is now async.** This app uses the
+  `expo-file-system/legacy` API (cover storage and backups), so it isn't
+  affected unless that was migrated since.
+
+Re-test after upgrading: barcode scan, cover photo picker (camera and
+library), Settings → Data backup/restore (including cover photos), and
+the daily reminder toggle on both iOS and Android.
 
 ### Gotcha #4: `.tsx` vs `.ts`
 
